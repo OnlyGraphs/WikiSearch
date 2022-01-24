@@ -65,15 +65,22 @@ pub struct RelationSearchOutput {
     pub relations: Vec<Relation>,
 }
 
+// TODO: Implement the Default trait
 fn default_sortby() -> Option<SortType> {
     Option::from(SortType::Relevance)
 }
+
+// TODO: Implement the Default trait
 fn default_page() -> Option<u32> {
     Option::from(1)
 }
+
+// TODO: Implement the Default trait
 fn default_results_per_page() -> Option<u16> {
     Option::from(20)
 }
+
+// TODO: Implement the Default trait
 fn default_query_relational() -> Option<String> {
     Option::from("".to_string())
 }
