@@ -1,4 +1,4 @@
 #[test]
-fn hello_world(){
-    assert_eq!(2+2,4);
+fn hello_world() {
+    assert_eq!(2 + 2, 4);
 }

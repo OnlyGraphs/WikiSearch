@@ -1,11 +1,10 @@
-use actix_web::{get, web, Responder, Result};
 use super::structs;
+use actix_web::{get, web, Responder, Result};
 
 /// Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
-pub async fn search(_q: web::Query<structs::SearchParameters>) -> Result<impl Responder>{ 
-
-    let mut docs:Vec<structs::Document> = Vec::new();
+pub async fn search(_q: web::Query<structs::SearchParameters>) -> Result<impl Responder> {
+    let mut docs: Vec<structs::Document> = Vec::new();
 
     let document1 = structs::Document{
         title: "April".to_string(),
@@ -27,10 +26,10 @@ pub async fn search(_q: web::Query<structs::SearchParameters>) -> Result<impl Re
 
 /// Endpoint for performing relational searches stretching from a given root
 #[get("/api/v1/relational")]
-pub async fn relational(_q: web::Query<structs::RelationalSearchParameters>) -> Result<impl Responder>{ 
-
-
-    let mut docs:Vec<structs::Document> = Vec::new();
+pub async fn relational(
+    _q: web::Query<structs::RelationalSearchParameters>,
+) -> Result<impl Responder> {
+    let mut docs: Vec<structs::Document> = Vec::new();
 
     let document1 = structs::Document{
         title: "April".to_string(),
@@ -47,26 +46,25 @@ pub async fn relational(_q: web::Query<structs::RelationalSearchParameters>) -> 
     docs.push(document1);
     docs.push(document2);
 
-    let mut relations:Vec<structs::Relation> = Vec::new();
+    let mut relations: Vec<structs::Relation> = Vec::new();
 
-    let relation1 = structs::Relation{
+    let relation1 = structs::Relation {
         source: "April".to_string(),
         destination: "May".to_string(),
     };
 
-    let relation2 = structs::Relation{
+    let relation2 = structs::Relation {
         source: "May".to_string(),
         destination: "April".to_string(),
     };
-    
+
     relations.push(relation1);
     relations.push(relation2);
 
-    let out = structs::RelationSearchOutput{
+    let out = structs::RelationSearchOutput {
         documents: docs,
         relations: relations,
     };
-    
+
     Ok(web::Json(out))
 }
-    
