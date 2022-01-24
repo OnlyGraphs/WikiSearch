@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 
+/// Represents the type of order to be imposed on list of documents
 #[derive(Debug,Deserialize)]
 #[serde(rename_all = "camelCase")] 
 pub enum SortType {
@@ -9,6 +10,7 @@ pub enum SortType {
     LastEdited,
 }
 
+/// Represents the parameters of a given standard search
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")] 
 pub struct SearchParameters {
@@ -26,6 +28,7 @@ pub struct SearchParameters {
 
 }
 
+/// Represents the parameters of a given relational search
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")] 
 pub struct RelationalSearchParameters {
@@ -40,7 +43,7 @@ pub struct RelationalSearchParameters {
     pub max_results: Option<u16>,
 }
 
-
+/// Represents a wikipedia article
 #[derive(Serialize)]
 pub struct Document{
 
@@ -51,7 +54,9 @@ pub struct Document{
     pub article_abstract: String,
 }
 
-
+/// Represents a relation between two articles 
+/// where source is the origin of a link 
+/// and destination is the destination of the link
 #[derive(Serialize)]
 pub struct Relation{
 
@@ -59,6 +64,7 @@ pub struct Relation{
     pub destination: String,
 }
 
+/// Represents a collection of documents and relations 
 #[derive(Serialize)]
 pub struct RelationSearchOutput{
     pub documents: Vec<Document>,

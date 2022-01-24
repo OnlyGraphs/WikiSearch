@@ -1,9 +1,10 @@
 use actix_web::{get, web, Responder, Result};
 use super::structs;
 
+/// Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
 pub async fn search(_q: web::Query<structs::SearchParameters>) -> Result<impl Responder>{ 
-    
+
     let mut docs:Vec<structs::Document> = Vec::new();
 
     let document1 = structs::Document{
@@ -24,6 +25,7 @@ pub async fn search(_q: web::Query<structs::SearchParameters>) -> Result<impl Re
     Ok(web::Json(docs))
 }
 
+/// Endpoint for performing relational searches stretching from a given root
 #[get("/api/v1/relational")]
 pub async fn relational(_q: web::Query<structs::RelationalSearchParameters>) -> Result<impl Responder>{ 
 
