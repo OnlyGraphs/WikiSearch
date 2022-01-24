@@ -1,5 +1,6 @@
 mod api;
 mod tests;
+
 use actix_web::{App, HttpServer};
 use std::env;
 
@@ -7,16 +8,8 @@ use std::env;
 async fn main() -> std::io::Result<()> {
     println!("Lauching Search API");
 
-    let ip: String = match env::var("SEARCH_IP") {
-        Ok(x) => x,
-        Err(_e) => "127.0.0.1".to_owned(),
-    };
-
-    let port = match env::var("SEARCH_PORT") {
-        Ok(x) => x,
-        Err(_e) => "80".to_owned(),
-    };
-
+    let ip: String = env::var("SEARCH_IP").unwrap_or("127.0.0.1".to_string());
+    let port = env::var("SEARCH_PORT").unwrap_or("80".to_string());
     let bind_address = format!("{}:{}", ip, port);
 
     println!("Binding to: {}", bind_address);
