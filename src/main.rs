@@ -1,4 +1,5 @@
 mod api;
+mod tests;
 use actix_web::{HttpServer,App};
 use std::env;
 
