@@ -19,12 +19,12 @@
 - `./target/release/search`
 
 # Running tests
-    - Tests are found in `src/tests`
-    - To run simply use: `cargo test`
+- Tests are found in `src/tests`
+- To run simply use: `cargo test`
 
 # Accessing & building documentation
-    - `cargo doc --open --no-deps`
+- `cargo doc --open --no-deps` (opens in browser)
 
 # Environment Variables
 - `SEARCH_PORT`: sets the port at which search API listens (default 80)
-- `SEARCH_IP`: setst the ip address to which the search API binds (default 127.0.0.1, for docker) 
+- `SEARCH_IP`: setst the ip address to which the search API binds (default 127.0.0.1) 
