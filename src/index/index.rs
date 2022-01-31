@@ -10,15 +10,18 @@ enum IndexEncoding {
 //TODO: 
 //Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
 #[derive(Debug)]
-struct Index{
+struct BasicIndex{
+    title: String,
     postings: HashMap<String,  Vec<(i16,i16)>>,
+    links: Vec<(i16, (i16,i16))>, // List of tuples, where each element is: (Doc id, (Word_pos start, word_pos end))
+    categories: Vec<String>,
+    citation_positions:  Vec<(i16, (i16,i16))>,
     doc_freq: HashMap<String, u16>,
-    
 }
 
 
 
-impl Index{
+impl BasicIndex{
 
         
     fn add_posting(&mut self, token: String, docid: i16, word_pos: i16){
@@ -28,16 +31,18 @@ impl Index{
 
     }
 
-    fn populate_index(&mut self, text: String){
+    fn add_document(&mut self, text: String, doc_id: i16){
         let mut split = text.split(" ");
         let mut word_pos = 0;
-        let mut docid = 1;
         for token in split{
-            self.add_posting(token.to_string(), docid, word_pos );
+            self.add_posting(token.to_string(), doc_id, word_pos );
             *self.doc_freq.entry(token.to_string()).or_insert(0) +=1;
             word_pos+=1;
         }
     }
+
+    
+
 
 }
 
@@ -45,30 +50,18 @@ impl Index{
 
 fn main(){
 
-    let mut index = Index{
+    let mut index = BasicIndex{
+        title:  String::from("Hello World"),
         postings: HashMap::new(),
-        doc_freq: HashMap::new(),
+        links: Vec::<(i16, (i16,i16))>::new(),
+        citation_positions: Vec::<(i16, (i16,i16))>::new(),
+        doc_freq: HashMap:: new(),
+        categories: Vec::new(),
     };
 
 
-    index.populate_index("Hello world It is time to cry world".to_string());
+    index.add_document("Hello world It is time to cry world".to_string(), 1);
     println!("{:?}", index);
 
 }
 
-// fn main(){
-//     let mut map = HashMap::new();
-//     let vec = Vec::<(i16,i16)>::new();
-//     let mut m =  Index{
-//         postings: map,
-//     }; 
-    
-//     m.postings.entry("Hello".to_string()).or_insert(Vec::<(i16,i16)>::new()).push((3,3));
-//     m.postings.get_mut("Hello").unwrap().push((4,5));
-//     m.postings.get_mut("Hello").unwrap().push((4,5));
-
-//     // *my_map.get_mut("a").unwrap() += 10;
-
-//     // *m.postings.entry("Hello".to_string()).or_insert(vec);
-//     println!("{:?}", m);
-// }
