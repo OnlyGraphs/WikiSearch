@@ -1,10 +1,11 @@
 use crate::api::structs::{
     Document, Relation, RelationSearchOutput, RelationalSearchParameters, SearchParameters,
+    UserFeedback,
 };
 use actix_web::{
     get,
     web::{Json, Query},
-    Responder, Result,
+    HttpResponse, Responder, Result,
 };
 
 /// Endpoint for performing general wiki queries
@@ -61,4 +62,9 @@ pub async fn relational(_q: Query<RelationalSearchParameters>) -> Result<impl Re
     };
 
     Ok(Json(out))
+}
+
+#[get("/api/v1/feedback")]
+pub async fn feedback(_q: Query<UserFeedback>) -> Result<impl Responder> {
+    Ok(HttpResponse::Ok().finish())
 }

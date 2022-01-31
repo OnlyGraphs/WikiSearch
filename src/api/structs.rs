@@ -39,6 +39,17 @@ pub struct RelationalSearchParameters {
     pub max_results: Option<u16>,
 }
 
+/// Represents a piece of feedback related to a user
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserFeedback {
+    pub query: String,
+    pub result_page: u8,
+
+    #[serde(default = "default_chosen_result")]
+    pub chosen_result: Option<String>,
+}
+
 /// Represents a wikipedia article
 #[derive(Serialize)]
 pub struct Document {
@@ -82,5 +93,9 @@ fn default_results_per_page() -> Option<u16> {
 
 // TODO: Implement the Default trait
 fn default_query_relational() -> Option<String> {
-    Option::from("".to_string())
+    Option::None
+}
+
+fn default_chosen_result() -> Option<String> {
+    Option::None
 }
