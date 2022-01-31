@@ -3,9 +3,10 @@
 
 # Starting search API server in docker container
 - build docker image:
-    - `$ docker build . -t <image name>:<image version> (i.e. search:1.0)`
+    - `make build_img`, defaults tag to: wiki_search_api:0.1
 - run the image
     - `$ docker run -p 80:80 --rm -a stdin -a stdout <image name>:<image version>`
+    - or `make run_img` for default tags
     - `--rm` makes sure image closes after you quit the shell
     - `-p` binds the port 80 in the container to port 80 on your machine (localhost)
     - `-a` options bind the console output and input to your shell for debugging
@@ -15,15 +16,16 @@
 - Install rust 1.58.1: https://www.rust-lang.org/learn/get-started
     - running `cargo build` should automatically install this version
 - Install docker: https://docs.docker.com/
-- `cargo build --release`
+- `make build` or `make run`
+
 - `./target/release/search`
 
 # Running tests
 - Tests are found in `src/tests`
-- To run simply use: `cargo test`
+- To run simply use: `make test`
 
 # Accessing & building documentation
-- `cargo doc --open --no-deps` (opens in browser)
+- `make docs` (opens in browser)
 
 # Environment Variables
 - `SEARCH_PORT`: sets the port at which search API listens (default 80)

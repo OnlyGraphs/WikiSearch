@@ -8,7 +8,7 @@ RUN cargo build --release
 
 
 # expose the api port
-ENV SEARCH_PORT=80
+ENV SEARCH_PORT=8000
 ENV SEARCH_IP=0.0.0.0
 
 EXPOSE ${SEARCH_PORT}
