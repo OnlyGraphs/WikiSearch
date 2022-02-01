@@ -12,3 +12,5 @@ serde = "1.0.135"
 futures = "0.3"
 async-trait = "0.1.52"
 either = "1.6.1"
+api-rs = { git = "https://github.com/OnlyGraphs/api" }
+tonic = "0.6.2"

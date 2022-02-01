@@ -68,5 +68,3 @@ pub async fn relational(_q: Query<RelationalSearchParameters>) -> Result<impl Re
 pub async fn feedback(_q: Query<UserFeedback>) -> Result<impl Responder> {
     Ok(HttpResponse::Ok().finish())
 }
-
-
