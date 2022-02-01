@@ -1,3 +1,5 @@
+mod enums
+
 // Tree implementation, taken from https://rust-leipzig.github.io/architecture/2016/12/20/idiomatic-trees-in-rust/
 
 pub struct Arena<T> {
@@ -5,6 +7,7 @@ pub struct Arena<T> {
 }
 
 pub struct Node<T> {
+    type: enums::NodeType,
     parent: Option<NodeId>,
     previous_sibling: Option<NodeId>,
     next_sibling: Option<NodeId>,
@@ -12,19 +15,20 @@ pub struct Node<T> {
     last_child: Option<NodeId>,
 
     /// The actual data which will be stored within the tree
-    pub data: T,
+    pub data: vec<String>,
 }
 
 pub struct NodeId {
     index: usize,
 }
 
-pub fn new_node(&mut self, data: T) -> NodeId {
+pub fn new_node(&mut self, data: vec<String>, node_type: enums::NodeType) -> NodeId {
     // Get the next free index
     let next_index = self.nodes.len();
 
     // Push the node into the arena
     self.nodes.push(Node {
+        type: NodeType
         parent: None,
         first_child: None,
         last_child: None,
