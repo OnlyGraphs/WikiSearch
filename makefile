@@ -1,7 +1,8 @@
 IMAGE_NAME="wiki_search_api"
 IMAGE_VERSION="0.1"
-SEARCH_PORT=8000
-SEARCH_IP=0.0.0.0
+export SEARCH_PORT=8000
+export SEARCH_IP=0.0.0.0
+export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
 
 run_img: build_img
 	docker run -p ${SEARCH_PORT}:${SEARCH_PORT} --rm -a stdin -a stdout ${IMAGE_NAME}:${IMAGE_VERSION}

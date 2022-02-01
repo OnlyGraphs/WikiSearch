@@ -6,5 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+sqlx = { version = "0.4.2", features = [ "runtime-actix-native-tls" , "postgres" ] }
 actix-web = "3"
 serde = "1.0.135"
+futures = "0.3"
+async-trait = "0.1.52"
+either = "1.6.1"
