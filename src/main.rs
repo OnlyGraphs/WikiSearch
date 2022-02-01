@@ -15,22 +15,23 @@ use tonic::transport::Server;
 fn main() -> std::io::Result<()> {
     let barrier = Arc::new(Barrier::new(2));
 
-    let barrier1 = barrier.clone();
-    thread::spawn(move || {
-        run_grpc(barrier1);
+    // the rust docs seemed to perform multiple joins
+    // with redeclarations of the handle, no idea if any version of that would work
+    let handle = thread::spawn(move || {
+        run_grpc();
     });
 
-    let barrier2 = barrier.clone();
-    thread::spawn(move || {
-        run_rest(barrier2);
+    handle = thread::spawn(move || {
+        run_rest();
     });
 
-    barrier.wait();
+    handle.join();
+
     Ok(())
 }
 
 #[actix_web::main]
-async fn run_grpc(barrier: Arc<Barrier>) -> std::io::Result<()> {
+async fn run_grpc() -> std::io::Result<()> {
     // launc grpc serices and server
     println!("Lauching gRPC server");
     let grpc_address = env::var("GRPC_ADDRESS").unwrap_or("127.0.0.1:50051".to_string());
@@ -43,13 +44,12 @@ async fn run_grpc(barrier: Arc<Barrier>) -> std::io::Result<()> {
         .add_service(WikiSearchServer::new(CheckIndexService { index: index }))
         .serve(grpc_address.parse().unwrap())
         .await;
-    barrier.wait();
 
     Ok(())
 }
 
 #[actix_web::main]
-async fn run_rest(barrier: Arc<Barrier>) -> std::io::Result<()> {
+async fn run_rest() -> std::io::Result<()> {
     // launch REST api
     println!("Lauching Search API");
     let ip: String = env::var("SEARCH_IP").unwrap_or("127.0.0.1".to_string());
@@ -66,8 +66,6 @@ async fn run_rest(barrier: Arc<Barrier>) -> std::io::Result<()> {
     .bind(bind_address)?
     .run()
     .await;
-
-    barrier.wait();
 
     Ok(())
 }
