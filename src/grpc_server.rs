@@ -7,7 +7,7 @@ use tonic::{Request, Response, Status};
 
 #[derive(Debug, Default)]
 pub struct CheckIndexService {
-    index: Arc<RwLock<BasicIndex>>,
+    pub index: Arc<RwLock<BasicIndex>>,
 }
 
 #[tonic::async_trait]
