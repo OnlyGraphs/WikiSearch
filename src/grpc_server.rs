@@ -27,7 +27,7 @@ impl WikiSearch for CheckIndexService {
             }
         };
 
-        let connection_string: String = env::var("DATABASE_URL").unwrap_or("".to_string());
+        let connection_string: String = env::var("DATABASE_URL").expect("Did not set URL.");
 
         let index_builder = SqlIndexBuilder {
             connection_string: connection_string,
