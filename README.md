@@ -5,7 +5,7 @@
 - build docker image:
     - `make build_img`, defaults tag to: wiki_search_api:0.1
 - run the image
-    - `$ docker run -p 80:80 --rm -a stdin -a stdout <image name>:<image version>`
+    - `$ docker run -p 8000:8000 --rm -a stdin -a stdout <image name>:<image version>`
     - or `make run_img` for default tags
     - `--rm` makes sure image closes after you quit the shell
     - `-p` binds the port 80 in the container to port 80 on your machine (localhost)

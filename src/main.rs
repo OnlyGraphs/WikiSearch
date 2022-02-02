@@ -21,7 +21,7 @@ fn main() -> std::io::Result<()> {
         run_grpc();
     });
 
-    handle = thread::spawn(move || {
+    let handle = thread::spawn(move || {
         run_rest();
     });
 
