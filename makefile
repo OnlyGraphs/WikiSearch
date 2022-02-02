@@ -12,8 +12,15 @@ run_img: build_img
 build_img:
 	docker build . -t ${IMAGE_NAME}:${IMAGE_VERSION}
 
+# Note: This requires the sqlx-cli cargo extension to be installed
+# This can be done using `cargo install sqlx-cli`
+# After there has been a change to the database schema or queries
+#	this command will need to be run again.
+update-schema:
+	cargo sql prepare
+
 run:
-	cargo run 
+	cargo run
 
 build:
 	cargo build --release
