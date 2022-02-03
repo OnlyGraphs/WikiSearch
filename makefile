@@ -22,7 +22,7 @@ build_img:
 # After there has been a change to the database schema or queries
 #	this command will need to be run again.
 update-schema:
-	cargo sql prepare
+	cargo sqlx prepare
 
 run:
 	cargo run
