@@ -1,13 +1,18 @@
 IMAGE_NAME=wiki_search_api
 IMAGE_VERSION=0.1
 
+export SQLX_OFFLINE=true
 export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
+export SEARCH_PORT=8000
+export GRPC_PORT=50051
 
-run_img: build_img
-	export SEARCH_PORT=8000 &&
-	export SEARCH_IP=0.0.0.0 &&
-	export GRPC_ADDRESS=0.0.0.0:50051
-	docker run -p ${SEARCH_PORT}:${SEARCH_PORT} --rm -a stdin -a stdout ${IMAGE_NAME}:${IMAGE_VERSION}
+run_img: #build_img
+	docker run -p ${SEARCH_PORT}:8000 \
+		-p ${GRPC_PORT}:50051 \
+		-e SEARCH_PORT \
+		-e SEARCH_IP=0.0.0.0 \
+		-e GRPC_ADDRESS=0.0.0.0:${GRPC_PORT}\
+		--rm -a stdin -a stdout ${IMAGE_NAME}:${IMAGE_VERSION} \
 
 build_img:
 	docker build . -t ${IMAGE_NAME}:${IMAGE_VERSION}
