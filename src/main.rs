@@ -7,9 +7,12 @@ use actix_web::{App, HttpServer};
 use api_rs::wiki_search::wiki_search_server::WikiSearchServer;
 use grpc_server::CheckIndexService;
 use index::index::BasicIndex;
-use std::env;
-use std::sync::{Arc, Barrier, RwLock};
-use std::thread;
+use std::{
+    env,
+    io::{Error, ErrorKind},
+    sync::{Arc, Barrier, RwLock},
+    thread,
+};
 use tonic::transport::Server;
 
 fn main() -> std::io::Result<()> {
@@ -18,14 +21,15 @@ fn main() -> std::io::Result<()> {
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
     let handle = thread::spawn(move || {
-        run_grpc();
+        run_grpc().expect("GRPC API Failed to run");
     });
 
     let handle = thread::spawn(move || {
-        run_rest();
+        run_rest().expect("REST API Failed to run");
     });
 
-    handle.join();
+    handle.join()
+        .map_err(|e| Error::new(ErrorKind::Other, "Failed to join handle"))?;
 
     Ok(())
 }
@@ -43,7 +47,8 @@ async fn run_grpc() -> std::io::Result<()> {
     Server::builder()
         .add_service(WikiSearchServer::new(CheckIndexService { index: index }))
         .serve(grpc_address.parse().unwrap())
-        .await;
+        .await
+        .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
 
     Ok(())
 }
@@ -65,7 +70,7 @@ async fn run_rest() -> std::io::Result<()> {
     })
     .bind(bind_address)?
     .run()
-    .await;
+    .await?;
 
     Ok(())
 }

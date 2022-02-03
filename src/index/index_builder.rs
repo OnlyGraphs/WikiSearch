@@ -29,7 +29,7 @@ impl SqlIndexBuilder {
             .parse()
         {
             Ok(v) => Ok(v),
-            Err(E) => Err("Current dumpid is gibberish.".to_string()),
+            Err(e) => Err(format!("Current dumpid is gibberish. {e}")),
         };
     }
 }

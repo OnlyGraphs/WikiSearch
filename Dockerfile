@@ -1,17 +1,14 @@
-FROM rust:1.58.1
-
+FROM rust:latest AS builder
+MAINTAINER Kyle Cotton <kylecottonkc@gmail.com>
 WORKDIR /usr/src/search
+
 COPY . .
-
-# expose the api port
-ENV SEARCH_PORT=8000
-ENV SEARCH_IP=0.0.0.0
-# this needs to be set before cargo build
-ENV DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
-
 RUN cargo build --release
 
+FROM gcr.io/distroless/cc-debian10
+MAINTAINER Kyle Cotton <kylecottonkc@gmail.com>
+EXPOSE 8000
+EXPOSE 50051
+COPY --from=builder /usr/src/search/target/release/search /workspace/search
 
-
-EXPOSE ${SEARCH_PORT}
-CMD ["./target/release/search"]
+CMD ["./workspace/search"]
