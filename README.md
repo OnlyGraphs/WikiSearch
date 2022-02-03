@@ -3,7 +3,6 @@
 - sqlx-cli (cargo install sqlx-cli)
 
 # Starting search API server in docker container
-- Set the database URL: `export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph`
 - run `make up` -> `make migrate` -> `make add-test-data` to populate the test database (in the infrastructure repository)
 - run `make update-schema` 
     - Install sqlx-cli (`cargo install sqlx-cli`) if it is not installed already
