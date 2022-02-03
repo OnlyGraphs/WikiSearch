@@ -4,7 +4,7 @@ mod index;
 mod tests;
 
 use actix_web::{App, HttpServer};
-use api_rs::wiki_search::wiki_search_server::WikiSearchServer;
+use api_rs::wiki_search::{wiki_search_server::{WikiSearchServer,WikiSearch},CheckIndexRequest,CheckIndexReply};
 use grpc_server::CheckIndexService;
 use index::index::BasicIndex;
 use std::{
@@ -13,7 +13,8 @@ use std::{
     sync::{Arc, Barrier, RwLock},
     thread,
 };
-use tonic::transport::Server;
+
+use tonic::{transport::Server, Request, Response, Status};
 
 fn main() -> std::io::Result<()> {
     let barrier = Arc::new(Barrier::new(2));
@@ -43,9 +44,18 @@ async fn run_grpc() -> std::io::Result<()> {
 
     // create shared memory for index
     let index = Arc::new(RwLock::new(BasicIndex::default()));
+     
+    // build initial index 
+    let service = CheckIndexService{
+        index: index 
+    };
+
+    // TODO: do proper shit
+    let a = service.update_index(Request::new(CheckIndexRequest{})).await ;
+    println!("{:?}",a.unwrap());
 
     Server::builder()
-        .add_service(WikiSearchServer::new(CheckIndexService { index: index }))
+        .add_service(WikiSearchServer::new(service))
         .serve(grpc_address.parse().unwrap())
         .await
         .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;

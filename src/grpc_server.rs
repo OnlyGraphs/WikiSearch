@@ -14,7 +14,7 @@ pub struct CheckIndexService {
 impl WikiSearch for CheckIndexService {
     async fn update_index(
         &self,
-        request: Request<CheckIndexRequest>,
+        _: Request<CheckIndexRequest>,
     ) -> Result<Response<CheckIndexReply>, Status> {
         // check dump id
         let dump_id = match SqlIndexBuilder::get_dump_id() {
@@ -55,7 +55,7 @@ impl WikiSearch for CheckIndexService {
         };
 
         *guard = res;
-
+        
         Ok(Response::new(CheckIndexReply {
             success: true,
             err_code: "".to_string(),

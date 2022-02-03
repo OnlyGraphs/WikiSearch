@@ -58,6 +58,7 @@ impl IndexBuilder for SqlIndexBuilder {
         };
 
         let mut idx = BasicIndex::default();
+        
 
         for row in res {
             idx.add_document(
