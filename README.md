@@ -1,7 +1,13 @@
 # Requirements
 - docker
+- sqlx-cli (cargo install sqlx-cli)
 
 # Starting search API server in docker container
+- Set the database URL: export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
+- run make up -> make migrate -> make add-test-data to populate the test database (in the infrastructure repository)
+- run make update-schema 
+    - Install sqlx-cli (cargo install sqlx-cli) if it is not installed already
+    - After there has been a change to the database schema or queries, this command will need to be run again.
 - build docker image:
     - `make build_img`, defaults tag to: wiki_search_api:0.1
 - run the image
