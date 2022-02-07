@@ -14,3 +14,5 @@ async-trait = "0.1.52"
 either = "1.6.1"
 api-rs = { git = "https://github.com/OnlyGraphs/api" }
 tonic = "0.6.2"
+#Use for tests
+tokio = {version = "1.0"} 
