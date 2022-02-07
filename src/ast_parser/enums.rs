@@ -1,4 +1,4 @@
-pub enum CategoryNodeType {
+pub enum StructureNodeType {
     TITLE,
     CATEGORY,
     CITATION,
