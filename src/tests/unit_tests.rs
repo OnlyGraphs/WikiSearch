@@ -2,6 +2,7 @@ use crate::index::index_builder::IndexBuilder;
 use crate::index::index_builder::SqlIndexBuilder;
 
 use crate::BasicIndex;
+
 use std::env;
 
 #[test]

@@ -1,51 +1,51 @@
+use crate::index::index_structs::*;
 use either::{Either, Left};
-use std::collections::HashMap;
+use sqlx::Postgres;
+use std::{collections::HashMap, hash::Hash};
 
 #[derive(Debug)]
 pub enum Domain {
-    org,
+    simple,
 }
+
+//SimpleIndex
+//trait
 
 pub enum IndexEncoding {
-    none,
-    delta_encoding,
-    elias_gamma_code,
-}
-
-// stores an appearance of a token in an article
-#[derive(Debug)]
-pub struct Posting {
-    document_id: u32, //TODO: double check memory requirements, highest article word count etc
-    position: u32,
+    None,
+    Delta_encoding,
+    Elias_gamma_code,
 }
 
 //TODO:
 //Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
 #[derive(Debug)]
 pub struct BasicIndex {
-    // pub title: String,
-    // pub domain: Domain,
-    // lastUpdatedDate: NaiveDate,
-
+    pub dump_id: Option<u32>,
+    pub document_metadata: HashMap<u32, DocumentMetaData>,
     //TODO: store tokens in a map, and store references in all others
     pub postings: HashMap<String, Vec<Posting>>,
     pub doc_freq: HashMap<String, u32>,
     pub term_freq: HashMap<String, HashMap<u32, u32>>, // tf(doc,term) -> frequency in document
     pub links: Either<HashMap<u32, Vec<String>>, HashMap<String, Vec<u32>>>, // List of tuples, where each element is: (Doc id, (Word_pos start, word_pos end))
-    pub categories: HashMap<u32, Vec<String>>,
+    pub categories: HashMap<u32, Vec<String>>, //The name of category pages which a page links to  (eg. docid -> category1, category2).
     pub abstracts: HashMap<u32, String>,
-    // pub citation_positions:  Vec<(u32, (u32,u32))>,
+    pub infoboxes: HashMap<u32, InfoBox>,
+    pub citations: HashMap<u32, Citations>,
 }
-
 impl Default for BasicIndex {
     fn default() -> Self {
         BasicIndex {
+            dump_id: None,
             postings: HashMap::new(),
             doc_freq: HashMap::new(),
             categories: HashMap::new(),
             abstracts: HashMap::new(),
             links: Left(HashMap::new()),
             term_freq: HashMap::new(),
+            document_metadata: HashMap::new(),
+            infoboxes: HashMap::new(),
+            citations: HashMap::new(),
         }
     }
 }
@@ -94,4 +94,6 @@ impl BasicIndex {
             .insert(doc_id, link_titles);
         self.abstracts.insert(doc_id, article_abstract.to_string());
     }
+
+    pub fn set_dump_id(new_dump_id: u32) {}
 }

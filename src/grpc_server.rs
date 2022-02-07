@@ -5,6 +5,8 @@ use std::env;
 use std::sync::{Arc, RwLock};
 use tonic::{Request, Response, Status};
 
+//The implementation listens to the scheduler and updates the index by checking against the dump id.
+
 #[derive(Debug, Default)]
 pub struct CheckIndexService {
     pub index: Arc<RwLock<BasicIndex>>,
