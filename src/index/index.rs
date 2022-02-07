@@ -8,13 +8,24 @@ pub enum Domain {
     simple,
 }
 
-//SimpleIndex
-//trait
-
 pub enum IndexEncoding {
     None,
     Delta_encoding,
     Elias_gamma_code,
+}
+
+//TODO: Interface to specify functions that should be shared among different types of indices created (Ternary Index Tree vs BasicIndex)
+pub trait IndexInterface {
+    fn add_posting(&mut self, token: String, docid: u32, word_pos: u32);
+    fn add_document(
+        &mut self,
+        text: &str,
+        doc_id: u32,
+        categories: &str,
+        article_links: &str,
+        article_abstract: &str,
+    );
+    fn set_dump_id(new_dump_id: u32);
 }
 
 //TODO:
@@ -33,6 +44,7 @@ pub struct BasicIndex {
     pub infoboxes: HashMap<u32, InfoBox>,
     pub citations: HashMap<u32, Citations>,
 }
+
 impl Default for BasicIndex {
     fn default() -> Self {
         BasicIndex {
@@ -50,9 +62,8 @@ impl Default for BasicIndex {
     }
 }
 
-impl BasicIndex {
+impl IndexInterface for BasicIndex {
     fn add_posting(&mut self, token: String, docid: u32, word_pos: u32) {
-        let docid_and_word_pos_tuple = (docid, word_pos);
         self.postings
             .entry(token.clone())
             .or_insert(Vec::<Posting>::new())
@@ -68,7 +79,7 @@ impl BasicIndex {
         *freq_map.entry(docid).or_insert(0) += 1;
     }
 
-    pub fn add_document(
+    fn add_document(
         &mut self,
         text: &str,
         doc_id: u32,
@@ -95,5 +106,5 @@ impl BasicIndex {
         self.abstracts.insert(doc_id, article_abstract.to_string());
     }
 
-    pub fn set_dump_id(new_dump_id: u32) {}
+    fn set_dump_id(new_dump_id: u32) {}
 }
