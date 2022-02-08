@@ -4,11 +4,12 @@ use nom::{
     IResult,
     combinator::map_res,
     bytes::complete::{tag, take_while},
-    character::complete::{char, alpha0},
+    character::complete::{char, alpha0, digit0},
     character::{is_alphabetic, is_digit},
     Err
 };
 use nom;
+use std::str::FromStr;
 
 
 // Constants
@@ -117,40 +118,28 @@ pub fn parse_term(s : &str) -> IResult<&str, Node> {
 
 }
 
-/*
+// TODO: Consider whitespace
 pub fn parse_dist_query(s : &str) -> IResult<&str, DistNode> {
     // `#DIST` `,` <number> `,` <term> `,` <term>        # Distance search
     
     // `#DIST` `,` <number> `,` <term> `,` <term>        # Distance search
 
-    let (nxt, _) = tag(DIST_TAG)(s);
+    let (nxt, _) = tag(DIST_TAG)(s)?;
     let (nxt, _)  = char(',')(nxt)?;
-    let (nxt, d) = take_while(is_digit)(nxt)?;
+    let (nxt, d) = digit0(nxt)?;
     let (nxt, _)  = char(',')(nxt)?;
-    let (nxt, t1) = parse_term(nxt);
+    let (nxt, t1) = parse_term(nxt)?;
     let (nxt, _)  = char(',')(nxt)?;
-    let (nxt, t2) = parse_term(nxt);
+    let (nxt, t2) = parse_term(nxt)?;
 
     let dist_node = DistNode {
         parent: None,
         previous_sibling: None,
         next_sibling: None,
-        first_child: t1,
-        last_child: t2,
-        dist: d,
+        first_child: Some(t1),
+        last_child: Some(t2),
+        dist: FromStr::from_str(d).unwrap(),
     };
     
     Ok((s, dist_node))
 }
-
-pub fn parse_query_to_tree(query: &str) {
-    // Create an arena that the tree lives in
-    let arena = Arena {
-        nodes : Vec::new()
-    };
-
-    // do shit
-
-}
-
-*/

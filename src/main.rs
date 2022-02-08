@@ -2,6 +2,7 @@ mod api;
 mod grpc_server;
 mod index;
 mod tests;
+mod ast_parser;
 
 use actix_web::{App, HttpServer};
 use api_rs::wiki_search::wiki_search_server::WikiSearchServer;
