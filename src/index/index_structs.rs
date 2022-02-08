@@ -18,18 +18,18 @@ pub struct PostingRange {
     pub position_end: u32,
 }
 #[derive(Debug)]
-pub struct InfoBox {
+pub struct ExtentInfoBox {
     pub infobox_positions: PostingRange,
     pub infobox_type: String, //TODO: Could change to this field to enum and define the list of possible infobox types somewhere
 }
 
 #[derive(Debug)]
-pub struct Citations {
+pub struct ExtentCitations {
     pub citation_positions: PostingRange,
     pub citation_string: String,
 }
 #[derive(Debug)]
-pub struct Categories {
+pub struct ExtentCategories {
     pub categories_positions: PostingRange,
     pub categories: Vec<String>,
 }
