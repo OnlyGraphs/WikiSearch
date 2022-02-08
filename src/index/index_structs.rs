@@ -12,25 +12,25 @@ pub struct Posting {
     pub position: u32,
 }
 #[derive(Debug)]
-pub struct PostingRange {
-    pub document_id: u32,
+pub struct ExtentPosting {
+    pub attributed_id: u32, //Refers to citation_id, infobox_id, etc..
     pub position_start: u32,
     pub position_end: u32,
 }
 #[derive(Debug)]
 pub struct ExtentInfoBox {
-    pub infobox_positions: PostingRange,
+    pub infobox_positions: ExtentPosting,
     pub infobox_type: String, //TODO: Could change to this field to enum and define the list of possible infobox types somewhere
 }
 
 #[derive(Debug)]
 pub struct ExtentCitations {
-    pub citation_positions: PostingRange,
+    pub citation_positions: ExtentPosting,
     pub citation_string: String,
 }
 #[derive(Debug)]
 pub struct ExtentCategories {
-    pub categories_positions: PostingRange,
+    pub categories_positions: ExtentPosting,
     pub categories: Vec<String>,
 }
 
