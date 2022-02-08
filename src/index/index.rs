@@ -1,30 +1,34 @@
 use crate::index::index_structs::*;
+use crate::index::utils::*;
 use either::{Either, Left};
-use sqlx::Postgres;
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
+
+/**
+ * BasicIndex Structure:
+ * Metadata <NOT included in postings>
+ * Abstracts <NOT included in postings>
+ * Infobox <Word position starts here at 0>
+ * Main body
+ * Citations
+ * Categories
+ */
 
 #[derive(Debug)]
 pub enum Domain {
-    simple,
+    Simple,
 }
 
 pub enum IndexEncoding {
     None,
-    Delta_encoding,
-    Elias_gamma_code,
+    DeltaEncoding,
+    EliasGammaCode,
 }
 
 //TODO: Interface to specify functions that should be shared among different types of indices created (Ternary Index Tree vs BasicIndex)
 pub trait IndexInterface {
     fn add_posting(&mut self, token: String, docid: u32, word_pos: u32);
-    fn add_document(
-        &mut self,
-        text: &str,
-        doc_id: u32,
-        categories: &str,
-        article_links: &str,
-        article_abstract: &str,
-    );
+    fn add_document(&mut self, document: Document);
+
     fn set_dump_id(&mut self, new_dump_id: u32);
     fn add_document_metadata(
         &mut self,
@@ -33,6 +37,10 @@ pub trait IndexInterface {
         lastUpdatedDate: String,
         namespace: u32,
     );
+    fn add_abstracts(&mut self, doc_id: u32, article_abstract: &str);
+
+    fn add_links(&mut self, doc_id: u32, article_links: &str);
+
     //TODO: Change to &str
     fn add_infoboxes(
         &mut self,
@@ -43,6 +51,7 @@ pub trait IndexInterface {
     );
 
     fn add_citations(&mut self, doc_id: u32, citations_body: Vec<String>, citation_ids: Vec<u32>);
+    fn add_categories(&mut self, doc_id: u32, categories_str: String);
 }
 
 //TODO:
@@ -56,7 +65,7 @@ pub struct BasicIndex {
     pub doc_freq: HashMap<String, u32>,
     pub term_freq: HashMap<String, HashMap<u32, u32>>, // tf(doc,term) -> frequency in document
     pub links: Either<HashMap<u32, Vec<String>>, HashMap<String, Vec<u32>>>, // List of tuples, where each element is: (Doc id, (Word_pos start, word_pos end))
-    pub categories: HashMap<u32, Vec<String>>, //The name of category pages which a page links to  (eg. docid -> category1, category2).
+    pub categories: HashMap<u32, Categories>, //The name of category pages which a page links to  (eg. docid -> category1, category2).
     pub abstracts: HashMap<u32, String>,
     pub infoboxes: HashMap<u32, InfoBox>,
     pub citations: HashMap<u32, Citations>,
@@ -96,31 +105,31 @@ impl IndexInterface for BasicIndex {
         *freq_map.entry(docid).or_insert(0) += 1;
     }
 
-    fn add_document(
-        &mut self,
-        text: &str,
-        doc_id: u32,
-        categories: &str,
-        article_links: &str,
-        article_abstract: &str,
-    ) {
+    fn add_document(&mut self, document: Document) {
         let mut word_pos = 0;
-        for token in text.split(" ") {
-            self.add_posting(token.to_string(), doc_id, word_pos);
+
+        //Metadata
+        self.add_document_metadata(
+            document.doc_id,
+            document.title,
+            document.last_updated_date,
+            document.namespace,
+        );
+
+        //Abstracts
+
+        //Infobox
+
+        //Main body
+        for token in document.main_text.split(" ") {
+            self.add_posting(token.to_string(), document.doc_id, word_pos);
             *self.doc_freq.entry(token.to_string()).or_insert(0) += 1;
             word_pos += 1;
         }
 
-        let mut link_titles: Vec<String> = Vec::new();
-        for link in article_links.split(",") {
-            link_titles.push(link.trim().to_string());
-        }
+        //Citations
 
-        self.links
-            .as_mut()
-            .expect_left("Index is not in buildable state")
-            .insert(doc_id, link_titles);
-        self.abstracts.insert(doc_id, article_abstract.to_string());
+        //Links
     }
 
     fn set_dump_id(&mut self, new_dump_id: u32) {
@@ -144,6 +153,21 @@ impl IndexInterface for BasicIndex {
         );
     }
 
+    fn add_abstracts(&mut self, doc_id: u32, article_abstract: &str) {
+        self.abstracts.insert(doc_id, article_abstract.to_string());
+    }
+
+    fn add_links(&mut self, doc_id: u32, article_links: &str) {
+        let mut link_titles: Vec<String> = Vec::new();
+        for link in article_links.split(",") {
+            link_titles.push(link.trim().to_string());
+        }
+        self.links
+            .as_mut()
+            .expect_left("Index is not in buildable state")
+            .insert(doc_id, link_titles);
+    }
+
     fn add_citations(&mut self, doc_id: u32, citations_body: Vec<String>, citation_ids: Vec<u32>) {}
 
     fn add_infoboxes(
@@ -153,5 +177,11 @@ impl IndexInterface for BasicIndex {
         text: Vec<String>,
         infobox_ids: Vec<u32>,
     ) {
+    }
+
+    fn add_categories(&mut self, doc_id: u32, categories_str: String) {
+        //Parse the query and retrieve the categories
+        let mut split = categories_str.split(",").map(|s| s.to_string());
+        let vec_categories: Vec<String> = split.collect();
     }
 }

@@ -34,3 +34,8 @@ fn check_if_dump_id_changed() {
 fn check_if_dump_id_is_assigned() {
     todo!();
 }
+
+//////////////////// Utils Test ///////////////////////
+fn find_length_string_test() {
+    todo!();
+}

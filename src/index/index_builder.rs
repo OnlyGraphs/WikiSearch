@@ -1,4 +1,5 @@
 use crate::index::index::{BasicIndex, IndexInterface};
+use crate::index::index_structs::Document;
 use async_trait::async_trait;
 use sqlx::{postgres::PgPoolOptions, query};
 use std::fs;
@@ -58,14 +59,25 @@ impl IndexBuilder for SqlIndexBuilder {
         };
 
         let mut idx = BasicIndex::default();
+
         for row in res {
-            idx.add_document(
-                &row.text.unwrap_or("".to_string()),
-                row.articleid as u32,
-                &row.categories.unwrap_or("".to_string()),
-                &row.links.unwrap_or("".to_string()),
-                &row.abstracts.unwrap_or("".to_string()),
-            );
+            //TODO!: change these fields as appropriate
+            let new_document = Document {
+                doc_id: row.articleid as u32,
+                title: "".to_string(),
+                categories: row.categories.unwrap_or("".to_string()),
+                last_updated_date: "".to_string(),
+                namespace: 0,
+                article_abstract: row.abstracts.unwrap_or("".to_string()),
+                infobox_text: "".to_string(),
+                infobox_type: "".to_string(),
+                infobox_ids: Vec::new(),
+                main_text: row.text.unwrap_or("".to_string()),
+                article_links: row.links.unwrap_or("".to_string()),
+                citations_text: "".to_string(),
+                citations_ids: Vec::new(),
+            };
+            idx.add_document(new_document);
         }
 
         pool.close().await;

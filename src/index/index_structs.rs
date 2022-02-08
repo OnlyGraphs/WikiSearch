@@ -29,12 +29,33 @@ pub struct Citations {
     pub citation_string: String,
 }
 #[derive(Debug)]
-pub struct DocumentMetaData {
-    pub title: String,
-    pub last_updated_date: String, //TODO: Change to DateTime type using chrono
-    pub namespace: u32,            //TODO: Could change this field to enum
+pub struct Categories {
+    pub categories_positions: PostingRange,
+    pub categories: Vec<String>,
 }
 
+pub struct Document {
+    pub doc_id: u32,
+    pub title: String,
+    pub categories: String,
+    pub last_updated_date: String,
+    pub namespace: u32,
+    pub article_abstract: String,
+    pub infobox_type: String,
+    pub infobox_text: String,
+    pub infobox_ids: Vec<u32>,
+    pub main_text: String,
+    pub article_links: String,
+    pub citations_text: String,
+    pub citations_ids: Vec<u32>,
+}
+
+#[derive(Debug)]
+pub struct DocumentMetaData {
+    pub title: String, //TODO: Implement another field with doc_id -> title and title -> doc_id
+    pub last_updated_date: String, //TODO: Change to DateTime type using chrono
+    pub namespace: u32, //TODO: Could change this field to enum
+}
 //TODO:
 impl DocumentMetaData {
     fn updateDate(&mut self) {}
