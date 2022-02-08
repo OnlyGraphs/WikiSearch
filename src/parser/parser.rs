@@ -30,7 +30,7 @@ pub fn parse_structure_query(nxt : &str) -> IResult<&str, Box<Query>>{
 }
 
 pub fn parse_freetext_query(nxt : &str) -> IResult<&str, Box<Query>> {
-    separated_list0(many1(tag(" ")), parse_token)(nxt)
+    separated_list0(parse_whitespace, parse_token)(nxt)
     .map(|(nxt,res)| (nxt, Box::new(Query::FreetextQuery{
         tokens: res
     })))
