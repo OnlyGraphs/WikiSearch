@@ -69,15 +69,33 @@ pub fn is_whitespace(nxt : char) -> bool {
     return is_space(nxt as u8);
 }
 
-// TODO: Consider error cases
+pub fn is_comma(nxt: char) -> bool {
+    return nxt == ',';
+}
+
+pub fn is_tab(nxt: char) -> bool {
+    return nxt == '\t';
+}
+
+pub fn is_seperator(nxt: char) -> bool {
+    return (is_whitespace(nxt) | is_comma(nxt) | is_tab(nxt))
+}
+
+// Parses any amount of whitespace, tab and comma separators
+pub fn parse_separator(nxt: &str) -> IResult<&str, &str>{
+    take_while1(is_seperator)(nxt)
+}
+
+// TODO: Consider more than single tokens (e.g.: #DIST,3,pumpkin pie,latte)
+// Note that this only considers single tokens
 pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
     // `#DIST` `,` <number> `,` <term> `,` <term>        # Distance search
     let (nxt, _) = tag(DIST_TAG)(nxt)?;
-    let (nxt, _)  = char(',')(nxt)?;
+    let (nxt, _)  = parse_separator(nxt)?;
     let (nxt, d) = digit0(nxt)?;
-    let (nxt, _)  = char(',')(nxt)?;
+    let (nxt, _)  = parse_separator(nxt)?;
     let (nxt, t1) = parse_token(nxt)?;
-    let (nxt, _)  = char(',')(nxt)?;
+    let (nxt, _)  = parse_separator(nxt)?;
     let (nxt, t2) = parse_token(nxt)?;
 
     let dist_query = Query::DistanceQuery{
