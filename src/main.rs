@@ -2,6 +2,7 @@ mod api;
 mod grpc_server;
 mod index;
 mod tests;
+mod parser; 
 
 use actix_web::{App, HttpServer};
 use api_rs::wiki_search::wiki_search_server::WikiSearchServer;
@@ -28,7 +29,8 @@ fn main() -> std::io::Result<()> {
         run_rest().expect("REST API Failed to run");
     });
 
-    handle.join()
+    handle
+        .join()
         .map_err(|e| Error::new(ErrorKind::Other, "Failed to join handle"))?;
 
     Ok(())

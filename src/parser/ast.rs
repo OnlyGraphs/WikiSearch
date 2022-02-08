@@ -1,20 +1,35 @@
 
+#[derive(Debug, PartialEq)]
 pub enum BinaryOp {
     And,
     Or
 }
 
+#[derive(Debug, PartialEq)]
 pub enum UnaryOp {
     Not,
 }
 
-pub enum StructElem{
+#[derive(Debug, PartialEq)]
+pub enum StructureElem{
     Title,
     Category,
     Citation,
     Infobox(String) // infobox name
 }
 
+impl From<&str> for StructureElem {
+    fn from(i: &str) -> Self {
+        match i.to_lowercase().as_str() {
+            "#title" => StructureElem::Title,
+            "#category" => StructureElem::Category,
+            "#citation" => StructureElem::Citation,
+            _ => StructureElem::Infobox(i.to_string())
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Query {
     BinaryQuery {
         op: BinaryOp,
@@ -34,7 +49,7 @@ pub enum Query {
         rhs: String,
     },
     StructureQuery {
-        elem: StructElem,
+        elem: StructureElem,
         sub: Box<Query>,
     },
     RelationQuery {
@@ -46,4 +61,8 @@ pub enum Query {
         prefix: String, // before wildcard
         postfix: String, // after wildcard
     },
+    FreetextQuery{
+        tokens: Vec<String>
+    }
+
 }

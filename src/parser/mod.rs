@@ -1,3 +1,2 @@
-pub mod ast_parser;
-pub mod structs; 
-pub mod preprocess;
+pub mod parser; 
+pub mod ast;
