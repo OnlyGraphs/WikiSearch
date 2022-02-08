@@ -1,3 +1,5 @@
+//TODO: Check whether some fields can be set to private
+
 #[derive(Debug)]
 pub enum Domain {
     simple,
@@ -29,6 +31,11 @@ pub struct Citations {
 #[derive(Debug)]
 pub struct DocumentMetaData {
     pub title: String,
-    pub lastUpdatedDate: String, //TODO: Change to DateTime type using chrono
-    pub namespace: u32,          //TODO: Could change this field to enum
+    pub last_updated_date: String, //TODO: Change to DateTime type using chrono
+    pub namespace: u32,            //TODO: Could change this field to enum
+}
+
+//TODO:
+impl DocumentMetaData {
+    fn updateDate(&mut self) {}
 }

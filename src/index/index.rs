@@ -25,7 +25,24 @@ pub trait IndexInterface {
         article_links: &str,
         article_abstract: &str,
     );
-    fn set_dump_id(new_dump_id: u32);
+    fn set_dump_id(&mut self, new_dump_id: u32);
+    fn add_document_metadata(
+        &mut self,
+        doc_id: u32,
+        title: String,
+        lastUpdatedDate: String,
+        namespace: u32,
+    );
+    //TODO: Change to &str
+    fn add_infoboxes(
+        &mut self,
+        doc_id: u32,
+        infobox_type: &str,
+        text: Vec<String>,
+        infobox_ids: Vec<u32>,
+    );
+
+    fn add_citations(&mut self, doc_id: u32, citations_body: Vec<String>, citation_ids: Vec<u32>);
 }
 
 //TODO:
@@ -106,5 +123,35 @@ impl IndexInterface for BasicIndex {
         self.abstracts.insert(doc_id, article_abstract.to_string());
     }
 
-    fn set_dump_id(new_dump_id: u32) {}
+    fn set_dump_id(&mut self, new_dump_id: u32) {
+        self.dump_id = Some(new_dump_id);
+    }
+
+    fn add_document_metadata(
+        &mut self,
+        doc_id: u32,
+        title: String,
+        last_updated_date: String,
+        namespace: u32,
+    ) {
+        self.document_metadata.insert(
+            doc_id,
+            DocumentMetaData {
+                title,
+                last_updated_date,
+                namespace,
+            },
+        );
+    }
+
+    fn add_citations(&mut self, doc_id: u32, citations_body: Vec<String>, citation_ids: Vec<u32>) {}
+
+    fn add_infoboxes(
+        &mut self,
+        doc_id: u32,
+        infobox_type: &str,
+        text: Vec<String>,
+        infobox_ids: Vec<u32>,
+    ) {
+    }
 }
