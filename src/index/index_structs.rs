@@ -42,11 +42,11 @@ pub struct Document {
     pub namespace: u32,
     pub article_abstract: String,
     pub infobox_type: String,
-    pub infobox_text: String,
+    pub infobox_text: Vec<String>,
     pub infobox_ids: Vec<u32>,
     pub main_text: String,
     pub article_links: String,
-    pub citations_text: String,
+    pub citations_text: Vec<String>,
     pub citations_ids: Vec<u32>,
 }
 
@@ -58,5 +58,5 @@ pub struct DocumentMetaData {
 }
 //TODO:
 impl DocumentMetaData {
-    fn updateDate(&mut self) {}
+    fn update_date(&mut self) {}
 }

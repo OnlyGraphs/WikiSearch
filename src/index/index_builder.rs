@@ -69,12 +69,12 @@ impl IndexBuilder for SqlIndexBuilder {
                 last_updated_date: "".to_string(),
                 namespace: 0,
                 article_abstract: row.abstracts.unwrap_or("".to_string()),
-                infobox_text: "".to_string(),
-                infobox_type: "".to_string(),
+                infobox_text: Vec::new(),
+                infobox_type: "Fruit".to_string(),
                 infobox_ids: Vec::new(),
                 main_text: row.text.unwrap_or("".to_string()),
                 article_links: row.links.unwrap_or("".to_string()),
-                citations_text: "".to_string(),
+                citations_text: Vec::new(),
                 citations_ids: Vec::new(),
             };
             idx.add_document(new_document);
