@@ -17,6 +17,12 @@ pub struct ExtentPosting {
     pub position_start: u32,
     pub position_end: u32,
 }
+
+#[derive(Debug)]
+pub struct ExtentPostingPositionsOnly {
+    pub position_start: u32,
+    pub position_end: u32,
+}
 #[derive(Debug)]
 pub struct ExtentInfoBox {
     pub infobox_positions: ExtentPosting,
@@ -29,8 +35,7 @@ pub struct ExtentCitations {
 }
 #[derive(Debug)]
 pub struct ExtentCategories {
-    pub categories_positions: ExtentPosting,
-    pub categories: Vec<String>,
+    pub categories_positions: ExtentPostingPositionsOnly,
 }
 
 pub struct Document {

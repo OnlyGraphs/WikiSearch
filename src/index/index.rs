@@ -161,10 +161,10 @@ impl IndexInterface for BasicIndex {
         );
 
         //Categories
-        // word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
+        word_pos = self.add_categories(document.doc_id, document.categories, word_pos);
 
         //Links
-        // word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
+        self.add_links(document.doc_id, &document.article_links);
     }
 
     fn set_dump_id(&mut self, new_dump_id: u32) {
@@ -258,11 +258,24 @@ impl IndexInterface for BasicIndex {
         }
         return word_pos;
     }
-
-    fn add_categories(&mut self, doc_id: u32, categories_str: String, word_pos: u32) -> u32 {
+    //categories_str is a list of categories represented in a string.
+    fn add_categories(&mut self, doc_id: u32, categories_str: String, mut word_pos: u32) -> u32 {
         //Parse the query and retrieve the categories
-        let mut split = categories_str.split(",").map(|s| s.to_string());
-        let vec_categories: Vec<String> = split.collect();
+        for cat in categories_str.split(",") {
+            let prev_pos = word_pos;
+            word_pos = self.add_tokens(doc_id, cat.to_string(), word_pos);
+
+            let extent = ExtentPostingPositionsOnly {
+                position_start: prev_pos,
+                position_end: word_pos,
+            };
+            self.categories
+                .entry(doc_id)
+                .or_insert(Vec::<ExtentCategories>::new())
+                .push(ExtentCategories {
+                    categories_positions: extent,
+                });
+        }
         return word_pos;
     }
 }
