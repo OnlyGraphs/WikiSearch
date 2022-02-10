@@ -26,7 +26,6 @@ pub struct ExtentInfoBox {
 #[derive(Debug)]
 pub struct ExtentCitations {
     pub citation_positions: ExtentPosting,
-    pub citation_string: String,
 }
 #[derive(Debug)]
 pub struct ExtentCategories {

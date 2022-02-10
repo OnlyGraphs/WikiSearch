@@ -153,7 +153,12 @@ impl IndexInterface for BasicIndex {
         word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
 
         //Citations
-        word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
+        word_pos = self.add_citations(
+            document.doc_id,
+            document.citations_text,
+            document.citations_ids,
+            word_pos,
+        );
 
         //Categories
         // word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
@@ -234,8 +239,23 @@ impl IndexInterface for BasicIndex {
         doc_id: u32,
         citations_body: Vec<String>,
         citation_ids: Vec<u32>,
-        word_pos: u32,
+        mut word_pos: u32,
     ) -> u32 {
+        for (text_str, id) in citations_body.iter().zip(citation_ids.iter()) {
+            let prev_pos = word_pos;
+            word_pos = self.add_tokens(doc_id, text_str.to_string(), word_pos);
+            let extent = ExtentPosting {
+                attributed_id: *id,
+                position_start: prev_pos,
+                position_end: word_pos,
+            };
+            self.citations
+                .entry(doc_id)
+                .or_insert(Vec::<ExtentCitations>::new())
+                .push(ExtentCitations {
+                    citation_positions: extent,
+                });
+        }
         return word_pos;
     }
 

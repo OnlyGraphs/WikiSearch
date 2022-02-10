@@ -35,6 +35,10 @@ fn check_if_dump_id_is_assigned() {
     todo!();
 }
 
+fn check_word_pos_if_correct() {
+    todo!();
+}
+
 //////////////////// Utils Test ///////////////////////
 fn find_length_string_test() {
     todo!();
