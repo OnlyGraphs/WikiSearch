@@ -4,23 +4,23 @@ mod index;
 mod tests;
 
 use actix_web::{App, HttpServer};
+use actix_files::Files;
 use api_rs::wiki_search::wiki_search_server::WikiSearchServer;
 use grpc_server::CheckIndexService;
 use index::index::BasicIndex;
 use std::{
     env,
     io::{Error, ErrorKind},
-    sync::{Arc, Barrier, RwLock},
+    sync::{Arc, RwLock},
     thread,
 };
 use tonic::transport::Server;
 
 fn main() -> std::io::Result<()> {
-    let barrier = Arc::new(Barrier::new(2));
 
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
-    let handle = thread::spawn(move || {
+    thread::spawn(move || {
         run_grpc().expect("GRPC API Failed to run");
     });
 
@@ -29,16 +29,19 @@ fn main() -> std::io::Result<()> {
     });
 
     handle.join()
-        .map_err(|e| Error::new(ErrorKind::Other, "Failed to join handle"))?;
+        .map_err(|_e| Error::new(ErrorKind::Other, "Failed to join handle"))?;
 
     Ok(())
 }
+
+
 
 #[actix_web::main]
 async fn run_grpc() -> std::io::Result<()> {
     // launc grpc serices and server
     println!("Lauching gRPC server");
     let grpc_address = env::var("GRPC_ADDRESS").unwrap_or("127.0.0.1:50051".to_string());
+    
     println!("Binding to {}", grpc_address);
 
     // create shared memory for index
@@ -60,13 +63,18 @@ async fn run_rest() -> std::io::Result<()> {
     let ip: String = env::var("SEARCH_IP").unwrap_or("127.0.0.1".to_string());
     let port = env::var("SEARCH_PORT").unwrap_or("8000".to_string());
     let bind_address = format!("{}:{}", ip, port);
+    let static_dir = env::var("STATIC_DIR").unwrap_or("./staticfiles".to_string());
 
     println!("Binding to: {}", bind_address);
-    HttpServer::new(|| {
+    HttpServer::new(move || {
+        let static_dir_cpy = &static_dir;
         App::new()
             .service(api::endpoints::search)
             .service(api::endpoints::relational)
             .service(api::endpoints::feedback)
+            .service(Files::new("/", static_dir_cpy)
+                .prefer_utf8(true)
+                .index_file("index.html"))
     })
     .bind(bind_address)?
     .run()
