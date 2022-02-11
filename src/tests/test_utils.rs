@@ -1,7 +1,7 @@
 use crate::index::index_structs::{Document,Infobox,Citation};
 
-pub fn get_document_with_text(id: u32,title: &str, infoboxes: Vec<(&str,&str)> , main_text: &str , citations: Vec<&str>, categories: &str) -> Document{
-     Document {
+pub fn get_document_with_text(id: u32,title: &str, infoboxes: Vec<(&str,&str)> , main_text: &str , citations: Vec<&str>, categories: &str) -> Box<Document>{
+     Box::new(Document {
         title: title.to_string(),
         doc_id: id,
         infoboxes: infoboxes.iter().map(|(a,b)| Infobox{itype:a.to_string(), text:b.to_string()}).collect(),
@@ -11,11 +11,11 @@ pub fn get_document_with_text(id: u32,title: &str, infoboxes: Vec<(&str,&str)> ,
         last_updated_date: String::default(),
         namespace: i16::default(),
         article_links: String::default(),
-    }
+    })
 }
 
-pub fn get_document_with_links(id: u32,title: &str ,links: &str) -> Document{
-    Document {
+pub fn get_document_with_links(id: u32,title: &str ,links: &str) -> Box<Document>{
+    Box::new(Document {
        title: title.to_string(),
        doc_id: id,
        infoboxes: vec![],
@@ -25,5 +25,5 @@ pub fn get_document_with_links(id: u32,title: &str ,links: &str) -> Document{
        last_updated_date: String::default(),
        namespace: i16::default(),
        article_links: links.to_string(),
-   }
+   })
 }
