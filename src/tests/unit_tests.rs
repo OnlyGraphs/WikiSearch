@@ -1,8 +1,10 @@
+use crate::index::index_builder::{IndexBuilder, SqlIndexBuilder};
 use crate::index::{
     index::{BasicIndex, Index},
     index_structs::{PosRange, Posting},
 };
 use crate::tests::test_utils::{get_document_with_links, get_document_with_text};
+use std::env;
 
 #[test]
 fn test_basic_index_get_postings() {
@@ -215,21 +217,22 @@ fn test_basic_index_links() {
 
 // // fn check_no_punctuation_as_tokens_please{}
 
-// #[tokio::test]
-// async fn test_index_builder() {
-//     let connection_string: String = env::var("DATABASE_URL").expect("Did not set URL.");
-//     let dump_id = 1;
-//     let index_builder = SqlIndexBuilder {
-//         connection_string: connection_string,
-//         dump_id: dump_id,
-//     };
-//     let idx = match index_builder.build_index().await {
-//         Ok(v) => v,
-//         Err(e) => panic!("{:#?}", e),
-//     };
+#[tokio::test]
+async fn test_index_builder() {
+    let connection_string: String = env::var("DATABASE_URL").expect("Did not set URL.");
+    let dump_id = 1;
+    let index_builder = SqlIndexBuilder {
+        connection_string: connection_string,
+        dump_id: dump_id,
+    };
+    let mut idx = match index_builder.build_index().await {
+        Ok(v) => v,
+        Err(e) => panic!("{:#?}", e),
+    };
 
-//     println!("{:?}", idx.doc_freq.get("april"));
-// }
+    println!("{:?}", idx.df("april"));
+    println!("{:?}", idx);
+}
 
 // //Check if index updates if dump id changes
 // fn check_if_dump_id_changed() {
