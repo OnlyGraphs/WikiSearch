@@ -13,9 +13,9 @@
     - `$ docker run -p 8000:8000 --rm -a stdin -a stdout <image name>:<image version>`
     - or `make run_img` for default tags
     - `--rm` makes sure image closes after you quit the shell
-    - `-p` binds the port 80 in the container to port 80 on your machine (localhost)
+    - `-p` binds the port 8000 in the container to port 8000 on your machine (localhost)
     - `-a` options bind the console output and input to your shell for debugging
-- The API server should now be available under `localhost:80`
+- The API server should now be available under `localhost:8000`
 
 # Compiling and running locally without docker
 - Install rust 1.58.1: https://www.rust-lang.org/learn/get-started
@@ -33,5 +33,5 @@
 - `make docs` (opens in browser)
 
 # Environment Variables
-- `SEARCH_PORT`: sets the port at which search API listens (default 80)
+- `SEARCH_PORT`: sets the port at which search API listens (default 8000)
 - `SEARCH_IP`: setst the ip address to which the search API binds (default 127.0.0.1) 
