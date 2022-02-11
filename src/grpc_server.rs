@@ -49,7 +49,6 @@ impl WikiSearch for CheckIndexService {
         };
 
         *guard = res;
-        println!("{:?}",*guard);
 
         Ok(Response::new(CheckIndexReply {
             success: true,

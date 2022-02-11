@@ -55,7 +55,7 @@ async fn run_grpc(index: Arc<RwLock<Box<dyn Index>>>) -> std::io::Result<()> {
 
     // build initial index
     let service = CheckIndexService { index: index };
-    // service.update_index(Request::new(CheckIndexRequest{})).await.expect("Could not update the index initially");
+    service.update_index(Request::new(CheckIndexRequest{})).await.expect("Could not update the index initially");
 
     Server::builder()
         .add_service(WikiSearchServer::new(service))

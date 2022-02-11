@@ -67,6 +67,7 @@ impl IndexBuilder for SqlIndexBuilder {
             })
         }
 
+
         
         let citations_query = match query!(
             "SELECT c.articleid, c.citationid, c.body

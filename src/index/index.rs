@@ -51,7 +51,7 @@ impl fmt::Debug for dyn Index {
 
 //TODO:
 //Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
-#[derive(Debug)]
+
 pub struct BasicIndex {
     pub dump_id: Option<u32>,
     pub document_metadata: HashMap<u32, DocumentMetaData>,
@@ -61,6 +61,12 @@ pub struct BasicIndex {
     pub links: Either<HashMap<u32, Vec<String>>, HashMap<u32, Vec<u32>>>, 
     pub extent: HashMap<String,HashMap<u32, PosRange>>, // structure type -> docid -> pos range
     pub id_title_map: BiMap<u32,String>,
+}
+
+impl fmt::Debug for BasicIndex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "hello")
+    }
 }
 
 impl Default for BasicIndex {
