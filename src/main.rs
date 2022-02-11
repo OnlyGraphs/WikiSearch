@@ -3,6 +3,7 @@ mod grpc_server;
 mod index;
 mod tests;
 
+use actix_cors::Cors;
 use tonic::Request;
 use actix_web::{App, HttpServer};
 use actix_files::Files;
@@ -54,7 +55,7 @@ async fn run_grpc(index: Arc<RwLock<Box<dyn Index>>>) -> std::io::Result<()> {
 
     // build initial index
     let service = CheckIndexService { index: index };
-    service.update_index(Request::new(CheckIndexRequest{})).await.expect("Could not update the index initially");
+    // service.update_index(Request::new(CheckIndexRequest{})).await.expect("Could not update the index initially");
 
     Server::builder()
         .add_service(WikiSearchServer::new(service))
@@ -75,9 +76,15 @@ async fn run_rest() -> std::io::Result<()> {
     let static_dir = env::var("STATIC_DIR").unwrap_or("./staticfiles".to_string());
 
     println!("Binding to: {}", bind_address);
+
+
+    
     HttpServer::new(move || {
+        let cors = Cors::permissive();
+
         let static_dir_cpy = &static_dir;
         App::new()
+            .wrap(cors)
             .service(api::endpoints::search)
             .service(api::endpoints::relational)
             .service(api::endpoints::feedback)
