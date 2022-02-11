@@ -1,7 +1,7 @@
 {
   "db": "PostgreSQL",
-  "cf862e2a73cdef58294a90087178fa829e843afbc15202890902c7c06841ee89": {
-    "query": "SELECT * FROM content\n                                ORDER BY articleid ASC ",
+  "618b967b31c942f0561fa68eb348fb571786d7256fe36e87a9b5baada4e0c594": {
+    "query": "SELECT a.articleid, a.title, a.domain, a.namespace, a.lastupdated,\n                    c.categories, c.abstracts, c.links, c.text\n             From article as a, \"content\" as c\n             where a.articleid = c.articleid",
     "describe": {
       "columns": [
         {
@@ -11,27 +11,78 @@
         },
         {
           "ordinal": 1,
-          "name": "text",
-          "type_info": "Text"
+          "name": "title",
+          "type_info": "Varchar"
         },
         {
           "ordinal": 2,
+          "name": "domain",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "namespace",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 4,
+          "name": "lastupdated",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
           "name": "categories",
           "type_info": "Text"
         },
         {
-          "ordinal": 3,
+          "ordinal": 6,
+          "name": "abstracts",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
           "name": "links",
           "type_info": "Text"
         },
         {
-          "ordinal": 4,
-          "name": "templates",
+          "ordinal": 8,
+          "name": "text",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  "71e614e62eaafab6e17b441599bab06ccd813ef755250493893d5a5bc3b54dc3": {
+    "query": "SELECT i.articleid, i.infoboxtype, i.body\n             From infoboxes as i",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "articleid",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "infoboxtype",
           "type_info": "Text"
         },
         {
-          "ordinal": 5,
-          "name": "abstracts",
+          "ordinal": 2,
+          "name": "body",
           "type_info": "Text"
         }
       ],
@@ -40,11 +91,38 @@
       },
       "nullable": [
         false,
-        true,
-        true,
-        true,
-        true,
-        true
+        false,
+        false
+      ]
+    }
+  },
+  "c76d7ee9cdb25d3a47ba461b7d5e51ad8912dac4e0d72e9e387a574b4d3f997c": {
+    "query": "SELECT c.articleid, c.citationid, c.body\n             From citations as c",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "articleid",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "citationid",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false
       ]
     }
   }

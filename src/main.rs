@@ -3,11 +3,12 @@ mod grpc_server;
 mod index;
 mod tests;
 
+use tonic::Request;
 use actix_web::{App, HttpServer};
 use actix_files::Files;
-use api_rs::wiki_search::wiki_search_server::WikiSearchServer;
-use grpc_server::CheckIndexService;
-use index::index::BasicIndex;
+use api_rs::wiki_search::{wiki_search_server::{WikiSearchServer,WikiSearch},CheckIndexRequest};
+use grpc_server::{CheckIndexService};
+use index::index::{BasicIndex,Index};
 use std::{
     env,
     io::{Error, ErrorKind},
@@ -18,10 +19,16 @@ use tonic::transport::Server;
 
 fn main() -> std::io::Result<()> {
 
+    
+    // create shared memory for index
+    let index : Arc<RwLock<Box<dyn Index>>> 
+        = Arc::new(RwLock::new(Box::new(BasicIndex::default())));
+
+
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
     thread::spawn(move || {
-        run_grpc().expect("GRPC API Failed to run");
+        run_grpc(index).expect("GRPC API Failed to run");
     });
 
     let handle = thread::spawn(move || {
@@ -37,18 +44,20 @@ fn main() -> std::io::Result<()> {
 
 
 #[actix_web::main]
-async fn run_grpc() -> std::io::Result<()> {
+async fn run_grpc(index: Arc<RwLock<Box<dyn Index>>>) -> std::io::Result<()> {
     // launc grpc serices and server
     println!("Lauching gRPC server");
     let grpc_address = env::var("GRPC_ADDRESS").unwrap_or("127.0.0.1:50051".to_string());
     
     println!("Binding to {}", grpc_address);
 
-    // create shared memory for index
-    let index = Arc::new(RwLock::new(BasicIndex::default()));
+
+    // build initial index
+    let service = CheckIndexService { index: index };
+    service.update_index(Request::new(CheckIndexRequest{})).await.expect("Could not update the index initially");
 
     Server::builder()
-        .add_service(WikiSearchServer::new(CheckIndexService { index: index }))
+        .add_service(WikiSearchServer::new(service))
         .serve(grpc_address.parse().unwrap())
         .await
         .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
