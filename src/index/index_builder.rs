@@ -1,9 +1,12 @@
 use crate::index::index_structs::Citation;
 use crate::index::index_structs::Infobox;
-use std::collections::HashMap;
-use crate::index::{index_structs::Document,index::{BasicIndex, Index}};
+use crate::index::{
+    index::{BasicIndex, Index},
+    index_structs::Document,
+};
 use async_trait::async_trait;
 use sqlx::{postgres::PgPoolOptions, query};
+use std::collections::HashMap;
 use std::fs;
 
 #[derive(Debug)]
@@ -25,7 +28,6 @@ pub struct SqlIndexBuilder {
     pub dump_id: u32,
 }
 
-
 #[async_trait]
 impl IndexBuilder for SqlIndexBuilder {
     async fn build_index(&self) -> Result<Box<dyn Index>, BuildErrorCode> {
@@ -42,47 +44,54 @@ impl IndexBuilder for SqlIndexBuilder {
             "SELECT a.articleid, a.title, a.domain, a.namespace, a.lastupdated,
                     c.categories, c.abstracts, c.links, c.text
              From article as a, \"content\" as c
-             where a.articleid = c.articleid")
-            .fetch_all(&pool)
-            .await{
+             where a.articleid = c.articleid"
+        )
+        .fetch_all(&pool)
+        .await
+        {
             Ok(main_query) => main_query,
             Err(error) => return Err(BuildErrorCode::Server(error.to_string())),
         };
-        
 
         let infoboxes_query = match query!(
             "SELECT i.articleid, i.infoboxtype, i.body
-             From infoboxes as i")
-            .fetch_all(&pool)
-            .await{
+             From infoboxes as i"
+        )
+        .fetch_all(&pool)
+        .await
+        {
             Ok(infoboxes_query) => infoboxes_query,
             Err(error) => return Err(BuildErrorCode::Server(error.to_string())),
         };
 
-        let mut article_infoboxes : HashMap<u32,Vec<Infobox>> = HashMap::new();
+        let mut article_infoboxes: HashMap<u32, Vec<Infobox>> = HashMap::new();
         for i in infoboxes_query {
-            article_infoboxes.entry(i.articleid as u32).or_insert(Vec::new()).push(Infobox{
-                itype: i.infoboxtype,
-                text: i.body
-            })
+            article_infoboxes
+                .entry(i.articleid as u32)
+                .or_insert(Vec::new())
+                .push(Infobox {
+                    itype: i.infoboxtype,
+                    text: i.body,
+                })
         }
 
-
-        
         let citations_query = match query!(
             "SELECT c.articleid, c.citationid, c.body
-             From citations as c")
-            .fetch_all(&pool)
-            .await{
+             From citations as c"
+        )
+        .fetch_all(&pool)
+        .await
+        {
             Ok(citations_query) => citations_query,
             Err(error) => return Err(BuildErrorCode::Server(error.to_string())),
         };
 
-        let mut article_citations : HashMap<u32,Vec<Citation>> = HashMap::new();
+        let mut article_citations: HashMap<u32, Vec<Citation>> = HashMap::new();
         for i in citations_query {
-            article_citations.entry(i.articleid as u32).or_insert(Vec::new()).push(Citation{
-                text: i.body
-            })
+            article_citations
+                .entry(i.articleid as u32)
+                .or_insert(Vec::new())
+                .push(Citation { text: i.body })
         }
 
         let mut idx = BasicIndex::default();
