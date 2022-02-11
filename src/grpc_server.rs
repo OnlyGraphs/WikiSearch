@@ -1,4 +1,4 @@
-use crate::index::index::{Index};
+use crate::index::index::Index;
 use crate::index::index_builder::{IndexBuilder, SqlIndexBuilder};
 use api_rs::wiki_search::{wiki_search_server::WikiSearch, CheckIndexReply, CheckIndexRequest};
 use std::env;
@@ -19,13 +19,11 @@ impl WikiSearch for CheckIndexService {
         request: Request<CheckIndexRequest>,
     ) -> Result<Response<CheckIndexReply>, Status> {
         // TODO: check dump id
-
         let connection_string: String = env::var("DATABASE_URL").expect("Did not set URL.");
-
 
         let index_builder = SqlIndexBuilder {
             connection_string: connection_string,
-            dump_id: 2,
+            dump_id: 0,
         };
 
         let res = match index_builder.build_index().await {
@@ -49,6 +47,8 @@ impl WikiSearch for CheckIndexService {
         };
 
         *guard = res;
+        // println!("Hello");
+        // println!("{:?}", self.index);
 
         Ok(Response::new(CheckIndexReply {
             success: true,

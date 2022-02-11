@@ -10,16 +10,6 @@ use std::{
     marker::{Send, Sync},
 };
 
-/**
- * BasicIndex Structure:
- * Metadata <NOT included in postings>
- * Abstracts <NOT included in postings>
- * Infobox <Word position starts here at 0>
- * Main body
- * Citations
- * Categories
- */
-
 pub enum IndexEncoding {
     None,
     DeltaEncoding,
@@ -49,7 +39,15 @@ impl fmt::Debug for dyn Index {
 
 //TODO:
 //Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
-
+/**
+ * BasicIndex Structure:
+ * Metadata <NOT included in postings>
+ * Abstracts <NOT included in postings>
+ * Infobox <Word position starts here at 0>
+ * Main body
+ * Citations
+ * Categories
+ */
 pub struct BasicIndex {
     pub dump_id: Option<u32>,
     pub document_metadata: HashMap<u32, DocumentMetaData>,
@@ -59,26 +57,12 @@ pub struct BasicIndex {
     pub links: Either<HashMap<u32, Vec<String>>, HashMap<u32, Vec<u32>>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>, // structure type -> docid -> pos range
     pub id_title_map: BiMap<u32, String>,
+    pub encoding_type: IndexEncoding,
 }
 
 impl fmt::Debug for BasicIndex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "hello")
-    }
-}
-
-impl Default for BasicIndex {
-    fn default() -> Self {
-        BasicIndex {
-            dump_id: None,
-            postings: HashMap::new(),
-            doc_freq: HashMap::new(),
-            links: Left(HashMap::new()),
-            term_freq: HashMap::new(),
-            document_metadata: HashMap::new(),
-            extent: HashMap::new(),
-            id_title_map: BiMap::new(),
-        }
     }
 }
 
@@ -198,6 +182,20 @@ impl Index for BasicIndex {
 }
 
 impl BasicIndex {
+    pub fn new(encoding_type: IndexEncoding) -> Self {
+        BasicIndex {
+            dump_id: None,
+            postings: HashMap::new(),
+            doc_freq: HashMap::new(),
+            links: Left(HashMap::new()),
+            term_freq: HashMap::new(),
+            document_metadata: HashMap::new(),
+            extent: HashMap::new(),
+            id_title_map: BiMap::new(),
+            encoding_type: encoding_type,
+        }
+    }
+
     fn add_tokens(&mut self, doc_id: u32, text_to_add: String, mut word_pos: u32) -> u32 {
         for token in text_to_add.split(" ") {
             self.add_posting(token.to_string(), doc_id, word_pos);

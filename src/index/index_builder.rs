@@ -1,6 +1,7 @@
 use crate::index::index_structs::Citation;
 use crate::index::index_structs::Infobox;
 use crate::index::{
+    index::IndexEncoding,
     index::{BasicIndex, Index},
     index_structs::Document,
 };
@@ -94,7 +95,7 @@ impl IndexBuilder for SqlIndexBuilder {
                 .push(Citation { text: i.body })
         }
 
-        let mut idx = BasicIndex::default();
+        let mut idx = BasicIndex::new(IndexEncoding::None);
 
         idx.set_dump_id(self.dump_id);
 
@@ -113,8 +114,8 @@ impl IndexBuilder for SqlIndexBuilder {
             });
             idx.add_document(new_document);
         }
-
         pool.close().await;
+
         Ok(Box::new(idx))
     }
 }

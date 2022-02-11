@@ -1,3 +1,4 @@
+use crate::index::index::IndexEncoding;
 use crate::index::index_builder::{IndexBuilder, SqlIndexBuilder};
 use crate::index::{
     index::{BasicIndex, Index},
@@ -8,7 +9,7 @@ use std::env;
 
 #[test]
 fn test_basic_index_get_postings() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::new(IndexEncoding::None);
 
     idx.add_document(get_document_with_text(
         2,
@@ -48,7 +49,7 @@ fn test_basic_index_get_postings() {
 
 #[test]
 fn test_basic_index_get_extent() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::new(IndexEncoding::None);
 
     idx.add_document(get_document_with_text(
         2,
@@ -96,7 +97,7 @@ fn test_basic_index_get_extent() {
 
 #[test]
 fn test_basic_index_tf() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::new(IndexEncoding::None);
 
     idx.add_document(get_document_with_text(
         0,
@@ -117,7 +118,7 @@ fn test_basic_index_tf() {
 
 #[test]
 fn test_basic_index_df() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::new(IndexEncoding::None);
 
     idx.add_document(get_document_with_text(
         0,
@@ -148,7 +149,7 @@ fn test_basic_index_df() {
 
 #[test]
 fn test_basic_index_links() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::new(IndexEncoding::None);
 
     idx.add_document(get_document_with_links(0, "source", "target1,target2"));
     idx.add_document(get_document_with_links(1, "target1", "a"));
@@ -170,76 +171,12 @@ fn test_basic_index_links() {
     assert_eq!(idx.title_to_id("target2".to_string()), Some(2));
 }
 
-// #[test]
-// fn test_arbitrary_index_example() {
-//     let mut idx = Index::default();
-//     let mut citations_text = Vec::new();
-//     citations_text.push("author jayden will smith".to_string());
-//     let mut citations_ids = Vec::new();
-//     citations_ids.push(1);
-//     let mut infobox_text = Vec::new();
-//     infobox_text.push("kyle loves rust".to_string());
-//     let mut infobox_ids = Vec::new();
-//     infobox_ids.push(1);
-//     let main_text = "april fourth month year julian gregorian calendars march months days april begins day week july additionally january leap years april ends day week december april flowers sweet pea daisy birthstone diamond meaning diamond innocence month file colorful spring garden jpg thumb px spring flowers".to_string();
-
-//     let all_text = infobox_text.get(0).unwrap().to_owned()
-//         + &main_text
-//         + &citations_text.get(0).unwrap().to_owned()
-//         + "month, dates, calendar";
-//     let mut split = all_text.split(" ");
-
-//     let tokens: Vec<&str> = split.collect();
-
-//     println!("{:#?}", tokens.get(50));
-
-//     let new_document = Document{
-//         doc_id: 1,
-//         title: "April".to_string(),
-//         categories: "month,dates,calendar".to_string(),
-//         last_updated_date: "2020-1-23 14-00-00".to_string(),
-//         namespace: 0,
-//         article_abstract: "April is the fourth month of the year in the Julian and Gregorian calendars and comes between March and May".to_string(),
-//         infobox_text: infobox_text,
-//         infobox_type: "testinfobox".to_string(),
-//         infobox_ids:infobox_ids,
-//         main_text: main_text,
-//         article_links: " Maine,Copenhagen,September,Rotterdam,Harry S. Truman,January 1,Albert Hofmann,Buddhism,Florida,Calendar,Swaziland,2001,Netherlands,King,Mexico,Tanganyika,Haile Selassie,Buddha,1865,1971,Abraham Lincoln,monarch,Thomas Jefferson,1968,John Wilkes Booth,Willem-Alexander of the Netherlands,Pablo Picasso,Zurich,Benito Mussolini,South America,same-sex marriage,1973,Henry VIII of England,November,Gregorian calendar,Sweet Pea,Jacob Roggeveen,flower,October,Laos,Tbilisi,Ridran,Dance,April 14,Iran,Army,calendar,Iceland,ANZAC Day,1909,Asteraceae,Russia,1533,1721,July,1994,sweet pea,China,2014,Catherine, Duchess of Cambridge,republic,Easter,Major League Baseball,1979,Pope,1841,Diamond,1937,April 18,Church of England,Marathon,Southeast Asia,Elba,Poland,common year,earthquake,love,May 20".to_string(),
-//         citations_text: citations_text,
-//         citations_ids: citations_ids,
-//     };
-
-//     idx.add_document(new_document);
-
-//     println!("{:#?}", idx);
-// }
 // // fn check_no_spaces_as_tokens_please{};
 
 // // fn check_no_punctuation_as_tokens_please{}
 
-#[tokio::test]
-async fn test_index_builder() {
-    let connection_string: String = env::var("DATABASE_URL").expect("Did not set URL.");
-    let dump_id = 1;
-    let index_builder = SqlIndexBuilder {
-        connection_string: connection_string,
-        dump_id: dump_id,
-    };
-    let mut idx = match index_builder.build_index().await {
-        Ok(v) => v,
-        Err(e) => panic!("{:#?}", e),
-    };
-
-    println!("{:?}", idx.df("april"));
-    println!("{:?}", idx);
-}
-
 // //Check if index updates if dump id changes
 // fn check_if_dump_id_changed() {
-//     todo!();
-// }
-
-// fn check_if_dump_id_is_assigned() {
 //     todo!();
 // }
 
