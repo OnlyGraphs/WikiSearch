@@ -1,5 +1,4 @@
-use crate::index::index::{BasicIndex, IndexInterface};
-use crate::index::index_structs::Document;
+use crate::index::{index_structs::Document,index::{BasicIndex, Index}};
 use async_trait::async_trait;
 use sqlx::{postgres::PgPoolOptions, query};
 use std::fs;

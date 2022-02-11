@@ -1,5 +1,4 @@
 use crate::index::index_structs::*;
-use crate::index::utils::*;
 
 use either::{Either, Left};
 use std::collections::HashMap;
@@ -26,43 +25,9 @@ pub enum IndexEncoding {
 }
 
 //TODO: Interface to specify functions that should be shared among different types of indices created (Ternary Index Tree vs BasicIndex)
-pub trait IndexInterface {
-    fn add_tokens(&mut self, doc_id: u32, text_to_add: String, word_pos: u32) -> u32;
-
-    fn add_posting(&mut self, token: String, docid: u32, word_pos: u32);
+pub trait Index {
     fn add_document(&mut self, document: Document);
-
     fn set_dump_id(&mut self, new_dump_id: u32);
-    fn add_document_metadata(
-        &mut self,
-        doc_id: u32,
-        title: String,
-        lastUpdatedDate: String,
-        namespace: u32,
-    );
-    fn add_abstract(&mut self, doc_id: u32, article_abstract: String);
-
-    fn add_links(&mut self, doc_id: u32, article_links: &str);
-
-    //TODO: Change to &str
-    fn add_infoboxes(
-        &mut self,
-        doc_id: u32,
-        infobox_type: String,
-        text: Vec<String>,
-        infobox_ids: Vec<u32>,
-        word_pos: u32,
-    ) -> u32;
-    fn add_main_text(&mut self, doc_id: u32, main_text: &str, word_pos: u32) -> u32;
-
-    fn add_citations(
-        &mut self,
-        doc_id: u32,
-        citations_body: Vec<String>,
-        citation_ids: Vec<u32>,
-        word_pos: u32,
-    ) -> u32;
-    fn add_categories(&mut self, doc_id: u32, categories_str: String, word_pos: u32) -> u32;
 }
 
 //TODO:
@@ -99,7 +64,7 @@ impl Default for BasicIndex {
     }
 }
 
-impl IndexInterface for BasicIndex {
+impl BasicIndex{
     fn add_tokens(&mut self, doc_id: u32, text_to_add: String, mut word_pos: u32) -> u32 {
         for token in text_to_add.split(" ") {
             self.add_posting(token.to_string(), doc_id, word_pos);
@@ -125,51 +90,6 @@ impl IndexInterface for BasicIndex {
         *freq_map.entry(docid).or_insert(0) += 1;
     }
 
-    fn add_document(&mut self, document: Document) {
-        let mut word_pos = 0;
-
-        //Metadata
-        self.add_document_metadata(
-            document.doc_id,
-            document.title,
-            document.last_updated_date,
-            document.namespace,
-        );
-
-        //Abstracts
-        self.add_abstract(document.doc_id, document.article_abstract);
-
-        // //Infobox
-
-        word_pos = self.add_infoboxes(
-            document.doc_id,
-            document.infobox_type,
-            document.infobox_text,
-            document.infobox_ids,
-            word_pos,
-        );
-
-        //Main body
-        word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
-
-        //Citations
-        word_pos = self.add_citations(
-            document.doc_id,
-            document.citations_text,
-            document.citations_ids,
-            word_pos,
-        );
-
-        //Categories
-        word_pos = self.add_categories(document.doc_id, document.categories, word_pos);
-
-        //Links
-        self.add_links(document.doc_id, &document.article_links);
-    }
-
-    fn set_dump_id(&mut self, new_dump_id: u32) {
-        self.dump_id = Some(new_dump_id);
-    }
 
     fn add_document_metadata(
         &mut self,
@@ -278,4 +198,57 @@ impl IndexInterface for BasicIndex {
         }
         return word_pos;
     }
+}
+
+
+
+impl Index for BasicIndex {
+
+    fn set_dump_id(&mut self, new_dump_id: u32) {
+        self.dump_id = Some(new_dump_id);
+    }
+
+    fn add_document(&mut self, document: Document) {
+        let mut word_pos = 0;
+
+        //Metadata
+        self.add_document_metadata(
+            document.doc_id,
+            document.title,
+            document.last_updated_date,
+            document.namespace,
+        );
+
+        //Abstracts
+        self.add_abstract(document.doc_id, document.article_abstract);
+
+        // //Infobox
+
+        word_pos = self.add_infoboxes(
+            document.doc_id,
+            document.infobox_type,
+            document.infobox_text,
+            document.infobox_ids,
+            word_pos,
+        );
+
+        //Main body
+        word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
+
+        //Citations
+        word_pos = self.add_citations(
+            document.doc_id,
+            document.citations_text,
+            document.citations_ids,
+            word_pos,
+        );
+
+        //Categories
+        self.add_categories(document.doc_id, document.categories, word_pos);
+
+        //Links
+        self.add_links(document.doc_id, &document.article_links);
+    }
+
+
 }
