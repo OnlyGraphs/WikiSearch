@@ -1,4 +1,4 @@
-use crate::parser::{parser::{parse_query, parse_dist_query, is_comma, is_tab},ast::{Query, StructureElem}};
+use crate::parser::{parser::{parse_query, parse_dist_query, is_comma, is_tab, parse_structure_query, parse_not_query},ast::{Query, StructureElem, UnaryOp}};
 
 // AST Helper Functions
 #[test]
@@ -58,4 +58,28 @@ fn test_dist_query_2() {
         _ => assert!(false)
     }
 
+}
+
+#[test]
+fn test_simple_structure_query() {
+    let query = "#TITLE pumpkin";
+    let (s, struct_node) = parse_structure_query(query).unwrap();
+    match *struct_node {
+        Query::StructureQuery{elem, sub} => assert!(elem == StructureElem::Title && sub == Box::new(Query::FreetextQuery{
+            tokens: vec!["pumpkin".to_string()],
+        })),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_simple_not_query() {
+    let query = "NOT pumpkin";
+    let (s, unary_node) = parse_not_query(query).unwrap();
+    match *unary_node {
+        Query::UnaryQuery{op, sub} => assert!(op == UnaryOp::Not && sub == Box::new(Query::FreetextQuery{
+            tokens: vec!["pumpkin".to_string()],
+        })),
+        _ => assert!(false),
+    }
 }
