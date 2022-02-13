@@ -115,6 +115,8 @@ impl IndexBuilder for SqlIndexBuilder {
         }
 
         pool.close().await;
+        idx.finalize();
+
         Ok(Box::new(idx))
     }
 }

@@ -1,8 +1,8 @@
-use crate::parser::ast::{Query,StructureElem, UnaryOp};
+use crate::parser::ast::{Query,StructureElem, UnaryOp, BinaryOp};
 
 use nom::{
     IResult,
-    bytes::complete::{take_while1,tag_no_case,tag, take_while},
+    bytes::complete::{take_while1,tag_no_case,tag, take_while, take_until},
     multi::{separated_list0,many1},
     character::{is_alphanumeric,is_space},
     character::complete::{digit0},
@@ -46,6 +46,14 @@ pub fn parse_separator(nxt: &str) -> IResult<&str, &str>{
     take_while(is_seperator)(nxt)
 }
 
+pub fn is_OR(nxt: &str) -> bool {
+    return nxt == "OR"
+}
+
+pub fn is_AND(nxt: &str) -> bool {
+    return nxt == "AND"
+}
+
 // TODO: Consider more than single tokens (e.g.: #DIST,3,pumpkin pie,latte)
 // Note that this only considers single tokens
 pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
@@ -84,6 +92,7 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
 pub fn parse_query(nxt : &str) -> IResult<&str, Box<Query>> {
     alt((
+        parse_binary_query,
         parse_structure_query,
         parse_freetext_query,
     ))(nxt)
@@ -123,6 +132,7 @@ pub fn parse_token(nxt : &str) -> IResult<&str, String> {
 }
 
 pub fn parse_not_query(nxt: &str) -> IResult<&str, Box<Query>> {
+    let (nxt, _)  = parse_separator(nxt)?;
     let (nxt, _) = tag_no_case("NOT")(nxt)?;
     let (nxt, _)  = parse_separator(nxt)?;
     let (nxt, query) = parse_query(nxt)?;
@@ -133,4 +143,52 @@ pub fn parse_not_query(nxt: &str) -> IResult<&str, Box<Query>> {
             sub: query,
         }
     )));
+}
+
+pub fn parse_or_query(nxt: &str) -> IResult<&str, Box<Query>> {
+    let (nxt, _)  = parse_separator(nxt)?;
+    let (query2, query1) = take_until("OR")(nxt)?;
+    let (query2, _) = tag("OR")(query2)?;
+    let (query2, _) = parse_separator(query2)?;
+
+    let (nxt, q1) = parse_query(query1)?;
+    let (nxt, q2) = parse_query(query2)?;
+
+    return Ok((nxt,
+        Box::new(
+            Query::BinaryQuery{
+                op: BinaryOp::Or,
+                lhs: q1,
+                rhs: q2,
+            }
+        )
+    ));
+
+}
+
+pub fn parse_and_query(nxt: &str) -> IResult<&str, Box<Query>> {
+    let (nxt, _)  = parse_separator(nxt)?;
+    let (query2, query1) = take_until("AND")(nxt)?;
+    let (query2, _) = tag("AND")(query2)?;
+    let (query2, _) = parse_separator(query2)?;
+    let (nxt, q1) = parse_query(query1)?;
+    let (nxt, q2) = parse_query(query2)?;
+
+    return Ok((nxt,
+        Box::new(
+            Query::BinaryQuery{
+                op: BinaryOp::And,
+                lhs: q1,
+                rhs: q2,
+            }
+        )
+    ));
+
+}
+
+pub fn parse_binary_query(nxt: &str) -> IResult<&str, Box<Query>> {
+   alt((
+       parse_and_query,
+       parse_or_query
+   ))(nxt)
 }
