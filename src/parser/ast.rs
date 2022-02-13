@@ -1,16 +1,16 @@
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum BinaryOp {
     And,
     Or
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum UnaryOp {
     Not,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum StructureElem{
     Title,
     Category,
@@ -29,7 +29,7 @@ impl From<&str> for StructureElem {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Query {
     BinaryQuery {
         op: BinaryOp,
