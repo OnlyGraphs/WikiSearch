@@ -48,6 +48,8 @@ impl WikiSearch for CheckIndexService {
             }
         };
 
+        println!("{:?}",res);
+
         *guard = res;
 
         Ok(Response::new(CheckIndexReply {

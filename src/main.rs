@@ -2,6 +2,7 @@ mod api;
 mod grpc_server;
 mod index;
 mod tests;
+mod utils;
 
 use actix_cors::Cors;
 use tonic::Request;

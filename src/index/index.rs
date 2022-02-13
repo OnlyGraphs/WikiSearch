@@ -1,14 +1,16 @@
-use crate::index::index_structs::*;
+use std::fmt::Formatter;
+use std::fmt::Debug;
 use bimap::BiMap;
 use std::collections::HashSet;
 
-use async_trait::async_trait;
 use either::{Either, Left, Right};
 use std::{
     collections::HashMap,
     fmt,
     marker::{Send, Sync},
 };
+use crate::utils::utils::MemFootprintCalculator;
+use crate::index::index_structs::{DocumentMetaData,Document,PosRange,Posting};
 
 /**
  * BasicIndex Structure:
@@ -27,7 +29,7 @@ pub enum IndexEncoding {
 }
 
 //TODO: Interface to specify functions that should be shared among different types of indices created (Ternary Index Tree vs BasicIndex)
-pub trait Index: Send + Sync {
+pub trait Index: Send + Sync + Debug + MemFootprintCalculator{
     fn add_document(&mut self, document: Box<Document>);
     fn set_dump_id(&mut self, new_dump_id: u32);
     fn get_dump_id(self) -> u32;
@@ -40,12 +42,10 @@ pub trait Index: Send + Sync {
     fn get_links(&mut self, source: u32) -> Vec<u32>;
     fn id_to_title(&mut self, source: u32) -> Option<&String>;
     fn title_to_id(&mut self, source: String) -> Option<u32>;
+
 }
-impl fmt::Debug for dyn Index {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
+
+
 
 //TODO:
 //Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
@@ -59,12 +59,6 @@ pub struct BasicIndex {
     pub links: Either<HashMap<u32, Vec<String>>, HashMap<u32, Vec<u32>>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>, // structure type -> docid -> pos range
     pub id_title_map: BiMap<u32, String>,
-}
-
-impl fmt::Debug for BasicIndex {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "hello")
-    }
 }
 
 impl Default for BasicIndex {
@@ -82,7 +76,42 @@ impl Default for BasicIndex {
     }
 }
 
+
+impl MemFootprintCalculator for BasicIndex {
+    fn real_mem(&self) -> u64 {
+        self.dump_id.real_mem() +
+        self.postings.real_mem() +
+        self.doc_freq.real_mem() + 
+        self.links.real_mem() +
+        self.term_freq.real_mem() +
+        self.document_metadata.real_mem() +
+        self.extent.real_mem() +
+        self.id_title_map.real_mem()
+    }
+}
+
+impl Debug for BasicIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result{
+        let mem = self.real_mem() as f64 / 1000000.0;
+        let docs = self.links.as_ref().unwrap_right().len();
+        write!(f, "BasicIndex{{\n\
+            \tDump ID={:?}\n\
+            \tPostings={:?}\n\
+            \tDocs={:.3}\n\
+            \tRAM={:.3}MB\n\
+            \tRAM/Docs={:.3}GB/1Million\n\
+            }}
+            ",self.dump_id,
+            self.postings.len(),
+            docs,
+            mem,
+            ((mem / 1000.0) / (docs as f64)) * 1000000.0
+        )
+    }
+}
+
 impl Index for BasicIndex {
+
     fn get_links(&mut self, source: u32) -> Vec<u32> {
         match self
             .links

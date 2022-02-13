@@ -1,0 +1,59 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch 'Search' LLDB",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/search",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "SEARCH_PORT":"8000",
+                "GRPC_PORT":"50051",
+                "DATABASE_URL":"postgresql://postgres:password@localhost:8001/only_graph",
+                "SQLX_OFFLINE":"true"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'search'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=search",
+                    "--package=search"
+                ],
+                "filter": {
+                    "name": "search",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'search'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=search",
+                    "--package=search"
+                ],
+                "filter": {
+                    "name": "search",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
