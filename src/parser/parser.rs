@@ -131,6 +131,11 @@ pub fn parse_token(nxt : &str) -> IResult<&str, String> {
         .map(|(nxt,res)| (nxt, res.to_string()))
 }
 
+pub fn parse_token0(nxt : &str) -> IResult<&str, String> {
+    take_while(is_token_char)(nxt)
+        .map(|(nxt,res)| (nxt, res.to_string()))
+}
+
 pub fn parse_not_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _)  = parse_separator(nxt)?;
     let (nxt, _) = tag_no_case("NOT")(nxt)?;
@@ -145,6 +150,7 @@ pub fn parse_not_query(nxt: &str) -> IResult<&str, Box<Query>> {
     )));
 }
 
+// TODO: Make OR not case sensitive
 pub fn parse_or_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _)  = parse_separator(nxt)?;
     let (query2, query1) = take_until("OR")(nxt)?;
@@ -166,6 +172,7 @@ pub fn parse_or_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
 }
 
+// TODO: Make AND not case sensitive
 pub fn parse_and_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _)  = parse_separator(nxt)?;
     let (query2, query1) = take_until("AND")(nxt)?;
@@ -191,4 +198,19 @@ pub fn parse_binary_query(nxt: &str) -> IResult<&str, Box<Query>> {
        parse_and_query,
        parse_or_query
    ))(nxt)
+}
+
+// TODO: Remove separators
+pub fn parse_wildcard_query(nxt: &str) -> IResult<&str, Box<Query>> {
+    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, lhs) = parse_token0(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, _) = tag("*")(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, rhs) = parse_token0(nxt)?;
+
+    Ok((nxt, Box::new(Query::WildcardQuery{
+        prefix: lhs.to_string(),
+        postfix: rhs.to_string(),
+    })))
 }

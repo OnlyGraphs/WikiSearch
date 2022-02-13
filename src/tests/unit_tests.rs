@@ -1,4 +1,17 @@
-use crate::parser::{parser::{parse_query, parse_dist_query, is_comma, is_tab, parse_structure_query, parse_not_query, parse_or_query, parse_and_query, parse_binary_query},ast::{Query, StructureElem, BinaryOp, UnaryOp}};
+use crate::parser::{
+    parser::{
+        parse_query, 
+        parse_dist_query, 
+        is_comma, 
+        is_tab, 
+        parse_structure_query, 
+        parse_not_query, 
+        parse_or_query, 
+        parse_and_query, 
+        parse_binary_query,
+        parse_wildcard_query,
+    },
+    ast::{Query, StructureElem, BinaryOp, UnaryOp}};
 
 // AST Helper Functions
 #[test]
@@ -206,5 +219,61 @@ fn test_nested_binary_query() {
     match *binary_node {
         Query::BinaryQuery{op, lhs, rhs} => assert!(op == BinaryOp::And && lhs == l && rhs == r),
         _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parse_simple_wildcard_query() {
+    let query = "p*kin";
+    let expected = Query::WildcardQuery{
+        prefix: "p".to_string(),
+        postfix: "kin".to_string(),
+    };
+    let (s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    match *wildcard_query {
+        q => assert!(q == expected),
+        _ => assert!(false)
+    }
+}
+
+#[test]
+fn test_parse_wildcard_query_with_whitespace() {
+    let query = " p * kin           ";
+    let expected = Query::WildcardQuery{
+        prefix: "p".to_string(),
+        postfix: "kin".to_string(),
+    };
+    let (s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    match *wildcard_query {
+        q => assert!(q == expected),
+        _ => assert!(false)
+    }
+}
+
+#[test]
+fn test_parse_wildcard_query_no_prefix() {
+    let query = "*kin";
+    let expected = Query::WildcardQuery{
+        prefix: "".to_string(),
+        postfix: "kin".to_string(),
+    };
+    let (s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    match *wildcard_query {
+        q => assert!(q == expected),
+        _ => assert!(false)
+    }
+}
+
+#[test]
+fn test_parse_simple_wildcard_query_no_suffix() {
+    let query = "p*";
+    let expected = Query::WildcardQuery{
+        prefix: "p".to_string(),
+        postfix: "".to_string(),
+    };
+    let (s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    match *wildcard_query {
+        q => assert!(q == expected),
+        _ => assert!(false)
     }
 }
