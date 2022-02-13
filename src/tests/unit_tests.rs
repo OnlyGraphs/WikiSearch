@@ -208,3 +208,123 @@ fn test_nested_binary_query() {
         _ => assert!(false),
     }
 }
+
+
+#[test]
+fn test_compound_query_or_and() {
+    let query = "pumpkin pie OR pumpkin AND patch";
+
+
+    assert_eq!(parse_query(query),Ok(("",
+    Box::new(
+        Query::BinaryQuery{
+            lhs: Box::new(
+                Query::BinaryQuery{
+                    lhs: Box::new(
+                        Query::FreetextQuery{
+                            tokens: vec!["pumpkin".to_string(),"pie".to_string()],
+                    }),
+                    op:BinaryOp::Or,
+                    rhs: Box::new(
+                        Query::FreetextQuery{
+                            tokens: vec!["pumpkin".to_string()]
+                        }
+                    ),
+                }
+            ),
+            op: BinaryOp::And,
+            rhs: Box::new(
+                Query::FreetextQuery{
+                    tokens: vec!["patch".to_string()],
+                }
+            ),
+        }
+    ))));
+}
+
+#[test]
+fn test_compound_query_or_and_2() {
+    let query = "pumpkin pie AND pumpkin OR patch";
+
+    assert_eq!(parse_query(query),Ok(("",
+    Box::new(
+        Query::BinaryQuery{
+            lhs: Box::new(
+                Query::FreetextQuery{
+                    tokens: vec!["pumpkin".to_string(),"pie".to_string()],
+                }
+            ),
+            op: BinaryOp::And,
+            rhs: Box::new(
+                Query::BinaryQuery{
+                    lhs: Box::new(
+                        Query::FreetextQuery{
+                            tokens: vec!["pumpkin".to_string()],
+                    }),
+                    op:BinaryOp::Or,
+                    rhs: Box::new(
+                        Query::FreetextQuery{
+                            tokens: vec!["patch".to_string()]
+                        }
+                    ),
+                }
+            ),
+        }
+    ))));
+}
+
+
+// test for left associativity for both operators
+// right associativity is fine too you can adapt this, but specify in the grammar the associativity and precedence
+//
+// #[test]
+// fn test_compound_query_or_and_3() {
+//     let query = "pumpkin AND pie AND pumpkin OR patch OR pie";
+
+//     assert_eq!(parse_query(query),Ok(("",
+//     Box::new(
+//         Query::BinaryQuery{
+//             lhs: Box::new(
+//                 Query::BinaryQuery{
+//                     lhs: Box::new(
+//                         Query::FreetextQuery{
+//                             tokens: vec!["pumpkin".to_string()]
+//                         }
+//                     ),
+//                     op: BinaryOp::And,
+//                     rhs: Box::new(
+//                         Query::FreetextQuery{
+//                             tokens: vec!["pie".to_string()]
+//                         }
+//                     ),
+//                 }
+//             ),
+//             op: BinaryOp::And,
+//             rhs: Box::new(
+//                 Query::BinaryQuery{
+//                     lhs: Box::new(
+//                         Query::BinaryQuery{
+//                             lhs: Box::new(
+//                                 Query::FreetextQuery{
+//                                     tokens: vec!["pumpkin".to_string()]
+//                                 }
+//                             ),
+//                             op: BinaryOp::Or,
+//                             rhs: Box::new(
+//                                     Query::FreetextQuery{
+//                                         tokens: vec!["patch".to_string()]
+//                             }),
+//                         }
+//                     ),
+//                     op:BinaryOp::Or,
+//                     rhs: Box::new(
+//                         Query::FreetextQuery{
+//                             tokens: vec!["pie".to_string()]
+//                         }
+//                     ),
+//                 }
+//             ),
+//         }
+//     ))))
+// }
+
