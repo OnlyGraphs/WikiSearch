@@ -1,5 +1,5 @@
 use crate::utils::utils::MemFootprintCalculator;
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 //TODO: Check whether some fields can be set to private
 #[derive(Debug)]
@@ -18,14 +18,12 @@ pub struct Posting {
 pub struct PostingNode {
     pub postings: Vec<Posting>,
     pub df: u32,
-    pub tf: HashMap<u32,u32>
+    pub tf: HashMap<u32, u32>,
 }
 
 impl MemFootprintCalculator for PostingNode {
-    fn real_mem(&self) -> u64{
-        self.postings.real_mem() +
-        self.df.real_mem() + 
-        self.tf.real_mem()
+    fn real_mem(&self) -> u64 {
+        self.postings.real_mem() + self.df.real_mem() + self.tf.real_mem()
     }
 }
 

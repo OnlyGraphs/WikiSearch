@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use crate::index::index_structs::Citation;
 use crate::index::index_structs::Infobox;
 use crate::index::{
@@ -8,6 +7,7 @@ use crate::index::{
 use async_trait::async_trait;
 use sqlx::{postgres::PgPoolOptions, query};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum BuildErrorCode {

@@ -5,12 +5,14 @@ mod tests;
 mod utils;
 
 use actix_cors::Cors;
-use tonic::Request;
-use actix_web::{App, HttpServer};
 use actix_files::Files;
-use api_rs::wiki_search::{wiki_search_server::{WikiSearchServer,WikiSearch},CheckIndexRequest};
-use grpc_server::{CheckIndexService};
-use index::index::{BasicIndex,Index};
+use actix_web::{App, HttpServer};
+use api_rs::wiki_search::{
+    wiki_search_server::{WikiSearch, WikiSearchServer},
+    CheckIndexRequest,
+};
+use grpc_server::CheckIndexService;
+use index::index::{BasicIndex, Index};
 use std::{
     env,
     io::{Error, ErrorKind},
@@ -18,14 +20,11 @@ use std::{
     thread,
 };
 use tonic::transport::Server;
+use tonic::Request;
 
 fn main() -> std::io::Result<()> {
-
-
     // create shared memory for index
-    let index : Arc<RwLock<Box<dyn Index>>> 
-        = Arc::new(RwLock::new(Box::new(BasicIndex::default())));
-
+    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::default())));
 
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
@@ -37,26 +36,27 @@ fn main() -> std::io::Result<()> {
         run_rest().expect("REST API Failed to run");
     });
 
-    handle.join()
+    handle
+        .join()
         .map_err(|_e| Error::new(ErrorKind::Other, "Failed to join handle"))?;
 
     Ok(())
 }
-
-
 
 #[actix_web::main]
 async fn run_grpc(index: Arc<RwLock<Box<dyn Index>>>) -> std::io::Result<()> {
     // launc grpc serices and server
     println!("Lauching gRPC server");
     let grpc_address = env::var("GRPC_ADDRESS").unwrap_or("127.0.0.1:50051".to_string());
-    
-    println!("Binding to {}", grpc_address);
 
+    println!("Binding to {}", grpc_address);
 
     // build initial index
     let service = CheckIndexService { index: index };
-    service.update_index(Request::new(CheckIndexRequest{})).await.expect("Could not update the index initially");
+    service
+        .update_index(Request::new(CheckIndexRequest {}))
+        .await
+        .expect("Could not update the index initially");
 
     Server::builder()
         .add_service(WikiSearchServer::new(service))
@@ -78,8 +78,6 @@ async fn run_rest() -> std::io::Result<()> {
 
     println!("Binding to: {}", bind_address);
 
-
-    
     HttpServer::new(move || {
         let cors = Cors::permissive();
 
@@ -89,9 +87,11 @@ async fn run_rest() -> std::io::Result<()> {
             .service(api::endpoints::search)
             .service(api::endpoints::relational)
             .service(api::endpoints::feedback)
-            .service(Files::new("/", static_dir_cpy)
-                .prefer_utf8(true)
-                .index_file("index.html"))
+            .service(
+                Files::new("/", static_dir_cpy)
+                    .prefer_utf8(true)
+                    .index_file("index.html"),
+            )
     })
     .bind(bind_address)?
     .run()

@@ -1,17 +1,17 @@
 use crate::index::index_structs::PostingNode;
-use std::fmt::Formatter;
-use std::fmt::Debug;
 use bimap::BiMap;
 use std::collections::HashSet;
+use std::fmt::Debug;
+use std::fmt::Formatter;
 
+use crate::index::index_structs::{Document, DocumentMetaData, PosRange, Posting};
+use crate::utils::utils::MemFootprintCalculator;
 use either::{Either, Left, Right};
 use std::{
     collections::HashMap,
     fmt,
     marker::{Send, Sync},
 };
-use crate::utils::utils::MemFootprintCalculator;
-use crate::index::index_structs::{DocumentMetaData,Document,PosRange,Posting};
 
 /**
  * BasicIndex Structure:
@@ -30,7 +30,7 @@ pub enum IndexEncoding {
 }
 
 //TODO: Interface to specify functions that should be shared among different types of indices created (Ternary Index Tree vs BasicIndex)
-pub trait Index: Send + Sync + Debug + MemFootprintCalculator{
+pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
     fn add_document(&mut self, document: Box<Document>);
     fn set_dump_id(&mut self, new_dump_id: u32);
     fn get_dump_id(&self) -> u32;
@@ -43,10 +43,7 @@ pub trait Index: Send + Sync + Debug + MemFootprintCalculator{
     fn get_links(&self, source: u32) -> &[u32];
     fn id_to_title(&self, source: u32) -> Option<&String>;
     fn title_to_id(&self, source: String) -> Option<u32>;
-
 }
-
-
 
 //TODO:
 //Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
@@ -73,30 +70,32 @@ impl Default for BasicIndex {
     }
 }
 
-
 impl MemFootprintCalculator for BasicIndex {
     fn real_mem(&self) -> u64 {
-        self.dump_id.real_mem() +
-        self.posting_nodes.real_mem() +
-        self.links.real_mem() +
-        self.document_metadata.real_mem() +
-        self.extent.real_mem() +
-        self.id_title_map.real_mem()
+        self.dump_id.real_mem()
+            + self.posting_nodes.real_mem()
+            + self.links.real_mem()
+            + self.document_metadata.real_mem()
+            + self.extent.real_mem()
+            + self.id_title_map.real_mem()
     }
 }
 
 impl Debug for BasicIndex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mem = self.real_mem() as f64 / 1000000.0;
         let docs = self.links.as_ref().unwrap_right().len();
-        write!(f, "BasicIndex{{\n\
+        write!(
+            f,
+            "BasicIndex{{\n\
             \tDump ID={:?}\n\
             \tPostings={:?}\n\
             \tDocs={:.3}\n\
             \tRAM={:.3}MB\n\
             \tRAM/Docs={:.3}GB/1Million\n\
             }}
-            ",self.dump_id,
+            ",
+            self.dump_id,
             self.posting_nodes.len(),
             docs,
             mem,
@@ -106,7 +105,6 @@ impl Debug for BasicIndex {
 }
 
 impl Index for BasicIndex {
-
     fn get_links(&self, source: u32) -> &[u32] {
         match self
             .links
@@ -156,9 +154,9 @@ impl Index for BasicIndex {
     }
 
     fn df(&self, token: &str) -> u32 {
-        match self.posting_nodes.get(token){
+        match self.posting_nodes.get(token) {
             Some(v) => v.df,
-            None => return 0
+            None => return 0,
         }
     }
 
@@ -170,7 +168,9 @@ impl Index for BasicIndex {
     }
 
     fn get_postings(&self, token: &str) -> Option<&[Posting]> {
-        self.posting_nodes.get(token).and_then(|c| Some(c.postings.as_slice()))
+        self.posting_nodes
+            .get(token)
+            .and_then(|c| Some(c.postings.as_slice()))
     }
 
     fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange> {
@@ -215,8 +215,12 @@ impl Index for BasicIndex {
         }
 
         //Categories
-        word_pos =
-            self.add_structure_elem(document.doc_id, "categories", &document.categories, word_pos);
+        word_pos = self.add_structure_elem(
+            document.doc_id,
+            "categories",
+            &document.categories,
+            word_pos,
+        );
 
         //Links
         self.add_links(document.doc_id, &document.article_links);
@@ -232,21 +236,15 @@ impl BasicIndex {
         return word_pos;
     }
 
-    fn add_posting(&mut self, token: &str, docid: u32, word_pos: u32){
+    fn add_posting(&mut self, token: &str, docid: u32, word_pos: u32) {
+        let node = self.posting_nodes.entry(token.to_string()).or_default();
 
-        let node = self.posting_nodes
-            .entry(token.to_string())
-            .or_default();
+        node.postings.push(Posting {
+            document_id: docid,
+            position: word_pos,
+        });
 
-        node.postings
-            .push(Posting {
-                document_id: docid,
-                position: word_pos,
-            });
-
-        *node.tf
-            .entry(docid)
-            .or_default()+=1;
+        *node.tf.entry(docid).or_default() += 1;
     }
 
     fn add_document_metadata(
