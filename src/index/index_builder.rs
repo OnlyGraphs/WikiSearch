@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::index::index_structs::Citation;
 use crate::index::index_structs::Infobox;
 use crate::index::{
@@ -7,15 +8,14 @@ use crate::index::{
 use async_trait::async_trait;
 use sqlx::{postgres::PgPoolOptions, query};
 use std::collections::HashMap;
-use std::fs;
 
 #[derive(Debug)]
 pub enum BuildErrorCode {
     Access(String),
-    Permissions(String),
-    MissingData(String),
+    // Permissions(String),
+    // MissingData(String),
     Server(String),
-    Teapot(String),
+    // Teapot(String),
 }
 
 #[async_trait]
@@ -39,6 +39,8 @@ impl IndexBuilder for SqlIndexBuilder {
             Ok(pool) => pool,
             Err(error) => return Err(BuildErrorCode::Access(error.to_string())),
         };
+
+        // TODO: check dump id before updating
 
         let main_query = match query!(
             "SELECT a.articleid, a.title, a.domain, a.namespace, a.lastupdated,

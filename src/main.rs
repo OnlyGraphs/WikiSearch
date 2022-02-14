@@ -21,7 +21,7 @@ use tonic::transport::Server;
 
 fn main() -> std::io::Result<()> {
 
-    
+
     // create shared memory for index
     let index : Arc<RwLock<Box<dyn Index>>> 
         = Arc::new(RwLock::new(Box::new(BasicIndex::default())));

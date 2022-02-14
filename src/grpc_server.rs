@@ -16,17 +16,21 @@ pub struct CheckIndexService {
 impl WikiSearch for CheckIndexService {
     async fn update_index(
         &self,
-        request: Request<CheckIndexRequest>,
+        _request: Request<CheckIndexRequest>,
     ) -> Result<Response<CheckIndexReply>, Status> {
-        // TODO: check dump id
 
         let connection_string: String = env::var("DATABASE_URL").expect("Did not set URL.");
 
+        let dump_id = match self.index.try_read(){
+                Ok(v) => (v).get_dump_id(),
+                Err(_) => 0
+        };
 
         let index_builder = SqlIndexBuilder {
             connection_string: connection_string,
-            dump_id: 2,
+            dump_id: self.index.try_read().unwrap().get_dump_id(),
         };
+        
 
         let res = match index_builder.build_index().await {
             Ok(v) => v,
@@ -47,7 +51,6 @@ impl WikiSearch for CheckIndexService {
                 }))
             }
         };
-
         println!("{:?}",res);
 
         *guard = res;

@@ -1,15 +1,32 @@
-//TODO: Check whether some fields can be set to private
+use crate::utils::utils::MemFootprintCalculator;
+use std::{collections::HashMap};
 
+//TODO: Check whether some fields can be set to private
 #[derive(Debug)]
 pub enum Domain {
     Simple,
 }
 
-// stores an appearance of a token in an article
+/// stores an appearance of a token in an article
 #[derive(Debug, Eq, PartialEq)]
 pub struct Posting {
     pub document_id: u32, //TODO: double check memory requirements, highest article word count etc
     pub position: u32,
+}
+
+#[derive(Debug, Eq, PartialEq, Default)]
+pub struct PostingNode {
+    pub postings: Vec<Posting>,
+    pub df: u32,
+    pub tf: HashMap<u32,u32>
+}
+
+impl MemFootprintCalculator for PostingNode {
+    fn real_mem(&self) -> u64{
+        self.postings.real_mem() +
+        self.df.real_mem() + 
+        self.tf.real_mem()
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
