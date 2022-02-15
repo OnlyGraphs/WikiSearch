@@ -117,6 +117,56 @@ fn test_basic_index_get_postings() {
     assert_eq!(idx.get_postings("dick"), None);
 }
 
+
+#[test]
+fn test_sorted_postings(){
+    let mut idx = BasicIndex::default();
+
+    idx.add_document(get_document_with_text(
+        3,
+        "d1",
+        vec![("", "ggg bbb")],
+        "ccc ddd",
+        vec!["eee fff"],
+        "ggg hhh",
+    )).unwrap();
+
+    idx.add_document(get_document_with_text(
+        2,
+        "d0",
+        vec![("", "ggg bbb")],
+        "ccc ddd",
+        vec!["eee fff"],
+        "ggg hhh",
+    )).unwrap();
+
+    idx.finalize().unwrap();
+
+  
+    assert_eq!(
+        *idx.get_postings("ggg").unwrap(),
+        vec![
+            Posting {
+                document_id: 2,
+                position: 0
+            },
+            Posting {
+                document_id: 2,
+                position: 6
+            },
+            Posting {
+                document_id: 3,
+                position: 0,
+            },
+            Posting {
+                document_id: 3,
+                position: 6,
+            },
+        ]
+    );
+
+}
+
 #[test]
 fn test_basic_index_get_extent() {
     let mut idx = BasicIndex::default();

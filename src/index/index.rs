@@ -192,6 +192,9 @@ impl Index for BasicIndex {
         }
         self.links = Right(id_links);
 
+        // sort postings
+        self.posting_nodes.iter_mut().for_each(|(_k,v)| v.postings.sort());
+
         Ok(())
     }
 

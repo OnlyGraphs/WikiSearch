@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 //TODO: Check whether some fields can be set to private
@@ -7,10 +8,10 @@ pub enum Domain {
 }
 
 /// stores an appearance of a token in an article
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Posting {
     pub document_id: u32, //TODO: double check memory requirements, highest article word count etc
-    pub position: u32,
+    pub position: u32, 
 }
 
 #[derive(Debug, Eq, PartialEq, Default)]
@@ -20,7 +21,7 @@ pub struct PostingNode {
     pub tf: HashMap<u32, u32>,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PosRange {
     pub start_pos: u32, //TODO: double check memory requirements, highest article word count etc
     pub end_pos: u32,
