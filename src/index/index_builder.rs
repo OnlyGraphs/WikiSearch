@@ -63,7 +63,7 @@ impl IndexBuilder for SqlIndexBuilder {
         .fetch_all(&pool)
         .await?;
 
-        let mut article_citations: HashMap<u32, Vec<Citation>> = HashMap::new();
+        let mut article_citations: HashMap<u32, Vec<Citation>> = HashMap::with_capacity(main_query.len());
         for i in citations_query {
             article_citations
                 .entry(i.articleid as u32)
@@ -71,7 +71,7 @@ impl IndexBuilder for SqlIndexBuilder {
                 .push(Citation { text: i.body })
         }
 
-        let mut idx = BasicIndex::default();
+        let mut idx = BasicIndex::with_capacity(main_query.len(),1024,512);
 
         idx.set_dump_id(self.dump_id);
 
@@ -99,7 +99,7 @@ impl IndexBuilder for SqlIndexBuilder {
         pool.close().await;
 
         idx.finalize()?;
-
-        Ok(Box::new(idx))
+        
+        Ok(idx)
     }
 }

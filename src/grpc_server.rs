@@ -4,6 +4,7 @@ use api_rs::wiki_search::{wiki_search_server::WikiSearch, CheckIndexReply, Check
 use std::sync::{Arc, RwLock};
 use tonic::{Request, Response, Status};
 use log::{info,error};
+use std::time::Instant;
 
 //The implementation listens to the scheduler and updates the index by checking against the dump id.
 
@@ -19,6 +20,7 @@ impl WikiSearch for CheckIndexService {
         &self,
         _request: Request<CheckIndexRequest>,
     ) -> Result<Response<CheckIndexReply>, Status> {
+        info!("Received index build signal.");
 
         let index_builder = SqlIndexBuilder {
             connection_string: self.connection_string.clone(),
@@ -31,6 +33,8 @@ impl WikiSearch for CheckIndexService {
             }.get_dump_id(),
         };
 
+        let timer = Instant::now();
+
         let res = match index_builder.build_index().await {
             Ok(v) => v,
             Err(e) => {
@@ -41,6 +45,8 @@ impl WikiSearch for CheckIndexService {
             }
         };
 
+        let time = timer.elapsed();
+        info!("Building index took {:?}", time);
 
         let mut guard = match self.index.try_write() {
             Ok(v) => v,

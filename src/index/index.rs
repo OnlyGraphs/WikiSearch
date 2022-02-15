@@ -56,7 +56,7 @@ pub struct BasicIndex {
     pub document_metadata: HashMap<u32, DocumentMetaData>,
     pub posting_nodes: HashMap<String, PostingNode>,
     pub links: Either<HashMap<u32, Vec<String>>, HashMap<u32, Vec<u32>>>,
-    pub extent: HashMap<String, HashMap<u32, PosRange>>, // structure type -> docid -> pos range
+    pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub id_title_map: BiMap<u32, String>,
 }
 
@@ -86,7 +86,22 @@ impl MemFootprintCalculator for BasicIndex {
 
 impl Debug for BasicIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mem = self.real_mem() as f64 / 1000000.0;
+
+        // split calculation to avoid recalculating
+        let posting_mem = self.posting_nodes.real_mem();
+        let metadata_mem = self.document_metadata.real_mem();
+        let links_mem = self.links.real_mem();
+        let extent_mem = self.extent.real_mem();
+        let id_map_mem = self.id_title_map.real_mem();
+
+        let real_mem = self.dump_id.real_mem()
+                        + posting_mem
+                        + links_mem
+                        + metadata_mem
+                        + extent_mem
+                        + id_map_mem;
+
+        let mem = real_mem as f64 / 1000000.0;
         let docs = self.links.as_ref().either(|c| c.len(), |c| c.len());
 
         write!(
@@ -97,18 +112,30 @@ impl Debug for BasicIndex {
             \tDocs={:.3}\n\
             \tRAM={:.3}MB\n\
             \tRAM/Docs={:.3}GB/1Million\n\
-            }}
-            ",
+            \t{{\n\
+            \t\tpostings:{:.3}Mb\n\
+            \t\tmetadata:{:.3}Mb\n\
+            \t\tlinks:{:.3}Mb\n\
+            \t\textent:{:.3}Mb\n\
+            \t\ttitles:{:.3}Mb\n\
+            \t}}\n\
+            }}",
             self.dump_id,
             self.posting_nodes.len(),
             docs,
             mem,
-            ((mem / 1000.0) / (docs as f64)) * 1000000.0
+            ((mem / 1000.0) / (docs as f64)) * 1000000.0,
+            posting_mem as f64 / 1000000.0,
+            metadata_mem as f64 / 1000000.0,
+            links_mem as f64 / 1000000.0,
+            extent_mem as f64 / 1000000.0,
+            id_map_mem as f64 / 1000000.0,
         )
     }
 }
 
 impl Index for BasicIndex {
+
     fn get_links(&self, source: u32) -> Result<&[u32],IndexError> {
         match self
             .links
@@ -136,7 +163,7 @@ impl Index for BasicIndex {
     fn finalize(&mut self) -> Result<(),IndexError> {
         // calculate df
         for (_token, postings) in self.posting_nodes.iter_mut() {
-            let mut unique_docs: HashSet<u32> = HashSet::new();
+            let mut unique_docs: HashSet<u32> = HashSet::with_capacity(self.id_title_map.len());
 
             for Posting { document_id, .. } in &postings.postings {
                 unique_docs.insert(*document_id);
@@ -146,7 +173,7 @@ impl Index for BasicIndex {
         }
 
         // work out links
-        let mut id_links: HashMap<u32, Vec<u32>> = HashMap::new();
+        let mut id_links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(self.id_title_map.len());
 
         for (id, links) in self.links.as_ref().left().ok_or(
             IndexError {
@@ -154,7 +181,7 @@ impl Index for BasicIndex {
                 kind: IndexErrorKind::InvalidIndexState
             })? 
         {
-            let mut targets: Vec<u32> = Vec::new();
+            let mut targets: Vec<u32> = Vec::with_capacity(links.len());
             for l in links {
                 if let Some(v) = self.id_title_map.get_by_right(l) {
                     targets.push(*v);
@@ -205,7 +232,7 @@ impl Index for BasicIndex {
 
         self.id_title_map
             .insert_no_overwrite(document.doc_id, document.title.clone())
-            .map_err(|c| IndexError{
+            .map_err(|_c| IndexError{
                 msg: "Attempted to insert document into index which already exists.".to_string(),
                 kind: IndexErrorKind::InvalidOperation,
             })?;
@@ -219,18 +246,15 @@ impl Index for BasicIndex {
         );
 
         //Infoboxes
-
-        for i in document.infoboxes {
-            word_pos = self.add_structure_elem(document.doc_id, &i.itype, &i.text, word_pos);
-        }
+        word_pos = document.infoboxes.iter()
+            .fold(word_pos,|a,i| self.add_structure_elem(document.doc_id, &i.itype, &i.text, a));
 
         //Main body
         word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
 
         //Citations
-        for c in document.citations {
-            word_pos = self.add_structure_elem(document.doc_id, "citation", &c.text, word_pos);
-        }
+        word_pos = document.citations.iter()
+            .fold(word_pos,|a,c| self.add_structure_elem(document.doc_id, "citation", &c.text, a));
 
         //Categories
         let _ = self.add_structure_elem(
@@ -248,6 +272,19 @@ impl Index for BasicIndex {
 }
 
 impl BasicIndex {
+    pub fn with_capacity(articles:usize, avg_tokens_per_article: usize, struct_elem_type_count: usize) -> Box<Self>{
+        Box::new(
+            BasicIndex{
+                dump_id: None,
+                posting_nodes: HashMap::with_capacity(articles * avg_tokens_per_article) ,
+                links: Left(HashMap::with_capacity(articles )),
+                document_metadata: HashMap::with_capacity(articles),
+                extent: HashMap::with_capacity(struct_elem_type_count),
+                id_title_map: BiMap::with_capacity(articles),
+            }
+        )
+    }
+
     fn add_tokens(&mut self, doc_id: u32, text_to_add: &str, mut word_pos: u32) -> u32 {
         for token in text_to_add.split(" ") {
             self.add_posting(token, doc_id, word_pos);
@@ -285,10 +322,11 @@ impl BasicIndex {
     }
 
     fn add_links(&mut self, doc_id: u32, article_links: &str) -> Result<(),IndexError> {
-        let mut link_titles: Vec<String> = Vec::new();
-        for link in article_links.split(",") {
-            link_titles.push(link.trim().to_string());
-        }
+        let link_titles : Vec<String> = article_links
+            .split(",")
+            .map(|c| c.trim().to_string())
+            .collect();
+
         self.links
             .as_mut()
             .left()

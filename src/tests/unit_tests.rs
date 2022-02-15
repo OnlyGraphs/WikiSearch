@@ -1,13 +1,29 @@
+use std::collections::HashMap;
+use core::mem::size_of;
 use crate::index::{
     index::{BasicIndex, Index},
     index_structs::{PosRange, Posting},
 };
 use crate::tests::test_utils::{get_document_with_links, get_document_with_text};
-
+use crate::utils::utils::{MemFootprintCalculator};
+use std::array::IntoIter;
 
 // TODO: split tests by library
 // add integration tests
 
+
+
+#[test]
+fn test_real_mem_primitives(){
+    assert_eq!((0 as u32).real_mem(),4);
+    assert_eq!((0 as u64).real_mem(),8);
+    assert_eq!(("hello".to_string()).real_mem(),24 + 5);
+    assert_eq!(("hello").real_mem(),16 + 5);
+    assert_eq!((vec!["hello".to_string(),"hello".to_string()]).real_mem(),24 + 24 + 24 + 5 + 5);
+    assert_eq!( HashMap::<_, _>::from_iter(IntoIter::new(
+        [(1 as u32, 2 as u32), (3, 4)])).real_mem(),
+        4*4 + 48);
+}
 
 #[test]
 fn test_add_after_finalize(){
