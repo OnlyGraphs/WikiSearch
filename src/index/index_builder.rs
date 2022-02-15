@@ -1,13 +1,12 @@
 use crate::index::index_structs::PostingNode;
-use std::collections::HashMap;
-use async_trait::async_trait;
-use sqlx::{postgres::PgPoolOptions, query,query_scalar};
 use crate::index::{
+    errors::{IndexError, IndexErrorKind},
     index::{BasicIndex, Index},
-    index_structs::{Document, Citation, Infobox},
-    errors::{IndexError, IndexErrorKind}
+    index_structs::{Citation, Document, Infobox},
 };
-use log::{info,error};
+use async_trait::async_trait;
+use sqlx::{postgres::PgPoolOptions, query, query_scalar};
+use std::collections::HashMap;
 
 #[async_trait]
 pub trait IndexBuilder {
@@ -27,13 +26,13 @@ impl IndexBuilder for SqlIndexBuilder {
             .connect(&self.connection_string)
             .await?;
 
-        
-
         let highest_dump_id = query_scalar!(
             "SELECT MAX(article.dumpid)
-             FROM article")
-            .fetch_one(&pool)
-            .await?.unwrap_or(0) as u32;
+             FROM article"
+        )
+        .fetch_one(&pool)
+        .await?
+        .unwrap_or(0) as u32;
 
         if highest_dump_id <= self.dump_id {
             return Ok(None);
@@ -73,7 +72,7 @@ impl IndexBuilder for SqlIndexBuilder {
         .fetch_all(&pool)
         .await?;
 
-        let mut article_citations: HashMap<u32, Vec<Citation>> = 
+        let mut article_citations: HashMap<u32, Vec<Citation>> =
             HashMap::with_capacity(main_query.len());
         for i in citations_query {
             article_citations
@@ -82,16 +81,15 @@ impl IndexBuilder for SqlIndexBuilder {
                 .push(Citation { text: i.body })
         }
 
-        let mut idx = BasicIndex::<HashMap<String,PostingNode>>::
-            with_capacity(main_query.len(),1024,512);
+        let mut idx =
+            BasicIndex::<HashMap<String, PostingNode>>::with_capacity(main_query.len(), 1024, 512);
 
         idx.set_dump_id(highest_dump_id);
 
         for row in main_query {
-
-            let doc_id = row.articleid.ok_or(IndexError{
+            let doc_id = row.articleid.ok_or(IndexError {
                 msg: "Missing articleid when querying articles".to_string(),
-                kind: IndexErrorKind::Database
+                kind: IndexErrorKind::Database,
             })? as u32;
 
             let new_document = Box::new(Document {
@@ -111,7 +109,7 @@ impl IndexBuilder for SqlIndexBuilder {
         pool.close().await;
 
         idx.finalize()?;
-        
+
         Ok(Some(idx))
     }
 }

@@ -1,32 +1,34 @@
-use std::collections::HashMap;
 use crate::index::{
+    collections::SmallPostingMap,
     index::{BasicIndex, Index},
     index_structs::{PosRange, Posting},
-    collections::SmallPostingMap
 };
 use crate::tests::test_utils::{get_document_with_links, get_document_with_text};
-use crate::utils::utils::{MemFootprintCalculator};
+use crate::utils::utils::MemFootprintCalculator;
 use std::array::IntoIter;
+use std::collections::HashMap;
 
 // TODO: split tests by library
 // add integration tests
 
-
-
 #[test]
-fn test_real_mem_primitives(){
-    assert_eq!((0 as u32).real_mem(),4);
-    assert_eq!((0 as u64).real_mem(),8);
-    assert_eq!(("hello".to_string()).real_mem(),24 + 5);
-    assert_eq!(("hello").real_mem(),16 + 5);
-    assert_eq!((vec!["hello".to_string(),"hello".to_string()]).real_mem(),24 + 24 + 24 + 5 + 5);
-    assert_eq!( HashMap::<_, _>::from_iter(IntoIter::new(
-        [(1 as u32, 2 as u32), (3, 4)])).real_mem(),
-        4*4 + 48);
+fn test_real_mem_primitives() {
+    assert_eq!((0 as u32).real_mem(), 4);
+    assert_eq!((0 as u64).real_mem(), 8);
+    assert_eq!(("hello".to_string()).real_mem(), 24 + 5);
+    assert_eq!(("hello").real_mem(), 16 + 5);
+    assert_eq!(
+        (vec!["hello".to_string(), "hello".to_string()]).real_mem(),
+        24 + 24 + 24 + 5 + 5
+    );
+    assert_eq!(
+        HashMap::<_, _>::from_iter(IntoIter::new([(1 as u32, 2 as u32), (3, 4)])).real_mem(),
+        4 * 4 + 48
+    );
 }
 
 #[test]
-fn test_add_after_finalize(){
+fn test_add_after_finalize() {
     let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
@@ -36,7 +38,8 @@ fn test_add_after_finalize(){
         "ccc ddd",
         vec!["eee fff"],
         "ggg hhh",
-    )).unwrap();
+    ))
+    .unwrap();
 
     idx.finalize().unwrap();
 
@@ -49,11 +52,11 @@ fn test_add_after_finalize(){
         "ggg hhh",
     ));
 
-    assert_eq!(res.is_err(),true);
+    assert_eq!(res.is_err(), true);
 }
 
 #[test]
-fn test_add_duplicate_article(){
+fn test_add_duplicate_article() {
     let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
@@ -63,7 +66,8 @@ fn test_add_duplicate_article(){
         "ccc ddd",
         vec!["eee fff"],
         "ggg hhh",
-    )).unwrap();
+    ))
+    .unwrap();
 
     let res = idx.add_document(get_document_with_text(
         2,
@@ -74,7 +78,7 @@ fn test_add_duplicate_article(){
         "ggg hhh",
     ));
 
-    assert_eq!(res.is_err(),true);
+    assert_eq!(res.is_err(), true);
 }
 
 #[test]
@@ -88,7 +92,8 @@ fn test_basic_index_get_postings() {
         "ccc ddd",
         vec!["eee fff"],
         "ggg hhh",
-    )).unwrap();
+    ))
+    .unwrap();
 
     assert_eq!(
         *idx.get_postings("aaa").unwrap(),
@@ -117,9 +122,8 @@ fn test_basic_index_get_postings() {
     assert_eq!(idx.get_postings("dick"), None);
 }
 
-
 #[test]
-fn test_sorted_postings(){
+fn test_sorted_postings() {
     let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
@@ -129,7 +133,8 @@ fn test_sorted_postings(){
         "ccc ddd",
         vec!["eee fff"],
         "ggg hhh",
-    )).unwrap();
+    ))
+    .unwrap();
 
     idx.add_document(get_document_with_text(
         2,
@@ -138,11 +143,11 @@ fn test_sorted_postings(){
         "ccc ddd",
         vec!["eee fff"],
         "ggg hhh",
-    )).unwrap();
+    ))
+    .unwrap();
 
     idx.finalize().unwrap();
 
-  
     assert_eq!(
         *idx.get_postings("ggg").unwrap(),
         vec![
@@ -164,7 +169,6 @@ fn test_sorted_postings(){
             },
         ]
     );
-
 }
 
 #[test]
@@ -178,7 +182,8 @@ fn test_basic_index_get_extent() {
         "ccc ddd",
         vec!["eee fff", "world", "eggs"],
         "ggg hhh",
-    )).unwrap();
+    ))
+    .unwrap();
 
     assert_eq!(
         *idx.get_extent_for("infobox", &2).unwrap(),
@@ -226,7 +231,8 @@ fn test_basic_index_tf() {
         "eggs world",
         vec!["this that", "that", "eggs"],
         "hello world",
-    )).unwrap();
+    ))
+    .unwrap();
 
     assert_eq!(idx.tf("hello", 0), 3);
     assert_eq!(idx.tf("world", 0), 3);
@@ -247,7 +253,8 @@ fn test_basic_index_df() {
         "eggs world",
         vec!["this that", "that", "eggs"],
         "hello world",
-    )).unwrap();
+    ))
+    .unwrap();
 
     idx.add_document(get_document_with_text(
         1,
@@ -256,7 +263,8 @@ fn test_basic_index_df() {
         "eggs world",
         vec!["aaa aa", "aaa", "aa"],
         "aaa aaa",
-    )).unwrap();
+    ))
+    .unwrap();
 
     idx.finalize().unwrap();
 
@@ -272,9 +280,12 @@ fn test_basic_index_df() {
 fn test_basic_index_links() {
     let mut idx = BasicIndex::<SmallPostingMap>::default();
 
-    idx.add_document(get_document_with_links(0, "source", "target1,target2")).unwrap();
-    idx.add_document(get_document_with_links(1, "target1", "a")).unwrap();
-    idx.add_document(get_document_with_links(2, "target2", "source")).unwrap();
+    idx.add_document(get_document_with_links(0, "source", "target1,target2"))
+        .unwrap();
+    idx.add_document(get_document_with_links(1, "target1", "a"))
+        .unwrap();
+    idx.add_document(get_document_with_links(2, "target2", "source"))
+        .unwrap();
 
     idx.finalize().unwrap();
 

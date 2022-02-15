@@ -4,9 +4,9 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 
 use crate::index::{
-    index_structs::{Document, DocumentMetaData, PosRange, Posting, PostingNode},
+    collections::StringPostingMap,
     errors::{IndexError, IndexErrorKind},
-    collections::{StringPostingMap}
+    index_structs::{Document, DocumentMetaData, PosRange, Posting},
 };
 
 use crate::utils::utils::MemFootprintCalculator;
@@ -28,24 +28,18 @@ use std::{
  * Categories
  */
 
-pub enum IndexEncoding {
-    None,
-    DeltaEncoding,
-    EliasGammaCode,
-}
-
 //TODO: Interface to specify functions that should be shared among different types of indices created (Ternary Index Tree vs BasicIndex)
 pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
-    fn add_document(&mut self, document: Box<Document>)-> Result<(),IndexError> ;
+    fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError>;
     fn set_dump_id(&mut self, new_dump_id: u32);
     fn get_dump_id(&self) -> u32;
     fn get_postings(&self, token: &str) -> Option<&[Posting]>;
     fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange>;
     fn df(&self, token: &str) -> u32;
     fn tf(&self, token: &str, docid: u32) -> u32;
-    fn finalize(&mut self) -> Result<(),IndexError>;
+    fn finalize(&mut self) -> Result<(), IndexError>;
 
-    fn get_links(&self, source: u32) -> Result<&[u32],IndexError>;
+    fn get_links(&self, source: u32) -> Result<&[u32], IndexError>;
     fn id_to_title(&self, source: u32) -> Option<&String>;
     fn title_to_id(&self, source: String) -> Option<u32>;
 }
@@ -62,9 +56,9 @@ pub struct BasicIndex<M: StringPostingMap + ?Sized> {
     pub id_title_map: BiMap<u32, String>,
 }
 
-impl <M : StringPostingMap>  Default for BasicIndex<M> {
+impl<M: StringPostingMap> Default for BasicIndex<M> {
     fn default() -> Self {
-        BasicIndex{
+        BasicIndex {
             dump_id: None,
             posting_nodes: M::default(),
             links: Left(HashMap::new()),
@@ -75,7 +69,7 @@ impl <M : StringPostingMap>  Default for BasicIndex<M> {
     }
 }
 
-impl <M : StringPostingMap> MemFootprintCalculator for BasicIndex<M> {
+impl<M: StringPostingMap> MemFootprintCalculator for BasicIndex<M> {
     fn real_mem(&self) -> u64 {
         self.dump_id.real_mem()
             + self.posting_nodes.real_mem()
@@ -86,9 +80,8 @@ impl <M : StringPostingMap> MemFootprintCalculator for BasicIndex<M> {
     }
 }
 
-impl <M : StringPostingMap> Debug for BasicIndex<M> {
+impl<M: StringPostingMap> Debug for BasicIndex<M> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-
         // split calculation to avoid recalculating
         let posting_mem = self.posting_nodes.real_mem();
         let metadata_mem = self.document_metadata.real_mem();
@@ -97,11 +90,11 @@ impl <M : StringPostingMap> Debug for BasicIndex<M> {
         let id_map_mem = self.id_title_map.real_mem();
 
         let real_mem = self.dump_id.real_mem()
-                        + posting_mem
-                        + links_mem
-                        + metadata_mem
-                        + extent_mem
-                        + id_map_mem;
+            + posting_mem
+            + links_mem
+            + metadata_mem
+            + extent_mem
+            + id_map_mem;
 
         let mem = real_mem as f64 / 1000000.0;
         let docs = self.links.as_ref().either(|c| c.len(), |c| c.len());
@@ -136,14 +129,13 @@ impl <M : StringPostingMap> Debug for BasicIndex<M> {
     }
 }
 
-impl <M : StringPostingMap> Index for BasicIndex<M> {
-
-    fn get_links(&self, source: u32) -> Result<&[u32],IndexError> {
+impl<M: StringPostingMap> Index for BasicIndex<M> {
+    fn get_links(&self, source: u32) -> Result<&[u32], IndexError> {
         match self
             .links
             .as_ref()
             .right()
-            .ok_or(IndexError{
+            .ok_or(IndexError {
                 msg: "Cannot retrieve links, index was not finalized.".to_string(),
                 kind: IndexErrorKind::InvalidIndexState,
             })?
@@ -162,7 +154,7 @@ impl <M : StringPostingMap> Index for BasicIndex<M> {
         self.id_title_map.get_by_right(&source).cloned()
     }
 
-    fn finalize(&mut self) -> Result<(),IndexError> {
+    fn finalize(&mut self) -> Result<(), IndexError> {
         // calculate df
         for (_token, postings) in self.posting_nodes.iter_mut() {
             let mut unique_docs: HashSet<u32> = HashSet::with_capacity(self.id_title_map.len());
@@ -177,12 +169,10 @@ impl <M : StringPostingMap> Index for BasicIndex<M> {
         // work out links
         let mut id_links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(self.id_title_map.len());
 
-        for (id, links) in self.links.as_ref().left().ok_or(
-            IndexError {
-                msg: "Index was already finalized, cannot finalize again.".to_string(),
-                kind: IndexErrorKind::InvalidIndexState
-            })? 
-        {
+        for (id, links) in self.links.as_ref().left().ok_or(IndexError {
+            msg: "Index was already finalized, cannot finalize again.".to_string(),
+            kind: IndexErrorKind::InvalidIndexState,
+        })? {
             let mut targets: Vec<u32> = Vec::with_capacity(links.len());
             for l in links {
                 if let Some(v) = self.id_title_map.get_by_right(l) {
@@ -195,7 +185,9 @@ impl <M : StringPostingMap> Index for BasicIndex<M> {
         self.links = Right(id_links);
 
         // sort postings
-        self.posting_nodes.iter_mut().for_each(|(_k,v)| v.postings.sort());
+        self.posting_nodes
+            .iter_mut()
+            .for_each(|(_k, v)| v.postings.sort());
 
         Ok(())
     }
@@ -232,12 +224,12 @@ impl <M : StringPostingMap> Index for BasicIndex<M> {
         return self.dump_id.unwrap_or(0).clone();
     }
 
-    fn add_document(&mut self, document: Box<Document>) -> Result<(),IndexError> {
+    fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError> {
         let mut word_pos = 0;
 
         self.id_title_map
             .insert_no_overwrite(document.doc_id, document.title.clone())
-            .map_err(|_c| IndexError{
+            .map_err(|_c| IndexError {
                 msg: "Attempted to insert document into index which already exists.".to_string(),
                 kind: IndexErrorKind::InvalidOperation,
             })?;
@@ -251,15 +243,17 @@ impl <M : StringPostingMap> Index for BasicIndex<M> {
         );
 
         //Infoboxes
-        word_pos = document.infoboxes.iter()
-            .fold(word_pos,|a,i| self.add_structure_elem(document.doc_id, &i.itype, &i.text, a));
+        word_pos = document.infoboxes.iter().fold(word_pos, |a, i| {
+            self.add_structure_elem(document.doc_id, &i.itype, &i.text, a)
+        });
 
         //Main body
         word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
 
         //Citations
-        word_pos = document.citations.iter()
-            .fold(word_pos,|a,c| self.add_structure_elem(document.doc_id, "citation", &c.text, a));
+        word_pos = document.citations.iter().fold(word_pos, |a, c| {
+            self.add_structure_elem(document.doc_id, "citation", &c.text, a)
+        });
 
         //Categories
         let _ = self.add_structure_elem(
@@ -276,18 +270,20 @@ impl <M : StringPostingMap> Index for BasicIndex<M> {
     }
 }
 
-impl <M : StringPostingMap>BasicIndex<M> {
-    pub fn with_capacity(articles:usize, avg_tokens_per_article: usize, struct_elem_type_count: usize) -> Box<Self>{
-        Box::new(
-            BasicIndex{
-                dump_id: None,
-                posting_nodes: M::with_capacity(articles * avg_tokens_per_article) ,
-                links: Left(HashMap::with_capacity(articles )),
-                document_metadata: HashMap::with_capacity(articles),
-                extent: HashMap::with_capacity(struct_elem_type_count),
-                id_title_map: BiMap::with_capacity(articles),
-            }
-        )
+impl<M: StringPostingMap> BasicIndex<M> {
+    pub fn with_capacity(
+        articles: usize,
+        avg_tokens_per_article: usize,
+        struct_elem_type_count: usize,
+    ) -> Box<Self> {
+        Box::new(BasicIndex {
+            dump_id: None,
+            posting_nodes: M::with_capacity(articles * avg_tokens_per_article),
+            links: Left(HashMap::with_capacity(articles)),
+            document_metadata: HashMap::with_capacity(articles),
+            extent: HashMap::with_capacity(struct_elem_type_count),
+            id_title_map: BiMap::with_capacity(articles),
+        })
     }
 
     fn add_tokens(&mut self, doc_id: u32, text_to_add: &str, mut word_pos: u32) -> u32 {
@@ -326,8 +322,8 @@ impl <M : StringPostingMap>BasicIndex<M> {
         );
     }
 
-    fn add_links(&mut self, doc_id: u32, article_links: &str) -> Result<(),IndexError> {
-        let link_titles : Vec<String> = article_links
+    fn add_links(&mut self, doc_id: u32, article_links: &str) -> Result<(), IndexError> {
+        let link_titles: Vec<String> = article_links
             .split(",")
             .map(|c| c.trim().to_string())
             .collect();
@@ -335,12 +331,12 @@ impl <M : StringPostingMap>BasicIndex<M> {
         self.links
             .as_mut()
             .left()
-            .ok_or(IndexError{
+            .ok_or(IndexError {
                 msg: "Attempted to add links to already finalized index.".to_string(),
-                kind: IndexErrorKind::InvalidIndexState
+                kind: IndexErrorKind::InvalidIndexState,
             })?
             .insert(doc_id, link_titles);
-        
+
         Ok(())
     }
 

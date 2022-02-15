@@ -9,17 +9,14 @@ pub trait MemFootprintCalculator {
     fn real_mem(&self) -> u64;
 }
 
-
 impl MemFootprintCalculator for &str {
     fn real_mem(&self) -> u64 {
-        (self.len() * size_of::<u8>()) as u64 
-        + size_of::<&str>() as u64
+        (self.len() * size_of::<u8>()) as u64 + size_of::<&str>() as u64
     }
 }
 impl MemFootprintCalculator for String {
     fn real_mem(&self) -> u64 {
-        (self.len() * size_of::<u8>()) as u64 
-        + size_of::<String>() as u64
+        (self.len() * size_of::<u8>()) as u64 + size_of::<String>() as u64
     }
 }
 
@@ -45,7 +42,7 @@ impl MemFootprintCalculator for PostingNode {
 
 impl MemFootprintCalculator for DocumentMetaData {
     fn real_mem(&self) -> u64 {
-        self.last_updated_date.real_mem() + self.namespace.real_mem() + self.title.real_mem() 
+        self.last_updated_date.real_mem() + self.namespace.real_mem() + self.title.real_mem()
         // above already counts metadata
     }
 }
@@ -67,8 +64,8 @@ where
     T: MemFootprintCalculator,
 {
     fn real_mem(&self) -> u64 {
-        self.iter().fold(0, |a, c| c.real_mem() + a) 
-        + size_of::<Vec<T>>() as u64 // need this as above doesnt count metadata
+        self.iter().fold(0, |a, c| c.real_mem() + a) + size_of::<Vec<T>>() as u64
+        // need this as above doesnt count metadata
     }
 }
 
@@ -102,7 +99,7 @@ where
     R: MemFootprintCalculator,
 {
     fn real_mem(&self) -> u64 {
-        self.as_ref().either(|c| c.real_mem(), |c| c.real_mem()) 
-        + size_of::<Either<L, R>>() as u64 // need this as above doesnt count metadata
+        self.as_ref().either(|c| c.real_mem(), |c| c.real_mem()) + size_of::<Either<L, R>>() as u64
+        // need this as above doesnt count metadata
     }
 }
