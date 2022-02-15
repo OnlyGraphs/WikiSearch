@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use core::mem::size_of;
 use crate::index::{
     index::{BasicIndex, Index},
     index_structs::{PosRange, Posting},
+    collections::SmallPostingMap
 };
 use crate::tests::test_utils::{get_document_with_links, get_document_with_text};
 use crate::utils::utils::{MemFootprintCalculator};
@@ -27,7 +27,7 @@ fn test_real_mem_primitives(){
 
 #[test]
 fn test_add_after_finalize(){
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
         2,
@@ -54,7 +54,7 @@ fn test_add_after_finalize(){
 
 #[test]
 fn test_add_duplicate_article(){
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
         2,
@@ -79,7 +79,7 @@ fn test_add_duplicate_article(){
 
 #[test]
 fn test_basic_index_get_postings() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
         2,
@@ -120,7 +120,7 @@ fn test_basic_index_get_postings() {
 
 #[test]
 fn test_sorted_postings(){
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
         3,
@@ -169,7 +169,7 @@ fn test_sorted_postings(){
 
 #[test]
 fn test_basic_index_get_extent() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
         2,
@@ -217,7 +217,7 @@ fn test_basic_index_get_extent() {
 
 #[test]
 fn test_basic_index_tf() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
         0,
@@ -238,7 +238,7 @@ fn test_basic_index_tf() {
 
 #[test]
 fn test_basic_index_df() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_text(
         0,
@@ -270,7 +270,7 @@ fn test_basic_index_df() {
 
 #[test]
 fn test_basic_index_links() {
-    let mut idx = BasicIndex::default();
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
 
     idx.add_document(get_document_with_links(0, "source", "target1,target2")).unwrap();
     idx.add_document(get_document_with_links(1, "target1", "a")).unwrap();

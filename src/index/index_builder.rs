@@ -1,3 +1,4 @@
+use crate::index::index_structs::PostingNode;
 use std::collections::HashMap;
 use async_trait::async_trait;
 use sqlx::{postgres::PgPoolOptions, query};
@@ -71,7 +72,8 @@ impl IndexBuilder for SqlIndexBuilder {
                 .push(Citation { text: i.body })
         }
 
-        let mut idx = BasicIndex::with_capacity(main_query.len(),1024,512);
+        let mut idx = BasicIndex::<HashMap<String,PostingNode>>::
+            with_capacity(main_query.len(),1024,512);
 
         idx.set_dump_id(self.dump_id);
 

@@ -5,8 +5,10 @@ use std::fmt::Formatter;
 
 use crate::index::{
     index_structs::{Document, DocumentMetaData, PosRange, Posting, PostingNode},
-    errors::{IndexError, IndexErrorKind}
+    errors::{IndexError, IndexErrorKind},
+    collections::{StringPostingMap}
 };
+
 use crate::utils::utils::MemFootprintCalculator;
 
 use either::{Either, Left, Right};
@@ -51,20 +53,20 @@ pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
 //TODO:
 //Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
 
-pub struct BasicIndex {
+pub struct BasicIndex<M: StringPostingMap + ?Sized> {
     pub dump_id: Option<u32>,
     pub document_metadata: HashMap<u32, DocumentMetaData>,
-    pub posting_nodes: HashMap<String, PostingNode>,
+    pub posting_nodes: M,
     pub links: Either<HashMap<u32, Vec<String>>, HashMap<u32, Vec<u32>>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub id_title_map: BiMap<u32, String>,
 }
 
-impl Default for BasicIndex {
+impl <M : StringPostingMap>  Default for BasicIndex<M> {
     fn default() -> Self {
-        BasicIndex {
+        BasicIndex{
             dump_id: None,
-            posting_nodes: HashMap::new(),
+            posting_nodes: M::default(),
             links: Left(HashMap::new()),
             document_metadata: HashMap::new(),
             extent: HashMap::new(),
@@ -73,7 +75,7 @@ impl Default for BasicIndex {
     }
 }
 
-impl MemFootprintCalculator for BasicIndex {
+impl <M : StringPostingMap> MemFootprintCalculator for BasicIndex<M> {
     fn real_mem(&self) -> u64 {
         self.dump_id.real_mem()
             + self.posting_nodes.real_mem()
@@ -84,7 +86,7 @@ impl MemFootprintCalculator for BasicIndex {
     }
 }
 
-impl Debug for BasicIndex {
+impl <M : StringPostingMap> Debug for BasicIndex<M> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 
         // split calculation to avoid recalculating
@@ -134,7 +136,7 @@ impl Debug for BasicIndex {
     }
 }
 
-impl Index for BasicIndex {
+impl <M : StringPostingMap> Index for BasicIndex<M> {
 
     fn get_links(&self, source: u32) -> Result<&[u32],IndexError> {
         match self
@@ -274,12 +276,12 @@ impl Index for BasicIndex {
     }
 }
 
-impl BasicIndex {
+impl <M : StringPostingMap>BasicIndex<M> {
     pub fn with_capacity(articles:usize, avg_tokens_per_article: usize, struct_elem_type_count: usize) -> Box<Self>{
         Box::new(
             BasicIndex{
                 dump_id: None,
-                posting_nodes: HashMap::with_capacity(articles * avg_tokens_per_article) ,
+                posting_nodes: M::with_capacity(articles * avg_tokens_per_article) ,
                 links: Left(HashMap::with_capacity(articles )),
                 document_metadata: HashMap::with_capacity(articles),
                 extent: HashMap::with_capacity(struct_elem_type_count),

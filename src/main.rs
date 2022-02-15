@@ -4,7 +4,7 @@ mod index;
 mod tests;
 mod utils;
 
-use crate::index::errors::IndexError;
+use crate::index::collections::SmallPostingMap;
 use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::{App, HttpServer};
@@ -44,7 +44,7 @@ fn main() -> std::io::Result<()> {
     let static_serve_dir = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string());
 
     // create shared memory for index
-    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::default())));
+    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::<SmallPostingMap>::default())));
 
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
