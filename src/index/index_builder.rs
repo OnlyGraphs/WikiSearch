@@ -1,7 +1,7 @@
 use crate::index::index_structs::PostingNode;
 use std::collections::HashMap;
 use async_trait::async_trait;
-use sqlx::{postgres::PgPoolOptions, query};
+use sqlx::{postgres::PgPoolOptions, query,query_scalar};
 use crate::index::{
     index::{BasicIndex, Index},
     index_structs::{Document, Citation, Infobox},
@@ -11,7 +11,7 @@ use log::{info,error};
 
 #[async_trait]
 pub trait IndexBuilder {
-    async fn build_index(&self) -> Result<Box<dyn Index>, IndexError>;
+    async fn build_index_if_needed(&self) -> Result<Option<Box<dyn Index>>, IndexError>;
 }
 
 pub struct SqlIndexBuilder {
@@ -21,14 +21,23 @@ pub struct SqlIndexBuilder {
 
 #[async_trait]
 impl IndexBuilder for SqlIndexBuilder {
-    async fn build_index(&self) -> Result<Box<dyn Index>, IndexError> {
+    async fn build_index_if_needed(&self) -> Result<Option<Box<dyn Index>>, IndexError> {
         let pool = PgPoolOptions::new()
             .max_connections(1)
             .connect(&self.connection_string)
             .await?;
 
         
-        // TODO: check dump id before updating
+
+        let highest_dump_id = query_scalar!(
+            "SELECT MAX(article.dumpid)
+             FROM article")
+            .fetch_one(&pool)
+            .await?.unwrap_or(0) as u32;
+
+        if highest_dump_id <= self.dump_id {
+            return Ok(None);
+        }
 
         let main_query = query!(
             "SELECT a.articleid, a.title, a.domain, a.namespace, a.lastupdated,
@@ -64,7 +73,8 @@ impl IndexBuilder for SqlIndexBuilder {
         .fetch_all(&pool)
         .await?;
 
-        let mut article_citations: HashMap<u32, Vec<Citation>> = HashMap::with_capacity(main_query.len());
+        let mut article_citations: HashMap<u32, Vec<Citation>> = 
+            HashMap::with_capacity(main_query.len());
         for i in citations_query {
             article_citations
                 .entry(i.articleid as u32)
@@ -75,7 +85,7 @@ impl IndexBuilder for SqlIndexBuilder {
         let mut idx = BasicIndex::<HashMap<String,PostingNode>>::
             with_capacity(main_query.len(),1024,512);
 
-        idx.set_dump_id(self.dump_id);
+        idx.set_dump_id(highest_dump_id);
 
         for row in main_query {
 
@@ -102,6 +112,6 @@ impl IndexBuilder for SqlIndexBuilder {
 
         idx.finalize()?;
         
-        Ok(idx)
+        Ok(Some(idx))
     }
 }

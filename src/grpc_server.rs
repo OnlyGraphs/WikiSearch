@@ -35,7 +35,7 @@ impl WikiSearch for CheckIndexService {
 
         let timer = Instant::now();
 
-        let res = match index_builder.build_index().await {
+        let res = match index_builder.build_index_if_needed().await {
             Ok(v) => v,
             Err(e) => {
                 return Ok(Response::new(CheckIndexReply {
@@ -44,6 +44,16 @@ impl WikiSearch for CheckIndexService {
                 }))
             }
         };
+
+        let rebuilt = res.is_some();
+
+        if !rebuilt{
+            info!("Index is already up to date. Not rebuilding.");
+            return Ok(Response::new(CheckIndexReply{
+                success: true,
+                err_code: "".to_string()
+            }))
+        }
 
         let time = timer.elapsed();
         info!("Building index took {:?}", time);
@@ -58,7 +68,7 @@ impl WikiSearch for CheckIndexService {
             }
         };
 
-        *guard = res;
+        *guard = res.expect("Something impossible happened!");
 
         Ok(Response::new(CheckIndexReply {
             success: true,
