@@ -5,7 +5,13 @@ use crate::Index;
 use crate::parser::ast::{Query};
 use crate::index::errors::IndexError;
 
-fn execute_query(query: Box<Query>, index: Arc<RwLock<Box<dyn Index>>>) -> Result<Vec<Posting>, IndexError>{
+#[derive(Debug,Eq,PartialEq,Ord,PartialOrd)]
+struct ScoredPosting {
+    score: u32,
+    posting: Posting,
+}
+
+fn execute_query(query: Box<Query>, index: Box<dyn Index>) -> Result<Vec<Posting>, IndexError>{
     
     match *query{
         Query::BinaryQuery{op, lhs, rhs} => Ok(Vec::default()),
@@ -19,7 +25,7 @@ fn execute_query(query: Box<Query>, index: Arc<RwLock<Box<dyn Index>>>) -> Resul
     }
 }
 
-fn rank_query_results(query: Box<Query>, result : &Vec<Posting>) -> Vec<(u32,u32)>{
+fn rank_query_results(query: Box<Query>, result : &Vec<Posting>) -> Vec<ScoredPosting>{
     Vec::default()
 }
 
