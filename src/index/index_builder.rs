@@ -1,26 +1,16 @@
-use crate::index::index_structs::Citation;
-use crate::index::index_structs::Infobox;
-use crate::index::{
-    index::{BasicIndex, Index},
-    index_structs::Document,
-};
+use std::collections::HashMap;
 use async_trait::async_trait;
 use sqlx::{postgres::PgPoolOptions, query};
-use std::collections::HashMap;
-use std::sync::Arc;
-
-#[derive(Debug)]
-pub enum BuildErrorCode {
-    Access(String),
-    // Permissions(String),
-    // MissingData(String),
-    Server(String),
-    // Teapot(String),
-}
+use crate::index::{
+    index::{BasicIndex, Index},
+    index_structs::{Document, Citation, Infobox},
+    errors::{IndexError, IndexErrorKind}
+};
+use log::{info,error};
 
 #[async_trait]
 pub trait IndexBuilder {
-    async fn build_index(&self) -> Result<Box<dyn Index>, BuildErrorCode>;
+    async fn build_index(&self) -> Result<Box<dyn Index>, IndexError>;
 }
 
 pub struct SqlIndexBuilder {
@@ -30,41 +20,30 @@ pub struct SqlIndexBuilder {
 
 #[async_trait]
 impl IndexBuilder for SqlIndexBuilder {
-    async fn build_index(&self) -> Result<Box<dyn Index>, BuildErrorCode> {
-        let pool = match PgPoolOptions::new()
+    async fn build_index(&self) -> Result<Box<dyn Index>, IndexError> {
+        let pool = PgPoolOptions::new()
             .max_connections(1)
             .connect(&self.connection_string)
-            .await
-        {
-            Ok(pool) => pool,
-            Err(error) => return Err(BuildErrorCode::Access(error.to_string())),
-        };
+            .await?;
 
+        
         // TODO: check dump id before updating
 
-        let main_query = match query!(
+        let main_query = query!(
             "SELECT a.articleid, a.title, a.domain, a.namespace, a.lastupdated,
                     c.categories, c.abstracts, c.links, c.text
              From article as a, \"content\" as c
              where a.articleid = c.articleid"
         )
         .fetch_all(&pool)
-        .await
-        {
-            Ok(main_query) => main_query,
-            Err(error) => return Err(BuildErrorCode::Server(error.to_string())),
-        };
+        .await?;
 
-        let infoboxes_query = match query!(
+        let infoboxes_query = query!(
             "SELECT i.articleid, i.infoboxtype, i.body
              From infoboxes as i"
         )
         .fetch_all(&pool)
-        .await
-        {
-            Ok(infoboxes_query) => infoboxes_query,
-            Err(error) => return Err(BuildErrorCode::Server(error.to_string())),
-        };
+        .await?;
 
         let mut article_infoboxes: HashMap<u32, Vec<Infobox>> = HashMap::new();
         for i in infoboxes_query {
@@ -77,16 +56,12 @@ impl IndexBuilder for SqlIndexBuilder {
                 })
         }
 
-        let citations_query = match query!(
+        let citations_query = query!(
             "SELECT c.articleid, c.citationid, c.body
              From citations as c"
         )
         .fetch_all(&pool)
-        .await
-        {
-            Ok(citations_query) => citations_query,
-            Err(error) => return Err(BuildErrorCode::Server(error.to_string())),
-        };
+        .await?;
 
         let mut article_citations: HashMap<u32, Vec<Citation>> = HashMap::new();
         for i in citations_query {
@@ -101,7 +76,12 @@ impl IndexBuilder for SqlIndexBuilder {
         idx.set_dump_id(self.dump_id);
 
         for row in main_query {
-            let doc_id = row.articleid.unwrap() as u32;
+
+            let doc_id = row.articleid.ok_or(IndexError{
+                msg: "Missing articleid when querying articles".to_string(),
+                kind: IndexErrorKind::Database
+            })? as u32;
+
             let new_document = Box::new(Document {
                 doc_id: doc_id,
                 categories: row.categories.unwrap_or_default(),
@@ -113,11 +93,12 @@ impl IndexBuilder for SqlIndexBuilder {
                 infoboxes: article_infoboxes.remove(&doc_id).unwrap_or_default(),
                 citations: article_citations.remove(&doc_id).unwrap_or_default(),
             });
-            idx.add_document(new_document);
+            idx.add_document(new_document)?;
         }
 
         pool.close().await;
-        idx.finalize();
+
+        idx.finalize()?;
 
         Ok(Box::new(idx))
     }

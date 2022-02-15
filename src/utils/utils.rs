@@ -1,4 +1,4 @@
-use crate::index::index_structs::{DocumentMetaData, PosRange, Posting};
+use crate::index::index_structs::{DocumentMetaData, PosRange, Posting, PostingNode};
 use bimap::BiMap;
 use either::Either;
 use std::collections::HashMap;
@@ -29,7 +29,19 @@ macro_rules! implMemFootprintCalculatorFor {
 
 implMemFootprintCalculatorFor!(u64, u32, u16, u8, i64, i32, i16, i8);
 implMemFootprintCalculatorFor!(&str);
-implMemFootprintCalculatorFor!(Posting, PosRange, DocumentMetaData);
+implMemFootprintCalculatorFor!(Posting, PosRange);
+
+impl MemFootprintCalculator for PostingNode {
+    fn real_mem(&self) -> u64 {
+        self.postings.real_mem() + self.df.real_mem() + self.tf.real_mem() + size_of::<PostingNode>() as u64
+    }
+}
+
+impl MemFootprintCalculator for DocumentMetaData {
+    fn real_mem(&self) -> u64 {
+        self.last_updated_date.real_mem() + self.namespace.real_mem() + self.title.real_mem()
+    }
+}
 
 impl<T> MemFootprintCalculator for Option<T>
 where

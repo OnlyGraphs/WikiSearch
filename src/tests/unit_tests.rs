@@ -4,6 +4,63 @@ use crate::index::{
 };
 use crate::tests::test_utils::{get_document_with_links, get_document_with_text};
 
+
+// TODO: split tests by library
+// add integration tests
+
+
+#[test]
+fn test_add_after_finalize(){
+    let mut idx = BasicIndex::default();
+
+    idx.add_document(get_document_with_text(
+        2,
+        "d0",
+        vec![("", "aaa bbb")],
+        "ccc ddd",
+        vec!["eee fff"],
+        "ggg hhh",
+    )).unwrap();
+
+    idx.finalize().unwrap();
+
+    let res = idx.add_document(get_document_with_text(
+        2,
+        "d0",
+        vec![("", "aaa bbb")],
+        "ccc ddd",
+        vec!["eee fff"],
+        "ggg hhh",
+    ));
+
+    assert_eq!(res.is_err(),true);
+}
+
+#[test]
+fn test_add_duplicate_article(){
+    let mut idx = BasicIndex::default();
+
+    idx.add_document(get_document_with_text(
+        2,
+        "d0",
+        vec![("", "aaa bbb")],
+        "ccc ddd",
+        vec!["eee fff"],
+        "ggg hhh",
+    )).unwrap();
+
+    let res = idx.add_document(get_document_with_text(
+        2,
+        "d0",
+        vec![("", "aaa bbb")],
+        "ccc ddd",
+        vec!["eee fff"],
+        "ggg hhh",
+    ));
+
+    assert_eq!(res.is_err(),true);
+}
+
 #[test]
 fn test_basic_index_get_postings() {
     let mut idx = BasicIndex::default();
@@ -15,7 +72,7 @@ fn test_basic_index_get_postings() {
         "ccc ddd",
         vec!["eee fff"],
         "ggg hhh",
-    ));
+    )).unwrap();
 
     assert_eq!(
         *idx.get_postings("aaa").unwrap(),
@@ -55,7 +112,7 @@ fn test_basic_index_get_extent() {
         "ccc ddd",
         vec!["eee fff", "world", "eggs"],
         "ggg hhh",
-    ));
+    )).unwrap();
 
     assert_eq!(
         *idx.get_extent_for("infobox", &2).unwrap(),
@@ -103,7 +160,7 @@ fn test_basic_index_tf() {
         "eggs world",
         vec!["this that", "that", "eggs"],
         "hello world",
-    ));
+    )).unwrap();
 
     assert_eq!(idx.tf("hello", 0), 3);
     assert_eq!(idx.tf("world", 0), 3);
@@ -124,7 +181,8 @@ fn test_basic_index_df() {
         "eggs world",
         vec!["this that", "that", "eggs"],
         "hello world",
-    ));
+    )).unwrap();
+
     idx.add_document(get_document_with_text(
         1,
         "d1",
@@ -132,9 +190,9 @@ fn test_basic_index_df() {
         "eggs world",
         vec!["aaa aa", "aaa", "aa"],
         "aaa aaa",
-    ));
+    )).unwrap();
 
-    idx.finalize();
+    idx.finalize().unwrap();
 
     assert_eq!(idx.df("hello"), 1);
     assert_eq!(idx.df("world"), 2);
@@ -148,15 +206,15 @@ fn test_basic_index_df() {
 fn test_basic_index_links() {
     let mut idx = BasicIndex::default();
 
-    idx.add_document(get_document_with_links(0, "source", "target1,target2"));
-    idx.add_document(get_document_with_links(1, "target1", "a"));
-    idx.add_document(get_document_with_links(2, "target2", "source"));
+    idx.add_document(get_document_with_links(0, "source", "target1,target2")).unwrap();
+    idx.add_document(get_document_with_links(1, "target1", "a")).unwrap();
+    idx.add_document(get_document_with_links(2, "target2", "source")).unwrap();
 
-    idx.finalize();
+    idx.finalize().unwrap();
 
-    assert_eq!(idx.get_links(0), vec![1, 2]);
-    assert_eq!(idx.get_links(1).len(), 0);
-    assert_eq!(idx.get_links(2), vec![0]);
+    assert_eq!(idx.get_links(0).unwrap(), vec![1, 2]);
+    assert_eq!(idx.get_links(1).unwrap().len(), 0);
+    assert_eq!(idx.get_links(2).unwrap(), vec![0]);
 
     assert_eq!(idx.id_to_title(0), Some(&"source".to_string()));
     assert_eq!(idx.title_to_id("source".to_string()), Some(0));

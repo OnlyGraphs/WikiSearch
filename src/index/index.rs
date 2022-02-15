@@ -1,11 +1,14 @@
-use crate::index::index_structs::PostingNode;
 use bimap::BiMap;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
-use crate::index::index_structs::{Document, DocumentMetaData, PosRange, Posting};
+use crate::index::{
+    index_structs::{Document, DocumentMetaData, PosRange, Posting, PostingNode},
+    errors::{IndexError, IndexErrorKind}
+};
 use crate::utils::utils::MemFootprintCalculator;
+
 use either::{Either, Left, Right};
 use std::{
     collections::HashMap,
@@ -31,16 +34,16 @@ pub enum IndexEncoding {
 
 //TODO: Interface to specify functions that should be shared among different types of indices created (Ternary Index Tree vs BasicIndex)
 pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
-    fn add_document(&mut self, document: Box<Document>);
+    fn add_document(&mut self, document: Box<Document>)-> Result<(),IndexError> ;
     fn set_dump_id(&mut self, new_dump_id: u32);
     fn get_dump_id(&self) -> u32;
     fn get_postings(&self, token: &str) -> Option<&[Posting]>;
     fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange>;
     fn df(&self, token: &str) -> u32;
     fn tf(&self, token: &str, docid: u32) -> u32;
-    fn finalize(&mut self);
+    fn finalize(&mut self) -> Result<(),IndexError>;
 
-    fn get_links(&self, source: u32) -> &[u32];
+    fn get_links(&self, source: u32) -> Result<&[u32],IndexError>;
     fn id_to_title(&self, source: u32) -> Option<&String>;
     fn title_to_id(&self, source: String) -> Option<u32>;
 }
@@ -84,7 +87,8 @@ impl MemFootprintCalculator for BasicIndex {
 impl Debug for BasicIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mem = self.real_mem() as f64 / 1000000.0;
-        let docs = self.links.as_ref().unwrap_right().len();
+        let docs = self.links.as_ref().either(|c| c.len(), |c| c.len());
+
         write!(
             f,
             "BasicIndex{{\n\
@@ -105,15 +109,19 @@ impl Debug for BasicIndex {
 }
 
 impl Index for BasicIndex {
-    fn get_links(&self, source: u32) -> &[u32] {
+    fn get_links(&self, source: u32) -> Result<&[u32],IndexError> {
         match self
             .links
             .as_ref()
-            .expect_right("Index was not finalized.")
+            .right()
+            .ok_or(IndexError{
+                msg: "Cannot retrieve links, index was not finalized.".to_string(),
+                kind: IndexErrorKind::InvalidIndexState,
+            })?
             .get(&source)
         {
-            Some(v) => v,
-            None => return &[],
+            Some(v) => Ok(v),
+            None => Ok(&[]),
         }
     }
 
@@ -125,9 +133,9 @@ impl Index for BasicIndex {
         self.id_title_map.get_by_right(&source).cloned()
     }
 
-    fn finalize(&mut self) {
+    fn finalize(&mut self) -> Result<(),IndexError> {
         // calculate df
-        for (token, postings) in self.posting_nodes.iter_mut() {
+        for (_token, postings) in self.posting_nodes.iter_mut() {
             let mut unique_docs: HashSet<u32> = HashSet::new();
 
             for Posting { document_id, .. } in &postings.postings {
@@ -140,7 +148,12 @@ impl Index for BasicIndex {
         // work out links
         let mut id_links: HashMap<u32, Vec<u32>> = HashMap::new();
 
-        for (id, links) in self.links.as_ref().unwrap_left() {
+        for (id, links) in self.links.as_ref().left().ok_or(
+            IndexError {
+                msg: "Index was already finalized, cannot finalize again.".to_string(),
+                kind: IndexErrorKind::InvalidIndexState
+            })? 
+        {
             let mut targets: Vec<u32> = Vec::new();
             for l in links {
                 if let Some(v) = self.id_title_map.get_by_right(l) {
@@ -151,6 +164,8 @@ impl Index for BasicIndex {
             let _ = id_links.insert(*id, targets);
         }
         self.links = Right(id_links);
+
+        Ok(())
     }
 
     fn df(&self, token: &str) -> u32 {
@@ -185,12 +200,15 @@ impl Index for BasicIndex {
         return self.dump_id.unwrap_or(0).clone();
     }
 
-    fn add_document(&mut self, document: Box<Document>) {
+    fn add_document(&mut self, document: Box<Document>) -> Result<(),IndexError> {
         let mut word_pos = 0;
 
         self.id_title_map
             .insert_no_overwrite(document.doc_id, document.title.clone())
-            .expect("Could not insert id-title pair.");
+            .map_err(|c| IndexError{
+                msg: "Attempted to insert document into index which already exists.".to_string(),
+                kind: IndexErrorKind::InvalidOperation,
+            })?;
 
         //Metadata
         self.add_document_metadata(
@@ -215,7 +233,7 @@ impl Index for BasicIndex {
         }
 
         //Categories
-        word_pos = self.add_structure_elem(
+        let _ = self.add_structure_elem(
             document.doc_id,
             "categories",
             &document.categories,
@@ -223,7 +241,9 @@ impl Index for BasicIndex {
         );
 
         //Links
-        self.add_links(document.doc_id, &document.article_links);
+        self.add_links(document.doc_id, &document.article_links)?;
+
+        Ok(())
     }
 }
 
@@ -264,15 +284,21 @@ impl BasicIndex {
         );
     }
 
-    fn add_links(&mut self, doc_id: u32, article_links: &str) {
+    fn add_links(&mut self, doc_id: u32, article_links: &str) -> Result<(),IndexError> {
         let mut link_titles: Vec<String> = Vec::new();
         for link in article_links.split(",") {
             link_titles.push(link.trim().to_string());
         }
         self.links
             .as_mut()
-            .expect_left("Index is not in buildable state")
+            .left()
+            .ok_or(IndexError{
+                msg: "Attempted to add links to already finalized index.".to_string(),
+                kind: IndexErrorKind::InvalidIndexState
+            })?
             .insert(doc_id, link_titles);
+        
+        Ok(())
     }
 
     fn add_structure_elem(
