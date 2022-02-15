@@ -2,6 +2,7 @@ mod api;
 mod grpc_server;
 mod index;
 mod tests;
+mod parser;
 mod utils;
 
 use crate::index::collections::SmallPostingMap;
