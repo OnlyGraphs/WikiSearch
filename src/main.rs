@@ -4,6 +4,7 @@ mod index;
 mod tests;
 mod parser;
 mod utils;
+mod search;
 
 use crate::index::collections::SmallPostingMap;
 use actix_cors::Cors;
