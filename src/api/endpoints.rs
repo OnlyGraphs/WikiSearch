@@ -45,13 +45,14 @@ pub async fn search(
 ) -> Result<impl Responder> {
     let (nxt, query) = parse_query(&_q.query).unwrap();
     // let index = BasicIndex::<M>::default();
-    let postings = execute_query(query, Arc::try_unwrap(idx.into_inner()).unwrap());
+    let postings = execute_query(query, &Arc::try_unwrap(idx.into_inner()).unwrap());
 
     // for post in postings:
     //     docs.append(post)
 
     // println!("{:?}", x.unwrap());
     // Ok(Json(x.unwrap()));
+    for post in postings.iter() {}
 
     let document2 = Document{
         title: "May".to_string(),

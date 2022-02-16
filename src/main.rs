@@ -7,6 +7,7 @@ use api_rs::wiki_search::{
 };
 use log::{error, info};
 use pretty_env_logger;
+use search_lib::api;
 use search_lib::grpc_server::CheckIndexService;
 use search_lib::index::collections::SmallPostingMap;
 use search_lib::index::index::{BasicIndex, Index};
