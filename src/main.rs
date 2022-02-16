@@ -1,12 +1,3 @@
-mod api;
-mod grpc_server;
-mod index;
-mod parser;
-mod search;
-mod tests;
-mod utils;
-
-use crate::index::collections::SmallPostingMap;
 use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::{App, HttpServer};
@@ -14,10 +5,11 @@ use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
     CheckIndexRequest,
 };
-use grpc_server::CheckIndexService;
-use index::index::{BasicIndex, Index};
 use log::{error, info};
 use pretty_env_logger;
+use search_lib::grpc_server::CheckIndexService;
+use search_lib::index::collections::SmallPostingMap;
+use search_lib::index::index::{BasicIndex, Index};
 use std::process;
 use std::{
     env,

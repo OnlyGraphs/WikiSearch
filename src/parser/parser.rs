@@ -64,16 +64,16 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, t2) = parse_token(nxt)?;
 
-    let mut dst: i32 = 0;
+    let mut dst: u32 = 0;
 
-    match d.parse::<i32>() {
+    match d.parse::<u32>() {
         Ok(n) => dst = n,
         Err(e) => {
             return Err(nom::Err::Error(nom::error::Error::new(
                 //the new struct, instead of the tuple
                 "Cannot convert string containing distance to integer.",
                 nom::error::ErrorKind::Tag,
-            )))
+            )));
         }
     };
 

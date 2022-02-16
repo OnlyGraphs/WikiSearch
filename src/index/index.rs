@@ -34,6 +34,8 @@ pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
     fn set_dump_id(&mut self, new_dump_id: u32);
     fn get_dump_id(&self) -> u32;
     fn get_postings(&self, token: &str) -> Option<&[Posting]>;
+    fn get_all_postings(&self) -> Vec<Posting>;
+
     fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange>;
     fn df(&self, token: &str) -> u32;
     fn tf(&self, token: &str, docid: u32) -> u32;
@@ -206,10 +208,22 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
         }
     }
 
+
+    // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
     fn get_postings(&self, token: &str) -> Option<&[Posting]> {
         self.posting_nodes
             .get(token)
             .and_then(|c| Some(c.postings.as_slice()))
+    }
+
+    // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
+    fn get_all_postings(&self) -> Vec<Posting>{
+        let mut out = self.posting_nodes.iter()
+                                        .flat_map(|(_,v)| v.postings.clone())
+                                        .collect::<Vec<Posting>>();
+        out.sort();
+
+        return out;
     }
 
     fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange> {
