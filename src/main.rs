@@ -1,12 +1,3 @@
-mod api;
-mod grpc_server;
-mod index;
-mod tests;
-mod parser;
-mod utils;
-mod search;
-
-use crate::index::collections::SmallPostingMap;
 use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::{App, HttpServer};
@@ -14,10 +5,11 @@ use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
     CheckIndexRequest,
 };
-use grpc_server::CheckIndexService;
-use index::index::{BasicIndex, Index};
 use log::{error, info};
 use pretty_env_logger;
+use search_lib::grpc_server::CheckIndexService;
+use search_lib::index::collections::SmallPostingMap;
+use search_lib::index::index::{BasicIndex, Index};
 use std::process;
 use std::{
     env,
@@ -161,9 +153,9 @@ async fn run_rest(ip: String, port: String, static_dir: String) -> std::io::Resu
         let static_dir_cpy = &static_dir;
         App::new()
             .wrap(cors)
-            .service(api::endpoints::search)
-            .service(api::endpoints::relational)
-            .service(api::endpoints::feedback)
+            .service(search_lib::api::endpoints::search)
+            .service(search_lib::api::endpoints::relational)
+            .service(search_lib::api::endpoints::feedback)
             .service(
                 Files::new("/", static_dir_cpy)
                     .prefer_utf8(true)

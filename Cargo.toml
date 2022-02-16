@@ -3,6 +3,14 @@ name = "search"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "search_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "search_api"
+path = "src/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -22,3 +30,5 @@ bimap="0.6.2"
 actix-cors="0.6.0-beta.10"
 log = "0.4"
 pretty_env_logger = "0.3"
+mockall = "0.11.0"
+itertools = "0.10.3"

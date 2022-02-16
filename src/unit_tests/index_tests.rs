@@ -3,7 +3,7 @@ use crate::index::{
     index::{BasicIndex, Index},
     index_structs::{PosRange, Posting},
 };
-use crate::tests::test_utils::{get_document_with_links, get_document_with_text};
+use crate::utils::test_utils::{get_document_with_links, get_document_with_text};
 use crate::utils::utils::MemFootprintCalculator;
 use std::array::IntoIter;
 use std::collections::HashMap;
