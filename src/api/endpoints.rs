@@ -4,26 +4,61 @@ use crate::api::structs::{
 };
 use actix_web::{
     get,
-    web::{Json, Query},
+    web::{Data, Json, Query},
     HttpResponse, Responder, Result,
 };
 
+use crate::index::index::{BasicIndex, Index};
+use crate::parser::parser::parse_query;
+use crate::search::search::execute_query;
+use std::{
+    env,
+    io::{Error, ErrorKind},
+    sync::{Arc, RwLock},
+    thread,
+};
+
+/// Endpoint for performing general wiki queries
+// #[get("/api/v1/search")]
+// pub async fn search(_q: Query<SearchParameters>) -> Result<impl Responder> {
+//     let document1 = Document{
+//         title: "April".to_string(),
+//         article_abstract: "April is the fourth month of the year in the Gregorian calendar, the fifth in the early Julian, the first of four months to have a length of 30 days, and the second of five months to have a length of less than 31 days.".to_string(),
+//         score: 0.5,
+//     };
+
+//     let document2 = Document{
+//         title: "May".to_string(),
+//         article_abstract: "May is the fifth month of the year in the Julian and Gregorian calendars and the third of seven months to have a length of 31 days.".to_string(),
+//         score: 0.6,
+//     };
+
+//     let docs = vec![document1, document2];
+
+//     Ok(Json(docs))
+// }
 /// Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
-pub async fn search(_q: Query<SearchParameters>) -> Result<impl Responder> {
-    let document1 = Document{
-        title: "April".to_string(),
-        article_abstract: "April is the fourth month of the year in the Gregorian calendar, the fifth in the early Julian, the first of four months to have a length of 30 days, and the second of five months to have a length of less than 31 days.".to_string(),
-        score: 0.5,
-    };
+pub async fn search(
+    _q: Query<SearchParameters>,
+    idx: Data<Box<dyn Index>>,
+) -> Result<impl Responder> {
+    let (nxt, query) = parse_query(&_q.query).unwrap();
+    // let index = BasicIndex::<M>::default();
+    let postings = execute_query(query, Arc::try_unwrap(idx.into_inner()).unwrap());
+
+    // for post in postings:
+    //     docs.append(post)
+
+    // println!("{:?}", x.unwrap());
+    // Ok(Json(x.unwrap()));
 
     let document2 = Document{
         title: "May".to_string(),
         article_abstract: "May is the fifth month of the year in the Julian and Gregorian calendars and the third of seven months to have a length of 31 days.".to_string(),
         score: 0.6,
     };
-
-    let docs = vec![document1, document2];
+    let docs = vec![document2];
 
     Ok(Json(docs))
 }

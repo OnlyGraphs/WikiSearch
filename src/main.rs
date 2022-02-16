@@ -1,10 +1,10 @@
 mod api;
 mod grpc_server;
 mod index;
-mod tests;
 mod parser;
-mod utils;
 mod search;
+mod tests;
+mod utils;
 
 use crate::index::collections::SmallPostingMap;
 use actix_cors::Cors;
@@ -53,11 +53,12 @@ fn main() -> std::io::Result<()> {
 
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
+    let index_grpc = index.clone();
     thread::spawn(move || {
         let mut retries = 3;
         while retries > 0 {
             let status = run_grpc(
-                index.clone(),
+                index_grpc.clone(),
                 grpc_address.clone(),
                 connection_string.clone(),
             );
@@ -74,11 +75,16 @@ fn main() -> std::io::Result<()> {
             }
         }
     });
-
+    let index_rest = index.clone();
     let handle = thread::spawn(move || {
         let mut retries = 3;
         while retries > 0 {
-            let status = run_rest(rest_ip.clone(), rest_port.clone(), static_serve_dir.clone());
+            let status = run_rest(
+                rest_ip.clone(),
+                rest_port.clone(),
+                static_serve_dir.clone(),
+                index_rest.clone(),
+            );
             if status.is_err() {
                 error!("REST service error: {:?}", status.err().unwrap());
                 error!("REST service failed, restarting..");
@@ -101,7 +107,7 @@ fn main() -> std::io::Result<()> {
 
 #[actix_web::main]
 async fn run_grpc<'a>(
-    index: Arc<RwLock<Box<dyn Index>>>,
+    index_grpc: Arc<RwLock<Box<dyn Index>>>,
     grpc_address: String,
     connection_string: String,
 ) -> std::io::Result<()> {
@@ -111,7 +117,7 @@ async fn run_grpc<'a>(
 
     // build initial index
     let service = CheckIndexService {
-        index: index.clone(),
+        index: index_grpc.clone(),
         connection_string: connection_string,
     };
 
@@ -133,7 +139,7 @@ async fn run_grpc<'a>(
     // show it or error
     info!(
         "{:?}",
-        index
+        index_grpc
             .try_read()
             .map_err(|c| Error::new(ErrorKind::Other, c.to_string()))
     );
@@ -148,7 +154,12 @@ async fn run_grpc<'a>(
 }
 
 #[actix_web::main]
-async fn run_rest(ip: String, port: String, static_dir: String) -> std::io::Result<()> {
+async fn run_rest(
+    ip: String,
+    port: String,
+    static_dir: String,
+    index_rest: Arc<RwLock<Box<dyn Index>>>,
+) -> std::io::Result<()> {
     // launch REST api
     info!("Lauching Search API");
     let bind_address = format!("{}:{}", ip, port);
@@ -161,6 +172,7 @@ async fn run_rest(ip: String, port: String, static_dir: String) -> std::io::Resu
         let static_dir_cpy = &static_dir;
         App::new()
             .wrap(cors)
+            .app_data(index_rest.clone())
             .service(api::endpoints::search)
             .service(api::endpoints::relational)
             .service(api::endpoints::feedback)
