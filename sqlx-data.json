@@ -1,5 +1,23 @@
 {
   "db": "PostgreSQL",
+  "03644e3ceeb89406a07b0919f508acb06c1615d65836ad6084a386f693b2caf9": {
+    "query": "SELECT MAX(article.dumpid)\n             FROM article",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "max",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "618b967b31c942f0561fa68eb348fb571786d7256fe36e87a9b5baada4e0c594": {
     "query": "SELECT a.articleid, a.title, a.domain, a.namespace, a.lastupdated,\n                    c.categories, c.abstracts, c.links, c.text\n             From article as a, \"content\" as c\n             where a.articleid = c.articleid",
     "describe": {

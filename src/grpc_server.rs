@@ -1,8 +1,9 @@
-use crate::index::index::{Index};
+use crate::index::index::Index;
 use crate::index::index_builder::{IndexBuilder, SqlIndexBuilder};
 use api_rs::wiki_search::{wiki_search_server::WikiSearch, CheckIndexReply, CheckIndexRequest};
-use std::env;
+use log::info;
 use std::sync::{Arc, RwLock};
+use std::time::Instant;
 use tonic::{Request, Response, Status};
 
 //The implementation listens to the scheduler and updates the index by checking against the dump id.
@@ -10,25 +11,34 @@ use tonic::{Request, Response, Status};
 #[derive(Debug)]
 pub struct CheckIndexService {
     pub index: Arc<RwLock<Box<dyn Index>>>,
+    pub connection_string: String,
 }
 
 #[tonic::async_trait]
 impl WikiSearch for CheckIndexService {
     async fn update_index(
         &self,
-        request: Request<CheckIndexRequest>,
+        _request: Request<CheckIndexRequest>,
     ) -> Result<Response<CheckIndexReply>, Status> {
-        // TODO: check dump id
-
-        let connection_string: String = env::var("DATABASE_URL").expect("Did not set URL.");
-
+        info!("Received index build signal.");
 
         let index_builder = SqlIndexBuilder {
-            connection_string: connection_string,
-            dump_id: 2,
+            connection_string: self.connection_string.clone(),
+            dump_id: match self.index.try_read() {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(Response::new(CheckIndexReply {
+                        success: false,
+                        err_code: e.to_string(),
+                    }))
+                }
+            }
+            .get_dump_id(),
         };
 
-        let res = match index_builder.build_index().await {
+        let timer = Instant::now();
+
+        let res = match index_builder.build_index_if_needed().await {
             Ok(v) => v,
             Err(e) => {
                 return Ok(Response::new(CheckIndexReply {
@@ -37,6 +47,19 @@ impl WikiSearch for CheckIndexService {
                 }))
             }
         };
+
+        let rebuilt = res.is_some();
+
+        if !rebuilt {
+            info!("Index is already up to date. Not rebuilding.");
+            return Ok(Response::new(CheckIndexReply {
+                success: true,
+                err_code: "".to_string(),
+            }));
+        }
+
+        let time = timer.elapsed();
+        info!("Building index took {:?}", time);
 
         let mut guard = match self.index.try_write() {
             Ok(v) => v,
@@ -48,9 +71,7 @@ impl WikiSearch for CheckIndexService {
             }
         };
 
-        println!("{:?}",res);
-
-        *guard = res;
+        *guard = res.expect("Something impossible happened!");
 
         Ok(Response::new(CheckIndexReply {
             success: true,

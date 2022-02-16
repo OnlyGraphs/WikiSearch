@@ -1,5 +1,6 @@
 use crate::index::index_structs::{Citation, Document, Infobox};
 
+#[allow(dead_code)]
 pub fn get_document_with_text(
     id: u32,
     title: &str,
@@ -32,6 +33,7 @@ pub fn get_document_with_text(
     })
 }
 
+#[allow(dead_code)]
 pub fn get_document_with_links(id: u32, title: &str, links: &str) -> Box<Document> {
     Box::new(Document {
         title: title.to_string(),

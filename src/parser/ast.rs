@@ -1,8 +1,7 @@
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum BinaryOp {
     And,
-    Or
+    Or,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -11,11 +10,11 @@ pub enum UnaryOp {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum StructureElem{
+pub enum StructureElem {
     Title,
     Category,
     Citation,
-    Infobox(String) // infobox name
+    Infobox(String), // infobox name
 }
 
 impl From<&str> for StructureElem {
@@ -24,7 +23,7 @@ impl From<&str> for StructureElem {
             "#title" => StructureElem::Title,
             "#category" => StructureElem::Category,
             "#citation" => StructureElem::Citation,
-            _ => StructureElem::Infobox(i.to_string())
+            _ => StructureElem::Infobox(i.to_string()),
         }
     }
 }
@@ -40,11 +39,12 @@ pub enum Query {
         op: UnaryOp,
         sub: Box<Query>,
     },
-    PhraseQuery { // TODO: can probably just compound over distance queries
+    PhraseQuery {
+        // TODO: can probably just compound over distance queries
         tks: Vec<String>,
     },
     DistanceQuery {
-        dst: i32,
+        dst: u32,
         lhs: String,
         rhs: String,
     },
@@ -58,11 +58,10 @@ pub enum Query {
         sub: Box<Option<Query>>,
     },
     WildcardQuery {
-        prefix: String, // before wildcard
+        prefix: String,  // before wildcard
         postfix: String, // after wildcard
     },
-    FreetextQuery{
-        tokens: Vec<String>
-    }
-
+    FreetextQuery {
+        tokens: Vec<String>,
+    },
 }
