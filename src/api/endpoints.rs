@@ -13,6 +13,7 @@ use actix_web::{
 };
 use sqlx::Row;
 use sqlx::{postgres::PgPoolOptions, query, query_scalar};
+use std::collections::HashSet;
 use std::{
     env,
     sync::{Arc, RwLock},
@@ -28,46 +29,6 @@ impl std::fmt::Display for MyError {
     }
 }
 impl ResponseError for MyError {}
-
-// impl ResponseError for MyError {
-//     fn error_response(&self) -> HttpResponse {
-//         match self.kind_ref() {
-//             ErrorKind::HttpResponse { msg, code, real } => {
-//                 println!("{}", real);
-
-//                 HttpResponse::build(code.to_owned()).json(json!({
-//                     "status": false,
-//                     "msg": msg
-//                 }))
-//             }
-//             _ => {
-//                 println!("{}", self);
-
-//                 HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).finish()
-//             }
-//         }
-//     }
-// }
-
-// // Endpoint for performing general wiki queries
-// #[get("/api/v1/search")]
-// pub async fn search(_q: Query<SearchParameters>) -> Result<impl Responder> {
-//     let document1 = Document{
-//         title: "April".to_string(),
-//         article_abstract: "April is the fourth month of the year in the Gregorian calendar, the fifth in the early Julian, the first of four months to have a length of 30 days, and the second of five months to have a length of less than 31 days.".to_string(),
-//         score: 0.5,
-//     };
-
-//     let document2 = Document{
-//         title: "May".to_string(),
-//         article_abstract: "May is the fifth month of the year in the Julian and Gregorian calendars and the third of seven months to have a length of 31 days.".to_string(),
-//         score: 0.6,
-//     };
-
-//     let docs = vec![document1, document2];
-
-//     Ok(Json(docs))
-// }
 
 //TODO!: 1) if index doesnt find id, return error to check implementation of index builder or retrieval.
 //2) Check other parsing errors, throw them back to frontend
@@ -86,16 +47,19 @@ pub async fn search(
         .max_connections(1)
         .connect(&data.connection_string)
         .await
-        .expect("DB error");
-    // .map_err(|e| {
-    //     println!("error is {}", e);
-    //     MyError(String::from("oh no")) //TODO!: Handle error more appropriately
-    // })?;
+        .expect("DB error"); //TODO! Handle error appropriately
 
-    let mut docs: Vec<Document> = Vec::new();
+    let mut docs = Vec::new();
+
+    let mut doc_retrieved_set = HashSet::new();
     for post in postings.iter() {
+        match doc_retrieved_set.get(&post.document_id) {
+            Some(x) => continue,
+            None => doc_retrieved_set.insert(post.document_id),
+        };
+
         let sql = sqlx::query(
-            "SELECT a.title, c.abstracts,
+            "SELECT a.title, c.abstracts
         From article as a, \"content\" as c
         where a.articleid= $1 AND a.articleid = c.articleid",
         )
@@ -117,7 +81,6 @@ pub async fn search(
             score: 0.0,
         });
     }
-
     Ok(Json(docs))
 }
 
