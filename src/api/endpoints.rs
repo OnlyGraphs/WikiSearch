@@ -51,7 +51,6 @@ pub async fn search(
         .expect("DB error"); //TODO! Handle error appropriately
 
     let mut docs = Vec::new();
-
     let mut doc_retrieved_set = HashSet::new();
     for post in postings.iter() {
         match doc_retrieved_set.get(&post.document_id) {
@@ -68,8 +67,7 @@ pub async fn search(
         .bind(post.document_id)
         .fetch_one(&pool)
         .await
-        .expect("Query error");
-        // .expect("Query error"); //TODO!: Handle error more appropriately
+        .expect("Query error"); //TODO!: Handle error more appropriately
         let title: String = sql.try_get("title").unwrap_or_default();
         let article_abstract: String = sql.try_get("abstracts").unwrap_or_default();
 
