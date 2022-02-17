@@ -3,8 +3,8 @@ use crate::parser::ast::{BinaryOp, Query, StructureElem, UnaryOp};
 use nom::{
     branch::alt,
     bytes::complete::{tag, tag_no_case, take_until, take_while, take_while1},
-    character::complete::digit0,
-    character::{is_alphanumeric, is_space},
+    character::complete::{digit0, digit1},
+    character::{is_alphanumeric, is_space, is_digit},
     multi::{many1, separated_list0},
     IResult,
 };
@@ -20,6 +20,14 @@ pub fn is_token_char(nxt: char) -> bool {
 
 pub fn parse_whitespace(nxt: &str) -> IResult<&str, &str> {
     take_while1(is_whitespace)(nxt)
+}
+
+pub fn parse_whitespace0(nxt: &str) ->IResult<&str, &str> {
+    take_while(is_whitespace)(nxt)
+}
+
+pub fn parse_comma(nxt: &str) -> IResult<&str, &str> {
+    take_while1(is_comma)(nxt)
 }
 
 pub fn is_whitespace(nxt: char) -> bool {
@@ -90,6 +98,7 @@ pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
     alt((
         parse_binary_query,
         parse_structure_query,
+        parse_relation_query,
         parse_freetext_query,
     ))(nxt)
 }
@@ -129,6 +138,20 @@ pub fn parse_token(nxt: &str) -> IResult<&str, String> {
 pub fn parse_token0(nxt : &str) -> IResult<&str, String> {
     take_while(is_token_char)(nxt)
         .map(|(nxt,res)| (nxt, res.to_string()))
+}
+
+pub fn parse_token_in_phrase(nxt: &str) -> IResult<&str, String> {
+    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, token) = parse_token(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
+    Ok((nxt, token))
+}
+
+pub fn parse_page_title(nxt: &str) -> IResult<&str, String> {
+    let (nxt, _) = parse_whitespace0(nxt)?;
+    let (nxt, token) = parse_token(nxt)?;
+    let (nxt, _) = parse_whitespace0(nxt)?;
+    Ok((nxt, token))
 }
 
 pub fn parse_not_query(nxt: &str) -> IResult<&str, Box<Query>> {
@@ -207,7 +230,96 @@ pub fn parse_wildcard_query(nxt: &str) -> IResult<&str, Box<Query>> {
     })))
 }
 
+pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
+    let (nxt, _) = tag_no_case("#LinksTo")(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, mut page_title) = many1(parse_token_in_phrase)(nxt)?;
+
+    let dst = page_title.pop();
+    let mut d : String = String::new();
+
+    match dst {
+        Some(x) => d = x.to_string(),
+        _ => { return Err(nom::Err::Error(nom::error::Error::new(
+            //the new struct, instead of the tuple
+            "Could not retrieve number of hops from query.",
+            nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
+
+    // Convert hops to int
+    let mut hops: u32 = 0;
+
+    match d.parse::<u32>() {
+        Ok(n) => hops = n,
+        Err(e) => {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                //the new struct, instead of the tuple
+                "Cannot convert string containing distance to integer.",
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    };
+
+    Ok((nxt, Box::new(
+        Query::RelationQuery{
+            root: page_title,
+            hops: hops,
+            sub: Box::new(None),
+        }
+    )))
+}
+
+// TODO: What if the title contains integers?
+pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
+    let (nxt, _) = tag_no_case("#LinksTo")(nxt)?;
+    let (nxt, _) = parse_whitespace0(nxt)?;
+    let (nxt, _) = parse_comma(nxt)?;
+    let (nxt, _) = parse_whitespace0(nxt)?;
+    let (nxt, page_title) = many1(parse_page_title)(nxt)?;
+    let (nxt, _) = parse_whitespace0(nxt)?;
+    let (nxt, _) = parse_comma(nxt)?;
+    let (nxt, _) = parse_whitespace0(nxt)?;
+    let (nxt, d) = digit1(nxt)?;
+    let (nxt, _) = parse_whitespace0(nxt)?;
+    let (nxt, _) = parse_comma(nxt)?;
+    let (nxt, _) = parse_whitespace0(nxt)?;
+    let (nxt, sub) = parse_query(nxt)?;
+
+    // Convert hops to int
+    let mut hops: u32 = 0;
+
+    match d.parse::<u32>() {
+        Ok(n) => hops = n,
+        Err(e) => {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                //the new struct, instead of the tuple
+                "Cannot convert string containing distance to integer.",
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    };
+
+    Ok((nxt, Box::new(
+        Query::RelationQuery{
+            root: page_title,
+            hops: hops,
+            sub: Box::new(Some(*sub)),
+        }
+    )))
+}
+
 pub fn parse_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
-    let (nxt, _) = tag_no_case("#LinksTo")(nxt)?
-    
+    alt((
+        parse_nested_relation_query,
+        parse_simple_relation_query
+    ))(nxt)
+}
+
+pub fn parse_phrase_query(nxt: &str) -> IResult<&str, Box<Query>> {
+    let (nxt, tokens) = many1(parse_token_in_phrase)(nxt)?;
+    Ok((nxt, Box::new(Query::PhraseQuery{
+        tks: tokens,
+    })))
 }
