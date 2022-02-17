@@ -1,6 +1,6 @@
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::{App, HttpServer};
+use actix_web::{web::Data, App, HttpServer};
 use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
     CheckIndexRequest,
@@ -166,14 +166,14 @@ async fn run_rest(
 
     HttpServer::new(move || {
         let cors = Cors::permissive();
-
+        let data = RESTSearchData {
+            index_rest: index_rest.clone(),
+            connection_string: connection_string.clone(),
+        };
         let static_dir_cpy = &static_dir;
         App::new()
             .wrap(cors)
-            .app_data(RESTSearchData {
-                index_rest: index_rest.clone(),
-                connection_string: connection_string.clone(),
-            })
+            .data(data)
             .service(api::endpoints::search)
             .service(api::endpoints::relational)
             .service(api::endpoints::feedback)

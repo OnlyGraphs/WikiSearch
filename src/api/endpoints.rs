@@ -1,11 +1,11 @@
-use crate::api::structs::RESTSearchData;
 use crate::api::structs::{
-    Document, Relation, RelationSearchOutput, RelationalSearchParameters, SearchParameters,
-    UserFeedback,
+    Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
+    SearchParameters, UserFeedback,
 };
 use crate::index::index::{BasicIndex, Index};
 use crate::parser::parser::parse_query;
 use crate::search::search::execute_query;
+use actix_web::Handler;
 use actix_web::{
     get,
     web::{Data, Json, Query},
@@ -15,34 +15,41 @@ use sqlx::Row;
 use sqlx::{postgres::PgPoolOptions, query, query_scalar};
 use std::{
     env,
-    io::{Error, ErrorKind},
     sync::{Arc, RwLock},
-    thread,
 };
-// #[derive(Debug)]
-// enum RESTErrorType {
-//     SqlxError(sqlx::Error),
-//     ResponseTypeError(dyn ResponseError),
-// };
 
-// struct RESTError {
-//     kind: RESTErrorType::SqlxError(sqlx::Error::new()),
-//     message: String,
-// };
+use log::info;
+use std::io::{self, Write};
+#[derive(Debug)]
+pub struct MyError(String);
+impl std::fmt::Display for MyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Oh no. something happened") //TODO!: Write a meaningful error
+    }
+}
+impl ResponseError for MyError {}
 
-// impl From<ResponseError:Sized> for RESTErrorType {
-//     fn from(err: dyn ResponseError) -> RESTErrorType {
-//         RESTErrorType::ResponseTypeError(err)
+// impl ResponseError for MyError {
+//     fn error_response(&self) -> HttpResponse {
+//         match self.kind_ref() {
+//             ErrorKind::HttpResponse { msg, code, real } => {
+//                 println!("{}", real);
+
+//                 HttpResponse::build(code.to_owned()).json(json!({
+//                     "status": false,
+//                     "msg": msg
+//                 }))
+//             }
+//             _ => {
+//                 println!("{}", self);
+
+//                 HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).finish()
+//             }
+//         }
 //     }
 // }
 
-// impl From<sqlx::Error:Sized> for RESTErrorType {
-//     fn from(err: sqlx::Error) -> RESTErrorType {
-//         RESTErrorType::SqlxError(err)
-//     }
-// }
-
-/// Endpoint for performing general wiki queries
+// // Endpoint for performing general wiki queries
 // #[get("/api/v1/search")]
 // pub async fn search(_q: Query<SearchParameters>) -> Result<impl Responder> {
 //     let document1 = Document{
@@ -65,11 +72,11 @@ use std::{
 //TODO!: 1) if index doesnt find id, return error to check implementation of index builder or retrieval.
 //2) Check other parsing errors, throw them back to frontend
 
-/// Endpoint for performing general wiki queries
+// Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
 pub async fn search(
-    _q: Query<SearchParameters>,
     data: Data<RESTSearchData>,
+    _q: Query<SearchParameters>,
 ) -> Result<impl Responder> {
     let (_, query) = parse_query(&_q.query).unwrap();
     let idx = data.index_rest.read().unwrap();
@@ -79,7 +86,12 @@ pub async fn search(
         .max_connections(1)
         .connect(&data.connection_string)
         .await
-        .expect("No DATABASE Connection"); //TODO! Maybe there's a better way to do this
+        .expect("DB error");
+    // .map_err(|e| {
+    //     println!("error is {}", e);
+    //     MyError(String::from("oh no")) //TODO!: Handle error more appropriately
+    // })?;
+
     let mut docs: Vec<Document> = Vec::new();
     for post in postings.iter() {
         let sql = sqlx::query(
@@ -90,7 +102,12 @@ pub async fn search(
         .bind(post.document_id)
         .fetch_one(&pool)
         .await
-        .expect("Query error"); //TODO!: Handle error more appropriately
+        .expect("Query error");
+        // .map_err(|e| {
+        //     println!("error is {}", e);
+        //     MyError(String::from("oh no. anyways"))
+        // })?; //TODO!: Handle error more appropriately
+        // .expect("Query error"); //TODO!: Handle error more appropriately
         let title: String = sql.try_get("title").unwrap_or_default();
         let article_abstract: String = sql.try_get("abstracts").unwrap_or_default();
 
@@ -100,7 +117,6 @@ pub async fn search(
             score: 0.0,
         });
     }
-    // let docs = vec![document2];
 
     Ok(Json(docs))
 }

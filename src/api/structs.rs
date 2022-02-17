@@ -54,7 +54,8 @@ pub struct UserFeedback {
 }
 
 /// Represents a wikipedia article
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
+
 pub struct Document {
     pub title: String,
     pub score: f64,
@@ -102,8 +103,16 @@ fn default_query_relational() -> Option<String> {
 fn default_chosen_result() -> Option<String> {
     Option::None
 }
-
+#[derive(Debug)]
 pub struct RESTSearchData {
     pub index_rest: Arc<RwLock<Box<dyn Index>>>,
     pub connection_string: String, //Used to query Database for metadata results like Title or Abstracts
 }
+
+// impl RestSearchData {
+//     fn new() -> actix_web::web::Data<RestSearchData> {
+//         actix_web::web::Data<AppState> {
+//             counter: Cell::new(0usize),
+//         }
+//     }
+// }
