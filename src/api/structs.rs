@@ -108,11 +108,3 @@ pub struct RESTSearchData {
     pub index_rest: Arc<RwLock<Box<dyn Index>>>,
     pub connection_string: String, //Used to query Database for metadata results like Title or Abstracts
 }
-
-// impl RestSearchData {
-//     fn new() -> actix_web::web::Data<RestSearchData> {
-//         actix_web::web::Data<AppState> {
-//             counter: Cell::new(0usize),
-//         }
-//     }
-// }
