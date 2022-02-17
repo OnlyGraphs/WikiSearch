@@ -5,7 +5,6 @@ use crate::api::structs::{
 use crate::index::index::{BasicIndex, Index};
 use crate::parser::parser::parse_query;
 use crate::search::search::execute_query;
-use actix_web::Handler;
 use actix_web::{
     get,
     web::{Data, Json, Query},
@@ -19,8 +18,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use log::info;
-use std::io::{self, Write};
+use log::{debug, info};
 #[derive(Debug)]
 pub struct MyError(String);
 impl std::fmt::Display for MyError {
@@ -40,9 +38,9 @@ pub async fn search(
     _q: Query<SearchParameters>,
 ) -> Result<impl Responder> {
     let (nxt, query) = parse_query(&_q.query).unwrap();
-    info!("{:?}", nxt);
+    debug!("{:?}", nxt);
     let idx = data.index_rest.read().unwrap();
-    info!("Query: {:?}", query);
+    debug!("Query: {:?}", query);
     let postings = execute_query(query, &idx);
     let pool = PgPoolOptions::new()
         .max_connections(1)
