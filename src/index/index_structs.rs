@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 /// stores an appearance of a token in an article
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]  //TODO: get rid of Copy and correct parts of program which use it
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)] //TODO: get rid of Copy and correct parts of program which use it
 pub struct Posting {
     pub document_id: u32, //TODO: double check memory requirements, highest article word count etc
     pub position: u32,
 }
 
-#[derive(Debug, Eq, PartialEq, Default, Clone)] 
+#[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct PostingNode {
     pub postings: Vec<Posting>,
     pub df: u32,

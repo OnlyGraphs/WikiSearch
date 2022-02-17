@@ -1,22 +1,21 @@
 use bimap::BiMap;
+use either::{Either, Left, Right};
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::{
+    collections::HashMap,
+    fmt,
+    marker::{Send, Sync},
+};
 
 use crate::index::{
     collections::StringPostingMap,
     errors::{IndexError, IndexErrorKind},
     index_structs::{Document, DocumentMetaData, PosRange, Posting},
 };
-
+use crate::parser::ast::StructureElem;
 use crate::utils::utils::MemFootprintCalculator;
-
-use either::{Either, Left, Right};
-use std::{
-    collections::HashMap,
-    fmt,
-    marker::{Send, Sync},
-};
 
 /**
  * BasicIndex Structure:
@@ -208,7 +207,6 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
         }
     }
 
-
     // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
     fn get_postings(&self, token: &str) -> Option<&[Posting]> {
         self.posting_nodes
@@ -217,10 +215,12 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
     }
 
     // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
-    fn get_all_postings(&self) -> Vec<Posting>{
-        let mut out = self.posting_nodes.iter()
-                                        .flat_map(|(_,v)| v.postings.clone())
-                                        .collect::<Vec<Posting>>();
+    fn get_all_postings(&self) -> Vec<Posting> {
+        let mut out = self
+            .posting_nodes
+            .iter()
+            .flat_map(|(_, v)| v.postings.clone())
+            .collect::<Vec<Posting>>();
         out.sort();
 
         return out;
@@ -266,13 +266,13 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
 
         //Citations
         word_pos = document.citations.iter().fold(word_pos, |a, c| {
-            self.add_structure_elem(document.doc_id, "citation", &c.text, a)
+            self.add_structure_elem(document.doc_id, StructureElem::Citation.into(), &c.text, a)
         });
 
         //Categories
         let _ = self.add_structure_elem(
             document.doc_id,
-            "categories",
+            StructureElem::Category.into(),
             &document.categories,
             word_pos,
         );
