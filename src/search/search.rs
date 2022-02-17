@@ -2,6 +2,7 @@ use crate::index::errors::IndexError;
 use crate::index::index::Index;
 use crate::index::index_structs::Posting;
 use crate::parser::ast::{BinaryOp, Query, UnaryOp};
+use crate::parser::parser::{parse_relation_query, parse_wildcard_query, parse_structure_query}
 use std::cmp::Ordering;
 use itertools::Itertools;
 

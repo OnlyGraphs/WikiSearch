@@ -100,6 +100,7 @@ pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
         parse_structure_query,
         parse_relation_query,
         parse_freetext_query,
+        parse_phrase_query,
     ))(nxt)
 }
 
