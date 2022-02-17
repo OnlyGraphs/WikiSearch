@@ -5,9 +5,6 @@ use search_lib::index_structs::Posting;
 use search_lib::parser::ast::{BinaryOp, Query, UnaryOp};
 use search_lib::search::search::execute_query;
 use search_lib::utils::test_utils::get_document_with_text;
-use search_lib::utils::utils::MemFootprintCalculator;
-use std::fmt::Debug;
-use std::fmt::Formatter;
 
 #[test]
 fn test_one_word_query() {
@@ -246,7 +243,7 @@ fn test_distance_query() {
         3,
         "d3",
         vec![("", "world hello")],
-        "hello world",
+        "hello ddd",
         vec!["world world"],
         "ggg hhh",
     ))
@@ -276,8 +273,12 @@ fn test_distance_query() {
         ),
         vec![
             Posting {
-                document_id: 3,
-                position: 1
+                document_id: 2,
+                position: 4
+            },
+            Posting {
+                document_id: 2,
+                position: 5
             },
             Posting {
                 document_id: 3,
@@ -285,12 +286,52 @@ fn test_distance_query() {
             },
             Posting {
                 document_id: 3,
-                position: 3
+                position: 4
+            }
+        ]
+    );
+}
+
+
+#[test]
+fn test_distance_query_overlap() {
+    let mut idx: Box<dyn Index> = Box::new(BasicIndex::<SmallPostingMap>::default());
+
+    idx.add_document(get_document_with_text(
+        3,
+        "d3",
+        vec![("", "dddd dddd")],
+        "hello ddd",
+        vec!["world world"],
+        "ggg hhh",
+    ))
+    .unwrap();
+
+    idx.finalize().unwrap();
+
+    assert_eq!(
+        execute_query(
+            Box::new(Query::DistanceQuery {
+                dst: 3,
+                lhs: "hello".to_string(),
+                rhs: "world".to_string(),
+                }
+            ),
+            &idx
+        ),
+        vec![
+            Posting {
+                document_id: 3,
+                position: 2
             },
             Posting {
                 document_id: 3,
                 position: 4
             },
+            Posting {
+                document_id: 3,
+                position: 5
+            }
         ]
     );
 }
@@ -378,14 +419,18 @@ fn test_phrase_query_multiple() {
 
     idx.finalize().unwrap();
 
-    assert_eq!(
-        execute_query(
-            Box::new(Query::PhraseQuery {
-                tks: vec!["hello".to_string(),"world".to_string(), "momma".to_string()]
-                }
-            ),
-            &idx
+    let mut out = execute_query(
+        Box::new(Query::PhraseQuery {
+            tks: vec!["hello".to_string(),"world".to_string(), "momma".to_string()]
+            }
         ),
+        &idx
+    );
+
+    out.dedup(); // allow consecutive duplicates (due to overlaps)
+
+    assert_eq!(
+        out, 
         vec![
             Posting {
                 document_id: 3,
@@ -432,14 +477,17 @@ fn test_phrase_query_multiple_same_start() {
 
     idx.finalize().unwrap();
 
-    assert_eq!(
-        execute_query(
-            Box::new(Query::PhraseQuery {
-                tks: vec!["hello".to_string(),"world".to_string(), "momma".to_string()]
-                }
-            ),
-            &idx
+    let mut out =  execute_query(
+        Box::new(Query::PhraseQuery {
+            tks: vec!["hello".to_string(),"world".to_string(), "momma".to_string()]
+            }
         ),
+        &idx
+    );
+    out.dedup(); // allow consecutive duplicates due to overlaps
+
+    assert_eq!(
+       out,
         vec![
             Posting {
                 document_id: 2,
