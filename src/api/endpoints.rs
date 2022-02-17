@@ -31,6 +31,7 @@ impl ResponseError for MyError {}
 //TODO!:
 //1) if index doesnt find id, return error to check implementation of index builder or retrieval.
 //2) Check other parsing errors, throw them back to frontend
+//3) adjust document scores based on tfidf parameter
 
 // Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
@@ -75,7 +76,7 @@ pub async fn search(
         docs.push(Document {
             title: title,
             article_abstract: article_abstract,
-            score: 0.0,
+            score: 0.0, //TODO! Adjust score based on tfidf
         });
     }
     Ok(Json(docs))
