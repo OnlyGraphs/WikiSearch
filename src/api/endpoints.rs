@@ -28,7 +28,8 @@ impl std::fmt::Display for MyError {
 }
 impl ResponseError for MyError {}
 
-//TODO!: 1) if index doesnt find id, return error to check implementation of index builder or retrieval.
+//TODO!:
+//1) if index doesnt find id, return error to check implementation of index builder or retrieval.
 //2) Check other parsing errors, throw them back to frontend
 
 // Endpoint for performing general wiki queries
@@ -67,10 +68,6 @@ pub async fn search(
         .fetch_one(&pool)
         .await
         .expect("Query error");
-        // .map_err(|e| {
-        //     println!("error is {}", e);
-        //     MyError(String::from("oh no. anyways"))
-        // })?; //TODO!: Handle error more appropriately
         // .expect("Query error"); //TODO!: Handle error more appropriately
         let title: String = sql.try_get("title").unwrap_or_default();
         let article_abstract: String = sql.try_get("abstracts").unwrap_or_default();
