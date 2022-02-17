@@ -302,3 +302,12 @@ fn test_basic_index_links() {
     assert_eq!(idx.id_to_title(2), Some(&"target2".to_string()));
     assert_eq!(idx.title_to_id("target2".to_string()), Some(2));
 }
+
+
+// make_sure_postings_are_in_order(){
+//    todo!();
+//}
+
+//make_sure_tokens_are_sorted(){
+//     todo!()
+// }
