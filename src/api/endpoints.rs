@@ -39,9 +39,10 @@ pub async fn search(
     data: Data<RESTSearchData>,
     _q: Query<SearchParameters>,
 ) -> Result<impl Responder> {
-    let (_, query) = parse_query(&_q.query).unwrap();
+    let (nxt, query) = parse_query(&_q.query).unwrap();
+    info!("{:?}", nxt);
     let idx = data.index_rest.read().unwrap();
-
+    info!("Query: {:?}", query);
     let postings = execute_query(query, &idx);
     let pool = PgPoolOptions::new()
         .max_connections(1)
@@ -57,6 +58,7 @@ pub async fn search(
             Some(x) => continue,
             None => doc_retrieved_set.insert(post.document_id),
         };
+        info!("Document: {:?}", post.document_id);
 
         let sql = sqlx::query(
             "SELECT a.title, c.abstracts
