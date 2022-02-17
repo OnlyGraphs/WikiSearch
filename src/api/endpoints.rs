@@ -1,22 +1,46 @@
+use crate::api::structs::RESTSearchData;
 use crate::api::structs::{
     Document, Relation, RelationSearchOutput, RelationalSearchParameters, SearchParameters,
     UserFeedback,
 };
-use actix_web::{
-    get,
-    web::{Data, Json, Query},
-    HttpResponse, Responder, Result,
-};
-
 use crate::index::index::{BasicIndex, Index};
 use crate::parser::parser::parse_query;
 use crate::search::search::execute_query;
+use actix_web::{
+    get,
+    web::{Data, Json, Query},
+    HttpResponse, Responder, ResponseError, Result,
+};
+use sqlx::Row;
+use sqlx::{postgres::PgPoolOptions, query, query_scalar};
 use std::{
     env,
     io::{Error, ErrorKind},
     sync::{Arc, RwLock},
     thread,
 };
+// #[derive(Debug)]
+// enum RESTErrorType {
+//     SqlxError(sqlx::Error),
+//     ResponseTypeError(dyn ResponseError),
+// };
+
+// struct RESTError {
+//     kind: RESTErrorType::SqlxError(sqlx::Error::new()),
+//     message: String,
+// };
+
+// impl From<ResponseError:Sized> for RESTErrorType {
+//     fn from(err: dyn ResponseError) -> RESTErrorType {
+//         RESTErrorType::ResponseTypeError(err)
+//     }
+// }
+
+// impl From<sqlx::Error:Sized> for RESTErrorType {
+//     fn from(err: sqlx::Error) -> RESTErrorType {
+//         RESTErrorType::SqlxError(err)
+//     }
+// }
 
 /// Endpoint for performing general wiki queries
 // #[get("/api/v1/search")]
@@ -37,29 +61,46 @@ use std::{
 
 //     Ok(Json(docs))
 // }
+
+//TODO!: 1) if index doesnt find id, return error to check implementation of index builder or retrieval.
+//2) Check other parsing errors, throw them back to frontend
+
 /// Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
 pub async fn search(
     _q: Query<SearchParameters>,
-    idx: Data<Box<dyn Index>>,
+    data: Data<RESTSearchData>,
 ) -> Result<impl Responder> {
-    let (nxt, query) = parse_query(&_q.query).unwrap();
-    // let index = BasicIndex::<M>::default();
-    let postings = execute_query(query, &Arc::try_unwrap(idx.into_inner()).unwrap());
+    let (_, query) = parse_query(&_q.query).unwrap();
+    let idx = data.index_rest.read().unwrap();
 
-    // for post in postings:
-    //     docs.append(post)
+    let postings = execute_query(query, &idx);
+    let pool = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&data.connection_string)
+        .await
+        .expect("No DATABASE Connection"); //TODO! Maybe there's a better way to do this
+    let mut docs: Vec<Document> = Vec::new();
+    for post in postings.iter() {
+        let sql = sqlx::query(
+            "SELECT a.title, c.abstracts,
+        From article as a, \"content\" as c
+        where a.articleid= $1 AND a.articleid = c.articleid",
+        )
+        .bind(post.document_id)
+        .fetch_one(&pool)
+        .await
+        .expect("Query error"); //TODO!: Handle error more appropriately
+        let title: String = sql.try_get("title").unwrap_or_default();
+        let article_abstract: String = sql.try_get("abstracts").unwrap_or_default();
 
-    // println!("{:?}", x.unwrap());
-    // Ok(Json(x.unwrap()));
-    for post in postings.iter() {}
-
-    let document2 = Document{
-        title: "May".to_string(),
-        article_abstract: "May is the fifth month of the year in the Julian and Gregorian calendars and the third of seven months to have a length of 31 days.".to_string(),
-        score: 0.6,
-    };
-    let docs = vec![document2];
+        docs.push(Document {
+            title: title,
+            article_abstract: article_abstract,
+            score: 0.0,
+        });
+    }
+    // let docs = vec![document2];
 
     Ok(Json(docs))
 }

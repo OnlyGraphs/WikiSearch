@@ -1,6 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::index::index::Index;
+use std::sync::{Arc, RwLock};
+
 /// Represents the type of order to be imposed on list of documents
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,4 +101,9 @@ fn default_query_relational() -> Option<String> {
 
 fn default_chosen_result() -> Option<String> {
     Option::None
+}
+
+pub struct RESTSearchData {
+    pub index_rest: Arc<RwLock<Box<dyn Index>>>,
+    pub connection_string: String, //Used to query Database for metadata results like Title or Abstracts
 }

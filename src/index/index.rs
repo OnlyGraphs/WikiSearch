@@ -208,7 +208,6 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
         }
     }
 
-
     // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
     fn get_postings(&self, token: &str) -> Option<&[Posting]> {
         self.posting_nodes
@@ -217,10 +216,12 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
     }
 
     // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
-    fn get_all_postings(&self) -> Vec<Posting>{
-        let mut out = self.posting_nodes.iter()
-                                        .flat_map(|(_,v)| v.postings.clone())
-                                        .collect::<Vec<Posting>>();
+    fn get_all_postings(&self) -> Vec<Posting> {
+        let mut out = self
+            .posting_nodes
+            .iter()
+            .flat_map(|(_, v)| v.postings.clone())
+            .collect::<Vec<Posting>>();
         out.sort();
 
         return out;
