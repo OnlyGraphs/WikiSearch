@@ -42,7 +42,7 @@ pub async fn search(
     data: Data<RESTSearchData>,
     _q: Query<SearchParameters>,
 ) -> Result<impl Responder> {
-    debug!("Query Before parsing: {:?}", &_q.query);
+    debug!("Query Before Parsing: {:?}", &_q.query);
     let (nxt, query) = parse_query(&_q.query).unwrap();
 
     debug!("Query Form After Parsing: {:?}", query);
@@ -61,7 +61,7 @@ pub async fn search(
     let mut docs = Vec::new();
     let mut doc_retrieved_set = HashSet::new();
 
-    let mut result_count: usize = 0; //TODO Change to page number
+    let mut result_count: usize = 0;
     let mut posting_index: usize = 0;
     let postings_len: usize = postings.len(); //Note: Panics if it cant change to type u16
     while posting_index < postings_len && result_count < results_per_page {
