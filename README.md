@@ -35,3 +35,6 @@
 # Environment Variables
 - `SEARCH_PORT`: sets the port at which search API listens (default 8000)
 - `SEARCH_IP`: setst the ip address to which the search API binds (default 127.0.0.1) 
+- `SQLX_OFFLINE` : if true reads sqlx-data.json at compile time to verify queries
+- `DATABASE_URL` : the sql connection string 
+- `RUST_LOG` : level of logging
