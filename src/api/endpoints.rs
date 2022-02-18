@@ -76,6 +76,7 @@ pub async fn search(
 
     let mut docs = Vec::new();
     let retrieved_doc_ids = get_retrieved_documents(postings);
+    debug!("Number of documents found: {:?}", retrieved_doc_ids.len());
 
     let mut doc_index: usize = ((page - 1) * (results_per_page as u32)).try_into().unwrap();
     let results_per_page: usize = (page * (results_per_page as u32)).try_into().unwrap();
@@ -104,6 +105,8 @@ pub async fn search(
         //Go to the next posting
         doc_index += 1;
     }
+    debug!("Number of results returned: {:?}", docs.len());
+
     Ok(Json(docs))
 }
 
