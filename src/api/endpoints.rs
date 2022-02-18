@@ -1,3 +1,4 @@
+use crate::api::structs::default_results_per_page;
 use crate::api::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
     SearchParameters, UserFeedback,
@@ -19,6 +20,7 @@ use std::{
 };
 
 use log::{debug, info};
+
 #[derive(Debug)]
 pub struct MyError(String);
 impl std::fmt::Display for MyError {
@@ -32,6 +34,7 @@ impl ResponseError for MyError {}
 //1) if index doesnt find id, return error to check implementation of index builder or retrieval.
 //2) Check other parsing errors, throw them back to frontend
 //3) adjust document scores based on tfidf parameter
+// 4) Maybe caching user results could be good, but that is extra if we have time.
 
 // Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
@@ -39,10 +42,15 @@ pub async fn search(
     data: Data<RESTSearchData>,
     _q: Query<SearchParameters>,
 ) -> Result<impl Responder> {
+    debug!("Query Before parsing: {:?}", &_q.query);
     let (nxt, query) = parse_query(&_q.query).unwrap();
-    debug!("{:?}", nxt);
+
+    debug!("Query Form After Parsing: {:?}", query);
+
+    let results_per_page: usize = _q.results_per_page.unwrap().into();
+    debug!("Results Per Page: {:?}", results_per_page);
+
     let idx = data.index_rest.read().unwrap();
-    debug!("Query: {:?}", query);
     let postings = execute_query(query, &idx);
     let pool = PgPoolOptions::new()
         .max_connections(1)
@@ -52,11 +60,20 @@ pub async fn search(
 
     let mut docs = Vec::new();
     let mut doc_retrieved_set = HashSet::new();
-    for post in postings.iter() {
+
+    let mut result_count: usize = 0; //TODO Change to page number
+    let mut posting_index: usize = 0;
+    let postings_len: usize = postings.len(); //Note: Panics if it cant change to type u16
+    while posting_index < postings_len && result_count < results_per_page {
+        let post = &postings[posting_index];
+        posting_index += 1;
+
         match doc_retrieved_set.get(&post.document_id) {
             Some(x) => continue,
             None => doc_retrieved_set.insert(post.document_id),
         };
+        result_count += 1;
+
         info!("Document: {:?}", post.document_id);
 
         let sql = sqlx::query(
@@ -76,7 +93,9 @@ pub async fn search(
             article_abstract: article_abstract,
             score: 0.0, //TODO! Adjust score based on tfidf
         });
+        //Go to the next posting
     }
+
     Ok(Json(docs))
 }
 
