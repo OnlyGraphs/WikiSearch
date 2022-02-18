@@ -1,12 +1,14 @@
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_web::{App, HttpServer};
+use actix_web::{web::Data, App, HttpServer};
 use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
     CheckIndexRequest,
 };
 use log::{error, info};
 use pretty_env_logger;
+use search_lib::api;
+use search_lib::api::structs::RESTSearchData;
 use search_lib::grpc_server::CheckIndexService;
 use search_lib::index::collections::SmallPostingMap;
 use search_lib::index::index::{BasicIndex, Index};
@@ -45,13 +47,15 @@ fn main() -> std::io::Result<()> {
 
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
+    let connection_string_grpc = connection_string.clone();
+    let index_grpc = index.clone();
     thread::spawn(move || {
         let mut retries = 3;
         while retries > 0 {
             let status = run_grpc(
-                index.clone(),
+                index_grpc.clone(),
                 grpc_address.clone(),
-                connection_string.clone(),
+                connection_string_grpc.clone(),
             );
 
             if status.is_err() {
@@ -66,11 +70,18 @@ fn main() -> std::io::Result<()> {
             }
         }
     });
-
+    let connection_string_rest = connection_string.clone();
+    let index_rest = index.clone();
     let handle = thread::spawn(move || {
         let mut retries = 3;
         while retries > 0 {
-            let status = run_rest(rest_ip.clone(), rest_port.clone(), static_serve_dir.clone());
+            let status = run_rest(
+                rest_ip.clone(),
+                rest_port.clone(),
+                static_serve_dir.clone(),
+                index_rest.clone(),
+                connection_string_rest.clone(),
+            );
             if status.is_err() {
                 error!("REST service error: {:?}", status.err().unwrap());
                 error!("REST service failed, restarting..");
@@ -93,7 +104,7 @@ fn main() -> std::io::Result<()> {
 
 #[actix_web::main]
 async fn run_grpc<'a>(
-    index: Arc<RwLock<Box<dyn Index>>>,
+    index_grpc: Arc<RwLock<Box<dyn Index>>>,
     grpc_address: String,
     connection_string: String,
 ) -> std::io::Result<()> {
@@ -103,7 +114,7 @@ async fn run_grpc<'a>(
 
     // build initial index
     let service = CheckIndexService {
-        index: index.clone(),
+        index: index_grpc.clone(),
         connection_string: connection_string,
     };
 
@@ -125,7 +136,7 @@ async fn run_grpc<'a>(
     // show it or error
     info!(
         "{:?}",
-        index
+        index_grpc
             .try_read()
             .map_err(|c| Error::new(ErrorKind::Other, c.to_string()))
     );
@@ -140,7 +151,13 @@ async fn run_grpc<'a>(
 }
 
 #[actix_web::main]
-async fn run_rest(ip: String, port: String, static_dir: String) -> std::io::Result<()> {
+async fn run_rest(
+    ip: String,
+    port: String,
+    static_dir: String,
+    index_rest: Arc<RwLock<Box<dyn Index>>>,
+    connection_string: String,
+) -> std::io::Result<()> {
     // launch REST api
     info!("Lauching Search API");
     let bind_address = format!("{}:{}", ip, port);
@@ -149,13 +166,17 @@ async fn run_rest(ip: String, port: String, static_dir: String) -> std::io::Resu
 
     HttpServer::new(move || {
         let cors = Cors::permissive();
-
+        let data = RESTSearchData {
+            index_rest: index_rest.clone(),
+            connection_string: connection_string.clone(),
+        };
         let static_dir_cpy = &static_dir;
         App::new()
             .wrap(cors)
-            .service(search_lib::api::endpoints::search)
-            .service(search_lib::api::endpoints::relational)
-            .service(search_lib::api::endpoints::feedback)
+            .data(data)
+            .service(api::endpoints::search)
+            .service(api::endpoints::relational)
+            .service(api::endpoints::feedback)
             .service(
                 Files::new("/", static_dir_cpy)
                     .prefer_utf8(true)

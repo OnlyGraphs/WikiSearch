@@ -66,6 +66,19 @@ fn test_dist_query_2() {
 }
 
 #[test]
+fn test_dist_query_parser() {
+    let query = "#DIST,3,pumpkin,pie";
+    let (s, dist_node) = parse_query(query).unwrap();
+    match *dist_node {
+        Query::DistanceQuery { dst, lhs, rhs } => {
+            assert!(dst == 3 && lhs == "pumpkin" && rhs == "pie")
+        }
+        _ => assert!(false),
+    }
+}
+
+
+#[test]
 fn test_simple_structure_query() {
     let query = "#TITLE pumpkin";
     let (s, struct_node) = parse_structure_query(query).unwrap();

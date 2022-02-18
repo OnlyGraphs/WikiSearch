@@ -3,6 +3,7 @@ use crate::index::index_structs::Posting;
 use crate::index_structs::PosRange;
 use crate::parser::ast::{BinaryOp, Query, UnaryOp};
 use itertools::Itertools;
+use std::cmp::Ordering;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ScoredPosting {

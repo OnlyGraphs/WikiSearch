@@ -88,6 +88,7 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
 pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
     alt((
+        parse_dist_query,
         parse_binary_query,
         parse_structure_query,
         parse_freetext_query,
