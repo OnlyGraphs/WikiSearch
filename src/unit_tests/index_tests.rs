@@ -3,7 +3,7 @@ use crate::index::{
     index::{BasicIndex, Index},
     index_structs::{PosRange, Posting},
 };
-use crate::tests::test_utils::{get_document_with_links, get_document_with_text};
+use crate::utils::test_utils::{get_document_with_links, get_document_with_text};
 use crate::utils::utils::MemFootprintCalculator;
 use std::array::IntoIter;
 use std::collections::HashMap;
@@ -302,3 +302,12 @@ fn test_basic_index_links() {
     assert_eq!(idx.id_to_title(2), Some(&"target2".to_string()));
     assert_eq!(idx.title_to_id("target2".to_string()), Some(2));
 }
+
+
+// make_sure_postings_are_in_order(){
+//    todo!();
+//}
+
+//make_sure_tokens_are_sorted(){
+//     todo!()
+// }

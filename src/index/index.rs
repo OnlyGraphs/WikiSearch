@@ -1,22 +1,21 @@
 use bimap::BiMap;
+use either::{Either, Left, Right};
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::{
+    collections::HashMap,
+    fmt,
+    marker::{Send, Sync},
+};
 
 use crate::index::{
     collections::StringPostingMap,
     errors::{IndexError, IndexErrorKind},
     index_structs::{Document, DocumentMetaData, PosRange, Posting},
 };
-
+use crate::parser::ast::StructureElem;
 use crate::utils::utils::MemFootprintCalculator;
-
-use either::{Either, Left, Right};
-use std::{
-    collections::HashMap,
-    fmt,
-    marker::{Send, Sync},
-};
 
 /**
  * BasicIndex Structure:
@@ -34,6 +33,8 @@ pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
     fn set_dump_id(&mut self, new_dump_id: u32);
     fn get_dump_id(&self) -> u32;
     fn get_postings(&self, token: &str) -> Option<&[Posting]>;
+    fn get_all_postings(&self) -> Vec<Posting>;
+
     fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange>;
     fn df(&self, token: &str) -> u32;
     fn tf(&self, token: &str, docid: u32) -> u32;
@@ -206,10 +207,23 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
         }
     }
 
+    // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
     fn get_postings(&self, token: &str) -> Option<&[Posting]> {
         self.posting_nodes
             .get(token)
             .and_then(|c| Some(c.postings.as_slice()))
+    }
+
+    // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
+    fn get_all_postings(&self) -> Vec<Posting> {
+        let mut out = self
+            .posting_nodes
+            .iter()
+            .flat_map(|(_, v)| v.postings.clone())
+            .collect::<Vec<Posting>>();
+        out.sort();
+
+        return out;
     }
 
     fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange> {
@@ -252,13 +266,13 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
 
         //Citations
         word_pos = document.citations.iter().fold(word_pos, |a, c| {
-            self.add_structure_elem(document.doc_id, "citation", &c.text, a)
+            self.add_structure_elem(document.doc_id, StructureElem::Citation.into(), &c.text, a)
         });
 
         //Categories
         let _ = self.add_structure_elem(
             document.doc_id,
-            "categories",
+            StructureElem::Category.into(),
             &document.categories,
             word_pos,
         );
