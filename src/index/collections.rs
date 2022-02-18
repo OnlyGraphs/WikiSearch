@@ -1,9 +1,9 @@
-use std::collections::hash_map::Iter;
-use std::collections::hash_map::Values;
 use crate::index::index_structs::PostingNode;
 use crate::utils::utils::MemFootprintCalculator;
 use std::collections::hash_map::Entry;
+use std::collections::hash_map::Iter;
 use std::collections::hash_map::IterMut;
+use std::collections::hash_map::Values;
 use std::{borrow::Borrow, collections::HashMap, hash::Hash};
 
 pub type SmallPostingMap = HashMap<String, PostingNode>;
@@ -42,7 +42,7 @@ where
     fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         HashMap::iter_mut(self)
     }
-    fn iter(&self) -> Iter<'_, K, V>{
+    fn iter(&self) -> Iter<'_, K, V> {
         HashMap::iter(self)
     }
 
@@ -65,7 +65,7 @@ where
         HashMap::entry(self, key)
     }
 
-    fn values(&mut self) -> Values<'_, K, V>{
+    fn values(&mut self) -> Values<'_, K, V> {
         HashMap::values(self)
     }
 }

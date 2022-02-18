@@ -1,3 +1,6 @@
+use std::fmt;
+use strum_macros::IntoStaticStr;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum BinaryOp {
     And,
@@ -9,7 +12,7 @@ pub enum UnaryOp {
     Not,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, IntoStaticStr, Clone)]
 pub enum StructureElem {
     Title,
     Category,
