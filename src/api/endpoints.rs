@@ -4,6 +4,7 @@ use crate::api::structs::{
     SearchParameters, UserFeedback,
 };
 use crate::index::index::{BasicIndex, Index};
+use crate::index_structs::Posting;
 use crate::parser::parser::parse_query;
 use crate::search::search::execute_query;
 use actix_web::{
@@ -30,6 +31,18 @@ impl std::fmt::Display for MyError {
 }
 impl ResponseError for MyError {}
 
+fn get_retrieved_documents(postings: Vec<Posting>) -> Vec<u32> {
+    let mut doc_retrieved_set = HashSet::new();
+    let mut doc_vector = Vec::new();
+    for post in postings {
+        if doc_retrieved_set.get(&post.document_id) == None {
+            doc_retrieved_set.insert(post.document_id);
+            doc_vector.push(post.document_id);
+        }
+    }
+    return doc_vector;
+}
+
 //TODO!:
 //1) if index doesnt find id, return error to check implementation of index builder or retrieval.
 //2) Check other parsing errors, throw them back to frontend
@@ -42,13 +55,16 @@ pub async fn search(
     data: Data<RESTSearchData>,
     _q: Query<SearchParameters>,
 ) -> Result<impl Responder> {
-    debug!("Query Before parsing: {:?}", &_q.query);
-    let (nxt, query) = parse_query(&_q.query).unwrap();
+    debug!("Query Before Parsing: {:?}", &_q.query);
+    let (_, query) = parse_query(&_q.query).unwrap();
 
     debug!("Query Form After Parsing: {:?}", query);
 
-    let results_per_page: usize = _q.results_per_page.unwrap().into();
+    let results_per_page = _q.results_per_page.unwrap();
     debug!("Results Per Page: {:?}", results_per_page);
+
+    let page = _q.page.unwrap();
+    debug!("Current Page Number: {:?}", page);
 
     let idx = data.index_rest.read().unwrap();
     let postings = execute_query(query, &idx);
@@ -59,29 +75,22 @@ pub async fn search(
         .expect("DB error"); //TODO! Handle error appropriately
 
     let mut docs = Vec::new();
-    let mut doc_retrieved_set = HashSet::new();
+    let retrieved_doc_ids = get_retrieved_documents(postings);
+    debug!("Number of documents found: {:?}", retrieved_doc_ids.len());
 
-    let mut result_count: usize = 0; //TODO Change to page number
-    let mut posting_index: usize = 0;
-    let postings_len: usize = postings.len(); //Note: Panics if it cant change to type u16
-    while posting_index < postings_len && result_count < results_per_page {
-        let post = &postings[posting_index];
-        posting_index += 1;
+    let mut doc_index: usize = ((page - 1) * (results_per_page as u32)).try_into().unwrap();
+    let results_per_page: usize = (page * (results_per_page as u32)).try_into().unwrap();
 
-        match doc_retrieved_set.get(&post.document_id) {
-            Some(x) => continue,
-            None => doc_retrieved_set.insert(post.document_id),
-        };
-        result_count += 1;
-
-        info!("Document: {:?}", post.document_id);
+    while doc_index < retrieved_doc_ids.len() && doc_index + 1 <= results_per_page {
+        let articleid = retrieved_doc_ids[doc_index];
+        debug!("Document: {:?}", articleid);
 
         let sql = sqlx::query(
             "SELECT a.title, c.abstracts
         From article as a, \"content\" as c
         where a.articleid= $1 AND a.articleid = c.articleid",
         )
-        .bind(post.document_id)
+        .bind(articleid)
         .fetch_one(&pool)
         .await
         .expect("Query error"); //TODO!: Handle error more appropriately
@@ -94,7 +103,9 @@ pub async fn search(
             score: 0.0, //TODO! Adjust score based on tfidf
         });
         //Go to the next posting
+        doc_index += 1;
     }
+    debug!("Number of results returned: {:?}", docs.len());
 
     Ok(Json(docs))
 }
