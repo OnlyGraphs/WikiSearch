@@ -60,10 +60,10 @@ pub async fn search(
 
     debug!("Query Form After Parsing: {:?}", query);
 
-    let results_per_page: usize = _q.results_per_page.unwrap().into();
+    let results_per_page = _q.results_per_page.unwrap();
     debug!("Results Per Page: {:?}", results_per_page);
 
-    let page = _q.page;
+    let page = _q.page.unwrap();
     debug!("Current Page Number: {:?}", page);
 
     let idx = data.index_rest.read().unwrap();
@@ -77,9 +77,9 @@ pub async fn search(
     let mut docs = Vec::new();
     let retrieved_doc_ids = get_retrieved_documents(postings);
 
-    let mut doc_index: usize = 0;
-    //page 1 : 0 -> max_results -1
-    //page 2 : max_results -> (max_results*2) -1
+    let mut doc_index: usize = ((page - 1) * (results_per_page as u32)).try_into().unwrap();
+    let results_per_page: usize = (page * (results_per_page as u32)).try_into().unwrap();
+
     while doc_index < retrieved_doc_ids.len() && doc_index + 1 <= results_per_page {
         let articleid = retrieved_doc_ids[doc_index];
         debug!("Document: {:?}", articleid);
