@@ -48,6 +48,7 @@ fn get_retrieved_documents(postings: Vec<Posting>) -> Vec<u32> {
 //2) Check other parsing errors, throw them back to frontend
 //3) adjust document scores based on tfidf parameter
 // 4) Maybe caching user results could be good, but that is extra if we have time.
+// 5) Adjust by sortby
 
 // Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
@@ -57,7 +58,6 @@ pub async fn search(
 ) -> Result<impl Responder> {
     debug!("Query Before Parsing: {:?}", &_q.query);
     let (_, query) = parse_query(&_q.query).unwrap();
-
     debug!("Query Form After Parsing: {:?}", query);
 
     let results_per_page = _q.results_per_page.unwrap();
@@ -65,6 +65,9 @@ pub async fn search(
 
     let page = _q.page.unwrap();
     debug!("Current Page Number: {:?}", page);
+
+    let sortby = _q.sortby.as_ref().unwrap();
+    debug!("Sort by: {:?}", sortby);
 
     let idx = data.index_rest.read().unwrap();
     let postings = execute_query(query, &idx);
