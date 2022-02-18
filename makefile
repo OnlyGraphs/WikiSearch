@@ -5,7 +5,7 @@ export SQLX_OFFLINE=true
 export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
 export SEARCH_PORT=8000
 export GRPC_PORT=50051
-export RUST_LOG=debug
+export RUST_LOG=info
 
 run_img: #build_img
 	docker run -p ${SEARCH_PORT}:8000 \
@@ -13,6 +13,8 @@ run_img: #build_img
 		-e SEARCH_PORT \
 		-e SEARCH_IP=0.0.0.0 \
 		-e GRPC_ADDRESS=0.0.0.0:${GRPC_PORT}\
+		-e DATABASE_URL=${DATABASE_URL} \
+		-e RUST_LOG=${RUST_LOG} \
 		--rm -a stdin -a stdout ${IMAGE_NAME}:${IMAGE_VERSION} \
 
 build_img:
