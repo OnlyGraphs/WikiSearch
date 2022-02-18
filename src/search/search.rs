@@ -81,6 +81,11 @@ pub fn execute_query(query: Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> 
     }
 }
 
+pub fn score_query(query: Box<Query>, index: &Box<dyn Index>, postings: &Vec<Posting>) -> Vec<ScoredPosting> {
+    Vec::default()
+}
+
+
 fn distance_merge(a: Vec<Posting>, b: Vec<Posting>, dst: u32) -> Vec<Posting> {
     let mut iter_left = a.iter();
     let mut iter_right = b.iter();
