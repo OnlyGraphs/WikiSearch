@@ -64,7 +64,7 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, t2) = parse_token(nxt)?;
 
-    let mut dst: u32 = 0;
+    let dst: u32;
 
     match d.parse::<u32>() {
         Ok(n) => dst = n,
