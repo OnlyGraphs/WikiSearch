@@ -6,9 +6,9 @@ use itertools::Itertools;
 use std::cmp::Ordering;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ScoredPosting {
+pub struct ScoredDocument {
     score: u32,
-    posting: Posting,
+    doc_id: u32,
 }
 
 //TODO: get rid of posting copying, do stuff by reference, + batch postings list in case we run out of memory
@@ -81,7 +81,7 @@ pub fn execute_query(query: Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> 
     }
 }
 
-pub fn score_query(query: Box<Query>, index: &Box<dyn Index>, postings: &Vec<Posting>) -> Vec<ScoredPosting> {
+pub fn score_query(query: Box<Query>, index: &Box<dyn Index>, postings: &Vec<Posting>) -> Vec<ScoredDocument> {
     Vec::default()
 }
 
