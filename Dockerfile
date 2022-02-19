@@ -13,6 +13,7 @@ MAINTAINER Kyle Cotton <kylecottonkc@gmail.com>
 WORKDIR /usr/src/search
 COPY . .
 RUN cargo build --release
+COPY ./staticfiles/* ./out/*
 COPY --from=frontend /usr/app/FrontEnd/out ./out
 
 FROM gcr.io/distroless/cc-debian10
