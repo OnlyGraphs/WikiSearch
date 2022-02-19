@@ -23,13 +23,20 @@ use std::{
 use log::{debug, info};
 
 #[derive(Debug)]
-pub struct MyError(String);
-impl std::fmt::Display for MyError {
+pub enum APIError {
+    DatabaseError,
+    QueryFormattingError,
+    EmptyQueryError,
+}
+
+impl std::fmt::Display for APIError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Oh no. something happened") //TODO!: Write a meaningful error
     }
 }
-impl ResponseError for MyError {}
+impl ResponseError for APIError {}
+
+// impl sqlx::Error for APIError {}
 
 fn get_retrieved_documents(postings: Vec<Posting>) -> Vec<u32> {
     let mut doc_retrieved_set = HashSet::new();
@@ -55,7 +62,7 @@ fn get_retrieved_documents(postings: Vec<Posting>) -> Vec<u32> {
 pub async fn search(
     data: Data<RESTSearchData>,
     _q: Query<SearchParameters>,
-) -> Result<impl Responder> {
+) -> Result<impl Responder, APIError> {
     debug!("Query Before Parsing: {:?}", &_q.query);
     let (_, query) = parse_query(&_q.query).unwrap();
     debug!("Query Form After Parsing: {:?}", query);
@@ -77,13 +84,25 @@ pub async fn search(
         .await
         .expect("DB error"); //TODO! Handle error appropriately
 
-    let mut docs = Vec::new();
     let retrieved_doc_ids = get_retrieved_documents(postings);
+
+    //Sort by
+    // let retrieved_doc_ids = match sortby {
+    //     SortType::Relevance => retrieved_doc_ids,
+    //     SortType::LastEdited => {
+    //     retrieved_doc_ids.iter_mut().for_each(|id| idx.)
+    //     }
+    // };
+    // self.posting_nodes
+    // .iter_mut()
+    // .for_each(|(_k, v)| v.postings.sort());
+
     debug!("Number of documents found: {:?}", retrieved_doc_ids.len());
 
     let mut doc_index: usize = ((page - 1) * (results_per_page as u32)).try_into().unwrap();
     let results_per_page: usize = (page * (results_per_page as u32)).try_into().unwrap();
 
+    let mut docs = Vec::new();
     while doc_index < retrieved_doc_ids.len() && doc_index + 1 <= results_per_page {
         let articleid = retrieved_doc_ids[doc_index];
         debug!("Document: {:?}", articleid);
@@ -96,8 +115,10 @@ pub async fn search(
         .bind(articleid)
         .fetch_one(&pool)
         .await
-        .expect("Query error"); //TODO!: Handle error more appropriately
+        .expect("Query error"); //TODO! Handle error appropriately
+
         let title: String = sql.try_get("title").unwrap_or_default();
+
         let article_abstract: String = sql.try_get("abstracts").unwrap_or_default();
 
         docs.push(Document {

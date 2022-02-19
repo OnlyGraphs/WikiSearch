@@ -1,4 +1,8 @@
+use chrono::NaiveDateTime;
+
 use std::collections::HashMap;
+
+pub const DATE_TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 /// stores an appearance of a token in an article
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)] //TODO: get rid of Copy and correct parts of program which use it
@@ -45,6 +49,6 @@ pub struct Document {
 #[derive(Debug)]
 pub struct DocumentMetaData {
     pub title: String, //TODO: Implement another field with doc_id -> title and title -> doc_id
-    pub last_updated_date: String, //TODO: Change to DateTime type using chrono
+    pub last_updated_date: Option<NaiveDateTime>, //TODO: Change to DateTime type using chrono
     pub namespace: i16, //TODO: Could change this field to enum
 }
