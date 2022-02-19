@@ -171,6 +171,59 @@ fn test_sorted_postings() {
     );
 }
 
+#[test]
+fn test_basic_index_get_all_postings_sorted() {
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
+
+    idx.add_document(get_document_with_text(
+        2,
+        "d0",
+        vec![("", "aaa eee")],
+        "ccc ddd",
+        vec!["eee fff"],
+        "fff fff",
+    ))
+    .unwrap();
+
+    assert_eq!(
+        *idx.get_all_postings(),
+        vec![Posting {
+            document_id: 2,
+            position: 0,
+        },
+        Posting {
+            document_id: 2,
+            position: 1,
+        },
+        Posting {
+            document_id: 2,
+            position: 2,
+        },
+        Posting {
+            document_id: 2,
+            position: 3,
+        },
+        Posting {
+            document_id: 2,
+            position: 4,
+        },
+        Posting {
+            document_id: 2,
+            position: 5,
+        },
+        Posting {
+            document_id: 2,
+            position: 6,
+        },
+        Posting {
+            document_id: 2,
+            position: 7,
+        }]
+    );
+
+}
+
+
 // #[test] TEMP REMOVAL
 // fn test_basic_index_get_extent() {
 //     let mut idx = BasicIndex::<SmallPostingMap>::default();
