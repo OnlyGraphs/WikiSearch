@@ -70,7 +70,6 @@ fn test_index_date_time_parsing_incorrect() {
     let incorrect_str4 = "08:59:60";
     let incorrect_str5 = "9999-99-99 99:99:99";
     let incorrect_str6 = "0000-00-00 00:00:00";
-    let incorrect_str6 = "0000-00-00 00:00:00";
 
     idx.add_document(get_document_with_date_time(1, "1", incorrect_str1))
         .unwrap();
