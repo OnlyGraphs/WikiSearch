@@ -6,7 +6,7 @@ use crate::api::structs::{
 use crate::index::index::{BasicIndex, Index};
 use crate::index_structs::Posting;
 use crate::parser::parser::parse_query;
-use crate::search::search::execute_query;
+use crate::search::search::{execute_query, score_query};
 use actix_web::{
     get,
     web::{Data, Json, Query},
@@ -38,18 +38,6 @@ impl ResponseError for APIError {}
 
 // impl sqlx::Error for APIError {}
 
-fn get_retrieved_documents(postings: Vec<Posting>) -> Vec<u32> {
-    let mut doc_retrieved_set = HashSet::new();
-    let mut doc_vector = Vec::new();
-    for post in postings {
-        if doc_retrieved_set.get(&post.document_id) == None {
-            doc_retrieved_set.insert(post.document_id);
-            doc_vector.push(post.document_id);
-        }
-    }
-    return doc_vector;
-}
-
 //TODO!:
 //1) if index doesnt find id, return error to check implementation of index builder or retrieval.
 //2) Check other parsing errors, throw them back to frontend
@@ -77,34 +65,23 @@ pub async fn search(
     debug!("Sort by: {:?}", sortby);
 
     let idx = data.index_rest.read().unwrap();
-    let postings = execute_query(query, &idx);
+    let postings = execute_query(query.clone(), &idx);
     let pool = PgPoolOptions::new()
         .max_connections(1)
         .connect(&data.connection_string)
         .await
         .expect("DB error"); //TODO! Handle error appropriately
 
-    let retrieved_doc_ids = get_retrieved_documents(postings);
+    let scored_documents = score_query(query, &idx, &postings);
 
-    //Sort by
-    // let retrieved_doc_ids = match sortby {
-    //     SortType::Relevance => retrieved_doc_ids,
-    //     SortType::LastEdited => {
-    //     retrieved_doc_ids.iter_mut().for_each(|id| idx.)
-    //     }
-    // };
-    // self.posting_nodes
-    // .iter_mut()
-    // .for_each(|(_k, v)| v.postings.sort());
-
-    debug!("Number of documents found: {:?}", retrieved_doc_ids.len());
+    debug!("Number of documents found: {:?}", scored_documents.len());
 
     let mut doc_index: usize = ((page - 1) * (results_per_page as u32)).try_into().unwrap();
     let results_per_page: usize = (page * (results_per_page as u32)).try_into().unwrap();
 
     let mut docs = Vec::new();
-    while doc_index < retrieved_doc_ids.len() && doc_index + 1 <= results_per_page {
-        let articleid = retrieved_doc_ids[doc_index];
+    while doc_index < scored_documents.len() && doc_index + 1 <= results_per_page {
+        let articleid = scored_documents[doc_index].get_doc_id();
         debug!("Document: {:?}", articleid);
 
         let sql = sqlx::query(
