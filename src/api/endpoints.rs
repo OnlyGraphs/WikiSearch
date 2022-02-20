@@ -79,7 +79,8 @@ pub async fn search(
     debug!("Number of documents found: {:?}", scored_documents.len());
     //Sort documents returned depending on SortType parameter requested by user
     match sortby {
-        SortType::Relevance => scored_documents.sort_by_key(|doc| doc.get_score()),
+        SortType::Relevance => scored_documents
+            .sort_by(|doc1, doc2| doc2.get_score().partial_cmp(&doc1.get_score()).unwrap()),
         SortType::LastEdited => scored_documents.sort_by_key(|doc| doc.get_date()),
     };
 
@@ -112,7 +113,7 @@ pub async fn search(
         docs.push(Document {
             title: title,
             article_abstract: article_abstract,
-            score: 0.0,
+            score: scored_documents[doc_index].get_score(),
         });
         //Go to the next document
         doc_index += 1;

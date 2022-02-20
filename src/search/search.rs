@@ -7,15 +7,15 @@ use itertools::Itertools;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct ScoredDocument {
-    score: u32,
+    score: f64,
     doc_id: u32,
     last_updated_date: Option<NaiveDateTime>,
 }
 
 impl ScoredDocument {
-    pub fn get_score(&self) -> u32 {
+    pub fn get_score(&self) -> f64 {
         self.score
     }
 
@@ -111,7 +111,7 @@ pub fn score_query(
             doc_retrieved_set.insert(post.document_id);
             scored_documents.push(ScoredDocument {
                 doc_id: post.document_id,
-                score: 0,
+                score: 0.0,
                 last_updated_date: index.get_last_updated_date(&post.document_id),
             });
         }
