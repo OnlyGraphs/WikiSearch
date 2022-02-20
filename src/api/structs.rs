@@ -9,7 +9,7 @@ use std::sync::{Arc, RwLock};
 #[serde(rename_all = "camelCase")]
 pub enum SortType {
     Relevance,
-    LastEdited,
+    LastEdited, //Sort in descending order of dates
 }
 
 /// Represents the parameters of a given standard search

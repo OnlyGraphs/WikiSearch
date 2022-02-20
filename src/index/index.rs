@@ -1,5 +1,6 @@
 use bimap::BiMap;
 use either::{Either, Left, Right};
+use log::error;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fmt::Formatter;
@@ -12,11 +13,11 @@ use std::{
 use crate::index::{
     collections::StringPostingMap,
     errors::{IndexError, IndexErrorKind},
-    index_structs::{Document, DocumentMetaData, PosRange, Posting},
+    index_structs::{Document, DocumentMetaData, PosRange, Posting, DATE_TIME_FORMAT},
 };
 use crate::parser::ast::StructureElem;
 use crate::utils::utils::MemFootprintCalculator;
-
+use chrono::NaiveDateTime;
 /**
  * BasicIndex Structure:
  * Metadata <NOT included in postings>
@@ -43,6 +44,7 @@ pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
     fn get_links(&self, source: u32) -> Result<&[u32], IndexError>;
     fn id_to_title(&self, source: u32) -> Option<&String>;
     fn title_to_id(&self, source: String) -> Option<u32>;
+    fn get_last_updated_date(&self, source: &u32) -> Option<NaiveDateTime>;
 }
 
 //TODO:
@@ -238,6 +240,13 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
         return self.dump_id.unwrap_or(0).clone();
     }
 
+    fn get_last_updated_date(&self, doc_id: &u32) -> Option<NaiveDateTime> {
+        return self
+            .document_metadata
+            .get(doc_id)
+            .and_then(|metadata| metadata.last_updated_date);
+    }
+
     fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError> {
         let mut word_pos = 0;
 
@@ -326,6 +335,17 @@ impl<M: StringPostingMap> BasicIndex<M> {
         last_updated_date: String,
         namespace: i16,
     ) {
+        let last_updated_date =
+            match NaiveDateTime::parse_from_str(&last_updated_date, DATE_TIME_FORMAT) {
+                Ok(date) => Some(date),
+                Err(e) => {
+                    error!(
+                        "Article ID {:?} has incorrect Date Time Format: {:?}",
+                        doc_id, last_updated_date
+                    );
+                    None
+                }
+            };
         self.document_metadata.insert(
             doc_id,
             DocumentMetaData {

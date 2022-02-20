@@ -51,6 +51,7 @@ fn setup_arbitrary_index_pointer() -> Arc<RwLock<Box<dyn Index>>> {
     ))
     .unwrap();
 
+    idx.finalize().unwrap();
     let index_pointer: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(idx)));
 
     return index_pointer;
