@@ -7,6 +7,7 @@ use crate::index::index::{BasicIndex, Index};
 use crate::index_structs::Posting;
 use crate::parser::parser::parse_query;
 use crate::search::search::{execute_query, score_query};
+use crate::structs::SortType;
 use actix_web::{
     get,
     web::{Data, Json, Query},
@@ -43,7 +44,8 @@ impl ResponseError for APIError {}
 //2) Check other parsing errors, throw them back to frontend
 //3) adjust document scores based on tfidf parameter
 // 4) Maybe caching user results could be good, but that is extra if we have time.
-// 5) Adjust by sortby
+// 5) Optimise code (Less memory, instead of initialising another docs vector, use the one returned by score_query)
+// 6) Make sure to return first page only if second page is not satisfied
 
 // Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
@@ -72,17 +74,27 @@ pub async fn search(
         .await
         .expect("DB error"); //TODO! Handle error appropriately
 
-    let scored_documents = score_query(query, &idx, &postings);
-
+    let mut scored_documents = score_query(query, &idx, &postings);
     debug!("Number of documents found: {:?}", scored_documents.len());
+    //Sort depending on type
+    match sortby {
+        SortType::Relevance => scored_documents.sort_by_key(|doc| doc.get_score()),
+        SortType::LastEdited => scored_documents.sort_by_key(|doc| doc.get_date()),
+    };
+    assert_eq!(scored_documents, scored_documents);
 
+    //Compute which documents to return
+    //TODO! Make sure to return first page
     let mut doc_index: usize = ((page - 1) * (results_per_page as u32)).try_into().unwrap();
-    let results_per_page: usize = (page * (results_per_page as u32)).try_into().unwrap();
+    let doc_index_end: usize = (page * (results_per_page as u32)).try_into().unwrap();
+    debug!("Start Doc: {:?}", doc_index);
+    debug!("End Doc: {:?}", doc_index_end);
 
     let mut docs = Vec::new();
-    while doc_index < scored_documents.len() && doc_index + 1 <= results_per_page {
+    while doc_index < scored_documents.len() && doc_index + 1 <= doc_index_end {
         let articleid = scored_documents[doc_index].get_doc_id();
         debug!("Document: {:?}", articleid);
+        debug!("Date: {:?}", scored_documents[doc_index].get_date());
 
         let sql = sqlx::query(
             "SELECT a.title, c.abstracts
