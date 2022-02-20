@@ -88,6 +88,22 @@ fn test_index_date_time_parsing_incorrect() {
         assert_eq!(idx.get_last_updated_date(&i), None);
     }
 }
+#[test]
+
+fn nono() {
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
+
+    let str1 = "2015-07-01 08:59:60";
+    let str2 = "2015-08-01 08:59:60";
+
+    idx.add_document(get_document_with_date_time(1, "1", str1))
+        .unwrap();
+
+    idx.add_document(get_document_with_date_time(2, "2", str2))
+        .unwrap();
+
+    assert!(idx.get_last_updated_date(&1) < idx.get_last_updated_date(&2));
+}
 
 #[test]
 fn test_add_after_finalize() {
