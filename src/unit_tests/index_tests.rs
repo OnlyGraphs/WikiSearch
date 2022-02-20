@@ -89,7 +89,6 @@ fn test_index_date_time_parsing_incorrect() {
     }
 }
 #[test]
-#[test]
 fn test_add_after_finalize() {
     let mut idx = BasicIndex::<SmallPostingMap>::default();
 
