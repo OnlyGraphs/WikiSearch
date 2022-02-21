@@ -1,12 +1,14 @@
+use actix_web::dev::ServiceResponse;
+use actix_web::dev::ServiceRequest;
 use actix_cors::Cors;
-use actix_files::Files;
-use actix_web::{web::Data, App, HttpServer};
+use actix_files::{NamedFile,Files};
+use actix_web::{App, HttpServer};
+use log::{error, info};
+use pretty_env_logger;
 use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
     CheckIndexRequest,
 };
-use log::{error, info};
-use pretty_env_logger;
 use search_lib::api;
 use search_lib::api::structs::RESTSearchData;
 use search_lib::grpc_server::CheckIndexService;
@@ -21,10 +23,10 @@ use std::{
 };
 use tonic::{transport::Server, Request};
 
+const DEFAULT_STATICFILES_DIR: &str = "./staticfiles";
 const DEFAULT_GRPC_ADDRESS: &str = "127.0.0.1:50051";
 const DEFAULT_REST_IP: &str = "127.0.0.1";
 const DEFAULT_REST_PORT: &str = "8000";
-const DEFAULT_STATICFILES_DIR: &str = "./staticfiles";
 
 fn main() -> std::io::Result<()> {
     pretty_env_logger::init();
@@ -35,15 +37,14 @@ fn main() -> std::io::Result<()> {
             process::exit(1);
         })
         .to_string();
+    info!("Using DATABASE_URL: {:?}",connection_string);
     let grpc_address = env::var("GRPC_ADDRESS").unwrap_or(DEFAULT_GRPC_ADDRESS.to_string());
     let rest_ip: String = env::var("SEARCH_IP").unwrap_or(DEFAULT_REST_IP.to_string());
     let rest_port = env::var("SEARCH_PORT").unwrap_or(DEFAULT_REST_PORT.to_string());
     let static_serve_dir = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string());
 
     // create shared memory for index
-    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::<
-        SmallPostingMap,
-    >::default())));
+    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::<SmallPostingMap>::default())));
 
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
@@ -66,6 +67,7 @@ fn main() -> std::io::Result<()> {
                     error!("Retried 3 times, GRPC offline.");
                 }
             } else {
+                info!("Launched GRPC server successfully.");
                 break;
             }
         }
@@ -90,6 +92,7 @@ fn main() -> std::io::Result<()> {
                     error!("Retried 3 times, REST service offline");
                 }
             } else {
+                info!("Launched REST service successfully.");
                 break;
             }
         }
@@ -164,13 +167,13 @@ async fn run_rest(
 
     info!("Binding to: {}", bind_address);
 
+
     HttpServer::new(move || {
         let cors = Cors::permissive();
         let data = RESTSearchData {
             index_rest: index_rest.clone(),
             connection_string: connection_string.clone(),
         };
-        let static_dir_cpy = &static_dir;
         App::new()
             .wrap(cors)
             .data(data)
@@ -178,11 +181,31 @@ async fn run_rest(
             .service(api::endpoints::relational)
             .service(api::endpoints::feedback)
             .service(
-                Files::new("/", static_dir_cpy)
+                Files::new("/", static_dir.clone())
                     .prefer_utf8(true)
-                    .index_file("index.html"),
+                    .index_file("index.html")
+                    .default_handler(|req: ServiceRequest| {
+                        let (http_req, _payload) = req.into_parts();
+                        error!("HELLO");
+
+                        async {
+                            let root = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string()); // stupid af, can't just use the static_dir variable cuz of moves and lifetimes
+
+
+                            let with_extension = format!("{}{}{}",root,http_req.path(),".html");
+                            let file = match NamedFile::open_async(with_extension).await {
+                                Ok(v) => v,
+                                Err(_) => NamedFile::open_async(format!("{}/{}",root,"404.html")).await.expect("No file named 404.html in staticfiles!")
+                            };
+                            
+                            let res = file.into_response(&http_req);
+                            Ok(ServiceResponse::new(http_req, res))
+                    
+                        }
+                    }),
             )
     })
+    
     .bind(bind_address)?
     .run()
     .await?;

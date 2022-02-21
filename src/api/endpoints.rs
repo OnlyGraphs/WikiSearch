@@ -1,10 +1,13 @@
+use crate::api::structs::default_results_per_page;
 use crate::api::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
     SearchParameters, UserFeedback,
 };
 use crate::index::index::{BasicIndex, Index};
+use crate::index_structs::Posting;
 use crate::parser::parser::parse_query;
-use crate::search::search::execute_query;
+use crate::search::search::{execute_query, score_query};
+use crate::structs::SortType;
 use actix_web::{
     get,
     web::{Data, Json, Query},
@@ -19,64 +22,104 @@ use std::{
 };
 
 use log::{debug, info};
+
 #[derive(Debug)]
-pub struct MyError(String);
-impl std::fmt::Display for MyError {
+pub enum APIError {
+    DatabaseError,
+    QueryFormattingError,
+    EmptyQueryError,
+}
+
+impl std::fmt::Display for APIError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Oh no. something happened") //TODO!: Write a meaningful error
     }
 }
-impl ResponseError for MyError {}
+impl ResponseError for APIError {}
+
+// impl sqlx::Error for APIError {}
 
 //TODO!:
 //1) if index doesnt find id, return error to check implementation of index builder or retrieval.
 //2) Check other parsing errors, throw them back to frontend
 //3) adjust document scores based on tfidf parameter
+// 4) Maybe caching user results could be good, but that is extra if we have time.
+// 5) Optimise code (Less memory, instead of initialising another docs vector, use the one returned by score_query)
+// 6) Make sure to return first page only if second page is not satisfied
 
 // Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
 pub async fn search(
     data: Data<RESTSearchData>,
     _q: Query<SearchParameters>,
-) -> Result<impl Responder> {
-    let (nxt, query) = parse_query(&_q.query).unwrap();
-    debug!("{:?}", nxt);
-    let idx = data.index_rest.read().unwrap();
-    debug!("Query: {:?}", query);
-    let postings = execute_query(query, &idx);
+) -> Result<impl Responder, APIError> {
+    //Initialise Database connection to retrieve article title and abstract for each document found for the query
     let pool = PgPoolOptions::new()
         .max_connections(1)
         .connect(&data.connection_string)
         .await
         .expect("DB error"); //TODO! Handle error appropriately
 
-    let mut docs = Vec::new();
-    let mut doc_retrieved_set = HashSet::new();
-    for post in postings.iter() {
-        match doc_retrieved_set.get(&post.document_id) {
-            Some(x) => continue,
-            None => doc_retrieved_set.insert(post.document_id),
-        };
-        info!("Document: {:?}", post.document_id);
+    // Retrieve the parameters requested from user
+    let results_per_page = _q.results_per_page.unwrap();
+    debug!("Results Per Page: {:?}", results_per_page);
+    let page = _q.page.unwrap();
+    debug!("Current Page Number: {:?}", page);
+    let sortby = _q.sortby.as_ref().unwrap();
+    debug!("Sort by: {:?}", sortby);
 
+    let idx = data.index_rest.read().unwrap();
+    //Parse the query given by user
+    debug!("Query Before Parsing: {:?}", &_q.query);
+    let (_, query) = parse_query(&_q.query).unwrap();
+    debug!("Query Form After Parsing: {:?}", query);
+    //Retrieve the scored documents
+    let postings = execute_query(query.clone(), &idx);
+    let mut scored_documents = score_query(query, &idx, &postings);
+    debug!("Number of documents found: {:?}", scored_documents.len());
+    //Sort documents returned depending on SortType parameter requested by user
+    match sortby {
+        SortType::Relevance => scored_documents
+            .sort_by(|doc1, doc2| doc2.get_score().partial_cmp(&doc1.get_score()).unwrap()),
+        SortType::LastEdited => scored_documents.sort_by_key(|doc| doc.get_date()),
+    };
+
+    //Compute which documents to return depending on page number and the results to be shown per page
+    //TODO! Make sure to return first page if second page is not available, and other types of edge cases
+    let mut doc_index: usize = ((page - 1) * (results_per_page as u32)).try_into().unwrap();
+    let doc_index_end: usize = (page * (results_per_page as u32)).try_into().unwrap();
+    debug!("Start Doc: {:?}", doc_index);
+    debug!("End Doc: {:?}", doc_index_end);
+
+    let mut docs = Vec::new(); //TODO! perhaps a better way would be to pop from scored_documents, saving on memory for huge results
+    while doc_index < scored_documents.len() && doc_index + 1 <= doc_index_end {
+        let articleid = scored_documents[doc_index].get_doc_id();
+        debug!("Document: {:?}", articleid);
+        debug!("Date: {:?}", scored_documents[doc_index].get_date());
+        //Retrieve article title and abstract from database
         let sql = sqlx::query(
             "SELECT a.title, c.abstracts
         From article as a, \"content\" as c
         where a.articleid= $1 AND a.articleid = c.articleid",
         )
-        .bind(post.document_id)
+        .bind(articleid)
         .fetch_one(&pool)
         .await
-        .expect("Query error"); //TODO!: Handle error more appropriately
+        .expect("Query error"); //TODO! Handle error appropriately
+
         let title: String = sql.try_get("title").unwrap_or_default();
         let article_abstract: String = sql.try_get("abstracts").unwrap_or_default();
 
         docs.push(Document {
             title: title,
             article_abstract: article_abstract,
-            score: 0.0, //TODO! Adjust score based on tfidf
+            score: scored_documents[doc_index].get_score(),
         });
+        //Go to the next document
+        doc_index += 1;
     }
+    debug!("Number of results returned: {:?}", docs.len());
+
     Ok(Json(docs))
 }
 

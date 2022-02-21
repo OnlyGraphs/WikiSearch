@@ -2,13 +2,30 @@ use crate::index::index::Index;
 use crate::index::index_structs::Posting;
 use crate::index_structs::PosRange;
 use crate::parser::ast::{BinaryOp, Query, UnaryOp};
+use chrono::NaiveDateTime;
 use itertools::Itertools;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ScoredPosting {
-    score: u32,
-    posting: Posting,
+#[derive(Debug, PartialEq, PartialOrd)]
+pub struct ScoredDocument {
+    score: f64,
+    doc_id: u32,
+    last_updated_date: Option<NaiveDateTime>,
+}
+
+impl ScoredDocument {
+    pub fn get_score(&self) -> f64 {
+        self.score
+    }
+
+    pub fn get_doc_id(&self) -> u32 {
+        self.doc_id
+    }
+
+    pub fn get_date(&self) -> Option<NaiveDateTime> {
+        self.last_updated_date
+    }
 }
 
 //TODO: get rid of posting copying, do stuff by reference, + batch postings list in case we run out of memory
@@ -79,6 +96,27 @@ pub fn execute_query(query: Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> 
             )
         }),
     }
+}
+
+//TODO! Current naive implementation is added with dummy scores for Search API (endpoints.rs). Might be better to remove hashset
+pub fn score_query(
+    query: Box<Query>,
+    index: &Box<dyn Index>,
+    postings: &Vec<Posting>,
+) -> Vec<ScoredDocument> {
+    let mut scored_documents = Vec::default();
+    let mut doc_retrieved_set = HashSet::new();
+    for post in postings {
+        if doc_retrieved_set.get(&post.document_id) == None {
+            doc_retrieved_set.insert(post.document_id);
+            scored_documents.push(ScoredDocument {
+                doc_id: post.document_id,
+                score: 0.0,
+                last_updated_date: index.get_last_updated_date(&post.document_id),
+            });
+        }
+    }
+    return scored_documents;
 }
 
 fn distance_merge(a: Vec<Posting>, b: Vec<Posting>, dst: u32) -> Vec<Posting> {

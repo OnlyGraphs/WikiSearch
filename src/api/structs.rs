@@ -9,7 +9,7 @@ use std::sync::{Arc, RwLock};
 #[serde(rename_all = "camelCase")]
 pub enum SortType {
     Relevance,
-    LastEdited,
+    LastEdited, //Sort in descending order of dates
 }
 
 /// Represents the parameters of a given standard search
@@ -91,7 +91,7 @@ fn default_page() -> Option<u32> {
 }
 
 // TODO: Implement the Default trait
-fn default_results_per_page() -> Option<u16> {
+pub fn default_results_per_page() -> Option<u16> {
     Option::from(20)
 }
 
@@ -103,6 +103,7 @@ fn default_query_relational() -> Option<String> {
 fn default_chosen_result() -> Option<String> {
     Option::None
 }
+
 #[derive(Debug)]
 pub struct RESTSearchData {
     pub index_rest: Arc<RwLock<Box<dyn Index>>>,

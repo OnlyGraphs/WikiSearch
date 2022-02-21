@@ -1,6 +1,6 @@
 [package]
 name = "search"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [lib]
@@ -35,3 +35,4 @@ itertools = "0.10.3"
 actix-rt = "2.6.0"
 strum_macros = "0.23"
 strum = "0.23"
+chrono = "0.4"

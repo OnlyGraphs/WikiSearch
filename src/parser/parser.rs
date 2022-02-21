@@ -72,7 +72,7 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, t2) = parse_token(nxt)?;
 
-    let mut dst: u32 = 0;
+    let dst: u32;
 
     match d.parse::<u32>() {
         Ok(n) => dst = n,
@@ -98,6 +98,7 @@ pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
     alt((
         parse_dist_query,
         parse_binary_query,
+        parse_not_query,
         parse_structure_query,
         parse_relation_query,
         parse_freetext_query,

@@ -3,7 +3,7 @@
 - sqlx-cli (cargo install sqlx-cli)
 
 # Starting search API server in docker container
-- run `make up` -> `make migrate` -> `make add-test-data` to populate the test database (in the infrastructure repository)
+- in the `infrastructure` repository run `make up COMPOSE_FILE:=docker-compose-db-only.yml` -> `make migrate` -> `make add-test-data` to populate the test database 
 - run `make update-schema` 
     - Install sqlx-cli (`cargo install sqlx-cli`) if it is not installed already
     - After there has been a change to the database schema or queries, this command will need to be run again.
@@ -35,3 +35,6 @@
 # Environment Variables
 - `SEARCH_PORT`: sets the port at which search API listens (default 8000)
 - `SEARCH_IP`: setst the ip address to which the search API binds (default 127.0.0.1) 
+- `SQLX_OFFLINE` : if true reads sqlx-data.json at compile time to verify queries
+- `DATABASE_URL` : the sql connection string 
+- `RUST_LOG` : level of logging
