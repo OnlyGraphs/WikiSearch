@@ -5,7 +5,8 @@ use nom::{
     bytes::complete::{tag, tag_no_case, take_until, take_while, take_while1},
     character::complete::digit0,
     character::{is_alphanumeric, is_space},
-    multi::{many1, separated_list0},
+    multi::{separated_list0, many_m_n},
+    combinator::{opt},
     IResult,
 };
 use std::str::FromStr;
@@ -88,6 +89,7 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
 pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
     alt((
+        parse_relational_query,
         parse_dist_query,
         parse_binary_query,
         parse_not_query,
@@ -106,6 +108,39 @@ pub fn parse_structure_query(nxt: &str) -> IResult<&str, Box<Query>> {
         Box::new(Query::StructureQuery {
             elem: struct_elem,
             sub: query,
+        }),
+    ))
+}
+
+
+pub fn parse_relational_query(nxt: &str) -> IResult<&str, Box<Query>> {
+    //  `#LINKEDTO` `,` <multiple_terms> `,` <number> [`,` <query>]?
+    let (nxt, _) = tag_no_case("#LINKEDTO")(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, mut title) = take_until(",")(nxt)?;
+    title = title.trim();
+    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, hops) = digit0(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
+    let res = opt(parse_query)(nxt);
+
+    let sub_query = match res {
+        Ok((_,Some(v))) => match *v {
+            Query::FreetextQuery {tokens} if tokens.len() == 0 => None,
+            _ => Some(v), 
+        },
+        _ => None  
+    };
+
+    Ok((
+        nxt,
+        Box::new(Query::RelationQuery {
+            root: title.to_string(),
+            hops: hops.parse().map_err(|e| nom::Err::Error(nom::error::Error::new(
+                hops,
+                nom::error::ErrorKind::Digit,
+            )))?,
+            sub: sub_query,
         }),
     ))
 }
