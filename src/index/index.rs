@@ -42,9 +42,10 @@ pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
     fn finalize(&mut self) -> Result<(), IndexError>;
 
     fn get_links(&self, source: u32) -> Result<&[u32], IndexError>;
+    fn get_incoming_links(&self, source: u32) -> &[u32];
     fn id_to_title(&self, source: u32) -> Option<&String>;
     fn title_to_id(&self, source: String) -> Option<u32>;
-    fn get_last_updated_date(&self, source: &u32) -> Option<NaiveDateTime>;
+    fn get_last_updated_date(&self, source: u32) -> Option<NaiveDateTime>;
 }
 
 //TODO:
@@ -55,6 +56,8 @@ pub struct BasicIndex<M: StringPostingMap + ?Sized> {
     pub document_metadata: HashMap<u32, DocumentMetaData>,
     pub posting_nodes: M,
     pub links: Either<HashMap<u32, Vec<String>>, HashMap<u32, Vec<u32>>>,
+    pub incoming_links: HashMap<u32, Vec<u32>>,
+
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub id_title_map: BiMap<u32, String>,
 }
@@ -65,6 +68,7 @@ impl<M: StringPostingMap> Default for BasicIndex<M> {
             dump_id: None,
             posting_nodes: M::default(),
             links: Left(HashMap::new()),
+            incoming_links: HashMap::new(),
             document_metadata: HashMap::new(),
             extent: HashMap::new(),
             id_title_map: BiMap::new(),
@@ -133,6 +137,17 @@ impl<M: StringPostingMap> Debug for BasicIndex<M> {
 }
 
 impl<M: StringPostingMap> Index for BasicIndex<M> {
+
+    fn get_incoming_links(&self, source: u32) -> &[u32]{
+        match self
+        .incoming_links
+        .get(&source)
+    {
+        Some(v) => v,
+        None => &[],
+    }
+    }
+
     fn get_links(&self, source: u32) -> Result<&[u32], IndexError> {
         match self
             .links
@@ -177,15 +192,28 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
             kind: IndexErrorKind::InvalidIndexState,
         })? {
             let mut targets: Vec<u32> = Vec::with_capacity(links.len());
-            for l in links {
-                if let Some(v) = self.id_title_map.get_by_right(l) {
+            links.iter().for_each(|l| {
+                self.id_title_map.get_by_right(l).map(|v| {
                     targets.push(*v);
-                }
-            }
+                    self.incoming_links // add link backwards as well
+                        .entry(*v)
+                        .or_default()
+                        .push(*id);
+                });
+
+            });
 
             let _ = id_links.insert(*id, targets);
         }
+        // sort links, and incoming links 
+        id_links.iter_mut()
+            .for_each(|(_,v)| v.sort());
+        self.incoming_links.iter_mut()
+            .for_each(|(_,v)| v.sort());
+
         self.links = Right(id_links);
+
+
 
         // sort postings
         self.posting_nodes
@@ -240,10 +268,10 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
         return self.dump_id.unwrap_or(0).clone();
     }
 
-    fn get_last_updated_date(&self, doc_id: &u32) -> Option<NaiveDateTime> {
+    fn get_last_updated_date(&self, doc_id: u32) -> Option<NaiveDateTime> {
         return self
             .document_metadata
-            .get(doc_id)
+            .get(&doc_id)
             .and_then(|metadata| metadata.last_updated_date);
     }
 
@@ -303,6 +331,7 @@ impl<M: StringPostingMap> BasicIndex<M> {
             dump_id: None,
             posting_nodes: M::with_capacity(articles * avg_tokens_per_article),
             links: Left(HashMap::with_capacity(articles)),
+            incoming_links: HashMap::with_capacity(articles),
             document_metadata: HashMap::with_capacity(articles),
             extent: HashMap::with_capacity(struct_elem_type_count),
             id_title_map: BiMap::with_capacity(articles),
@@ -357,6 +386,7 @@ impl<M: StringPostingMap> BasicIndex<M> {
     }
 
     fn add_links(&mut self, doc_id: u32, article_links: &str) -> Result<(), IndexError> {
+        // out links
         let link_titles: Vec<String> = article_links
             .split(",")
             .map(|c| c.trim().to_string())
@@ -370,6 +400,7 @@ impl<M: StringPostingMap> BasicIndex<M> {
                 kind: IndexErrorKind::InvalidIndexState,
             })?
             .insert(doc_id, link_titles);
+        // in links
 
         Ok(())
     }

@@ -31,7 +31,7 @@ impl From<&str> for StructureElem {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Query {
     BinaryQuery {
         op: BinaryOp,
@@ -58,7 +58,7 @@ pub enum Query {
     RelationQuery {
         root: Vec<String>,
         hops: u32,
-        sub: Box<Option<Query>>,
+        sub: Option<Box<Query>>,
     },
     WildcardQuery {
         prefix: String,  // before wildcard

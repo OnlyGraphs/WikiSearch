@@ -2,7 +2,7 @@ use crate::parser::{
     ast::{BinaryOp, Query, StructureElem, UnaryOp},
     parser::{
         is_comma, is_tab, parse_and_query, parse_binary_query, parse_dist_query, parse_not_query,
-        parse_or_query, parse_query, parse_structure_query,
+        parse_or_query, parse_query, parse_structure_query,parse_relational_query
     },
 };
 
@@ -65,6 +65,29 @@ fn test_dist_query_as_query() {
     }
 }
 
+#[test]
+fn test_simple_relational_query_no_sub() {
+    let query = "#LINKEDTO , Pumpernickel hello, 3";
+    assert_eq!(parse_query(query).unwrap().1,
+        Box::new(Query::RelationQuery{
+            root: "Pumpernickel hello".to_string(),
+            sub: None,
+            hops: 3,
+    }))
+}
+
+#[test]
+fn test_simple_relational_query() {
+    let query = "#LINKEDTO , Pumpernickel hello, 3, hello";
+    assert_eq!(parse_query(query).unwrap().1,
+        Box::new(Query::RelationQuery{
+            root: "Pumpernickel hello".to_string(),
+            sub: Some(Box::new(Query::FreetextQuery{
+                tokens: vec!["hello".to_string()]
+            })),
+            hops: 3,
+    }))
+}
 
 #[test]
 fn test_simple_structure_query() {

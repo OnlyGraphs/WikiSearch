@@ -1,5 +1,23 @@
 use crate::index::index_structs::{Citation, Document, Infobox};
 
+
+
+#[allow(dead_code)]
+pub fn get_document_with_text_and_links(
+    id: u32,
+    title: &str,
+    infoboxes: Vec<(&str, &str)>,
+    main_text: &str,
+    citations: Vec<&str>,
+    categories: &str,
+    links: &str
+) -> Box<Document> {
+    let mut a = get_document_with_text(id, title, infoboxes, main_text, citations, categories);
+    a.article_links = links.to_string();
+    return a;
+}
+
+
 #[allow(dead_code)]
 pub fn get_document_with_text(
     id: u32,

@@ -52,12 +52,12 @@ fn test_index_date_time_parsing_correct() {
         .unwrap();
 
     let datetime_correct1 = NaiveDateTime::parse_from_str(str1, DATE_TIME_FORMAT).unwrap();
-    assert_eq!(idx.get_last_updated_date(&1), Some(datetime_correct1));
+    assert_eq!(idx.get_last_updated_date(1), Some(datetime_correct1));
     //Second Example
     idx.add_document(get_document_with_date_time(2, "2", test_str2))
         .unwrap();
     let datetime_correct2 = NaiveDateTime::parse_from_str(actual_str2, DATE_TIME_FORMAT).unwrap();
-    assert_eq!(idx.get_last_updated_date(&2), Some(datetime_correct2));
+    assert_eq!(idx.get_last_updated_date(2), Some(datetime_correct2));
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn test_index_date_time_parsing_incorrect() {
         .unwrap();
 
     for i in 1..7 {
-        assert_eq!(idx.get_last_updated_date(&i), None);
+        assert_eq!(idx.get_last_updated_date(i), None);
     }
 }
 #[test]
@@ -394,18 +394,22 @@ fn test_basic_index_df() {
 fn test_basic_index_links() {
     let mut idx = BasicIndex::<SmallPostingMap>::default();
 
-    idx.add_document(get_document_with_links(0, "source", "target1,target2"))
+    idx.add_document(get_document_with_links(0, "source", "target1, target2")) 
         .unwrap();
-    idx.add_document(get_document_with_links(1, "target1", "a"))
+    idx.add_document(get_document_with_links(1, "target1", "target2, target1"))
         .unwrap();
-    idx.add_document(get_document_with_links(2, "target2", "source"))
+    idx.add_document(get_document_with_links(2, "target2", "source, target1"))
         .unwrap();
 
     idx.finalize().unwrap();
 
     assert_eq!(idx.get_links(0).unwrap(), vec![1, 2]);
-    assert_eq!(idx.get_links(1).unwrap().len(), 0);
-    assert_eq!(idx.get_links(2).unwrap(), vec![0]);
+    assert_eq!(idx.get_links(1).unwrap(), vec![1,2]);
+    assert_eq!(idx.get_links(2).unwrap(), vec![0,1]);
+
+    assert_eq!(idx.get_incoming_links(0), vec![2]);
+    assert_eq!(idx.get_incoming_links(1), vec![0,1,2]);
+    assert_eq!(idx.get_incoming_links(2), vec![0,1]);
 
     assert_eq!(idx.id_to_title(0), Some(&"source".to_string()));
     assert_eq!(idx.title_to_id("source".to_string()), Some(0));
