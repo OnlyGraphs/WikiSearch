@@ -1,12 +1,18 @@
-use crate::index::{
-    collections::SmallPostingMap,
-    index::{BasicIndex, Index},
-    index_structs::{PosRange, Posting},
-};
+use crate::test_utils::get_document_with_date_time;
 use crate::utils::test_utils::{get_document_with_links, get_document_with_text};
 use crate::utils::utils::MemFootprintCalculator;
+use crate::{
+    index::{
+        collections::SmallPostingMap,
+        index::{BasicIndex, Index},
+        index_structs::{PosRange, Posting},
+    },
+    index_structs::DATE_TIME_FORMAT,
+};
 use std::array::IntoIter;
 use std::collections::HashMap;
+
+use chrono::NaiveDateTime;
 
 // TODO: split tests by library
 // add integration tests
@@ -26,7 +32,62 @@ fn test_real_mem_primitives() {
         4 * 4 + 48
     );
 }
+#[test]
+fn test_real_mem_naive_date_time() {
+    let datetime =
+        NaiveDateTime::parse_from_str("2015-07-01 08:59:60", "%Y-%m-%d %H:%M:%S").unwrap();
+    assert_eq!(datetime.real_mem(), 4 + 4 + 4);
+}
+#[test]
+fn test_index_date_time_parsing_correct() {
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
+    //Ideal test
+    let str1 = "2015-07-01 08:59:60";
+    //Shouldn't ideally happen, but testing if 0s are left out
+    let test_str2 = "2015-7-1 8:9:6";
+    let actual_str2 = "2015-7-1 08:09:06";
 
+    //First example
+    idx.add_document(get_document_with_date_time(1, "1", str1))
+        .unwrap();
+
+    let datetime_correct1 = NaiveDateTime::parse_from_str(str1, DATE_TIME_FORMAT).unwrap();
+    assert_eq!(idx.get_last_updated_date(&1), Some(datetime_correct1));
+    //Second Example
+    idx.add_document(get_document_with_date_time(2, "2", test_str2))
+        .unwrap();
+    let datetime_correct2 = NaiveDateTime::parse_from_str(actual_str2, DATE_TIME_FORMAT).unwrap();
+    assert_eq!(idx.get_last_updated_date(&2), Some(datetime_correct2));
+}
+
+#[test]
+fn test_index_date_time_parsing_incorrect() {
+    let mut idx = BasicIndex::<SmallPostingMap>::default();
+
+    let incorrect_str1 = "2015-07-01 08-59-60"; //Incorrect formatting
+    let incorrect_str2 = "";
+    let incorrect_str3 = "2015-07-01";
+    let incorrect_str4 = "08:59:60";
+    let incorrect_str5 = "9999-99-99 99:99:99";
+    let incorrect_str6 = "0000-00-00 00:00:00";
+
+    idx.add_document(get_document_with_date_time(1, "1", incorrect_str1))
+        .unwrap();
+    idx.add_document(get_document_with_date_time(2, "2", incorrect_str2))
+        .unwrap();
+    idx.add_document(get_document_with_date_time(3, "3", incorrect_str3))
+        .unwrap();
+    idx.add_document(get_document_with_date_time(4, "4", incorrect_str4))
+        .unwrap();
+    idx.add_document(get_document_with_date_time(5, "5", incorrect_str5))
+        .unwrap();
+    idx.add_document(get_document_with_date_time(6, "6", incorrect_str6))
+        .unwrap();
+
+    for i in 1..7 {
+        assert_eq!(idx.get_last_updated_date(&i), None);
+    }
+}
 #[test]
 fn test_add_after_finalize() {
     let mut idx = BasicIndex::<SmallPostingMap>::default();
@@ -355,7 +416,6 @@ fn test_basic_index_links() {
     assert_eq!(idx.id_to_title(2), Some(&"target2".to_string()));
     assert_eq!(idx.title_to_id("target2".to_string()), Some(2));
 }
-
 
 // make_sure_postings_are_in_order(){
 //    todo!();

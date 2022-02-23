@@ -1,13 +1,13 @@
 use std::fmt;
 use strum_macros::IntoStaticStr;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BinaryOp {
     And,
     Or,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum UnaryOp {
     Not,
 }
@@ -31,7 +31,7 @@ impl From<&str> for StructureElem {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Query {
     BinaryQuery {
         op: BinaryOp,

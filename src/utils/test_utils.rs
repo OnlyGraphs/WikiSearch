@@ -47,3 +47,17 @@ pub fn get_document_with_links(id: u32, title: &str, links: &str) -> Box<Documen
         article_links: links.to_string(),
     })
 }
+
+pub fn get_document_with_date_time(id: u32, title: &str, last_updated_date: &str) -> Box<Document> {
+    Box::new(Document {
+        title: title.to_string(),
+        doc_id: id,
+        infoboxes: vec![],
+        main_text: String::default(),
+        citations: vec![],
+        categories: String::default(),
+        last_updated_date: last_updated_date.to_string(),
+        namespace: i16::default(),
+        article_links: String::default(),
+    })
+}

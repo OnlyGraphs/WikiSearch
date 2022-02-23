@@ -1,10 +1,10 @@
 use crate::index::index_structs::{DocumentMetaData, PosRange, Posting, PostingNode};
 use bimap::BiMap;
+use chrono::NaiveDateTime;
 use either::Either;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::mem::size_of;
-
 pub trait MemFootprintCalculator {
     fn real_mem(&self) -> u64;
 }
@@ -101,5 +101,14 @@ where
     fn real_mem(&self) -> u64 {
         self.as_ref().either(|c| c.real_mem(), |c| c.real_mem()) + size_of::<Either<L, R>>() as u64
         // need this as above doesnt count metadata
+    }
+}
+
+//Struct: NaiveDateTime { NaiveDate, NaiveTime}. Calculate the memory for fields defined in each.
+impl MemFootprintCalculator for NaiveDateTime {
+    fn real_mem(&self) -> u64 {
+        let naive_date_size = size_of::<i32>(); // for the field "ymdf" in NaiveDate, which is
+        let naive_time_size = size_of::<u32>() + size_of::<u32>(); //secs + fracs, calculated from chrono crate
+        (naive_date_size + naive_time_size) as u64
     }
 }
