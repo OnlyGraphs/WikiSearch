@@ -1,4 +1,3 @@
-use crate::search::search::preprocess_query;
 use crate::api::structs::default_results_per_page;
 use crate::api::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
@@ -7,6 +6,7 @@ use crate::api::structs::{
 use crate::index::index::{BasicIndex, Index};
 use crate::index_structs::Posting;
 use crate::parser::parser::parse_query;
+use crate::search::search::preprocess_query;
 use crate::search::search::{execute_query, score_query};
 use crate::structs::SortType;
 use actix_web::{
@@ -66,13 +66,13 @@ pub async fn search(
     debug!("Results Per Page: {:?}", results_per_page);
     let page = _q.page.unwrap();
     debug!("Current Page Number: {:?}", page);
-    let sortby = _q.sortby.as_ref().unwrap();
+    let sortby = _q.sortBy.as_ref().unwrap();
     debug!("Sort by: {:?}", sortby);
 
     let idx = data.index_rest.read().unwrap();
     //Parse the query given by user
     debug!("Query Before Parsing: {:?}", &_q.query);
-    let (_,ref mut query) = parse_query(&_q.query).unwrap();
+    let (_, ref mut query) = parse_query(&_q.query).unwrap();
     preprocess_query(query);
 
     debug!("Query Form After Parsing: {:?}", query);

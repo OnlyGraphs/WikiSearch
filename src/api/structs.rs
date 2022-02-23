@@ -19,7 +19,7 @@ pub struct SearchParameters {
     pub query: String,
 
     #[serde(default = "default_sortby")]
-    pub sortby: Option<SortType>,
+    pub sortBy: Option<SortType>,
 
     #[serde(default = "default_page")]
     pub page: Option<u32>,
