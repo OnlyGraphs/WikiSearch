@@ -374,10 +374,10 @@ fn test_parse_complex_phrase_query() {
 
 #[test]
 fn test_parse_simple_relation_query() {
-    let query = "#LINKSTO Whale 3";
-    let expected_root = vec!["Whale".to_string()];
+    let query = "#LINKSTO, Whale,3";
+    let expected_root = "Whale".to_string();
     let expected_hops = 3;
-    let expected_sub = Box::new(None);
+    let expected_sub = None;
     let expected = Box::new(Query::RelationQuery{
         root: expected_root,
         hops: expected_hops,
@@ -389,10 +389,10 @@ fn test_parse_simple_relation_query() {
 
 #[test]
 fn test_parse_simple_relation_query2() {
-    let query = "#LINKSTO Big Whale 3";
-    let expected_root = vec!["Big".to_string(), "Whale".to_string()];
+    let query = "#LINKSTO, Big Whale, 3";
+    let expected_root = "Big Whale".to_string();
     let expected_hops = 3;
-    let expected_sub = Box::new(None);
+    let expected_sub = None;
     let expected = Box::new(Query::RelationQuery{
         root: expected_root,
         hops: expected_hops,
@@ -404,10 +404,10 @@ fn test_parse_simple_relation_query2() {
 
 #[test]
 fn test_parse_simple_relation_query3() {
-    let query = "#LINKSTO Big Whale 354545";
-    let expected_root = vec!["Big".to_string(), "Whale".to_string()];
+    let query = "#LINKSTO, Big Whale, 354545";
+    let expected_root = "Big Whale".to_string();
     let expected_hops = 354545;
-    let expected_sub = Box::new(None);
+    let expected_sub = None;
     let expected = Box::new(Query::RelationQuery{
         root: expected_root,
         hops: expected_hops,
@@ -420,9 +420,9 @@ fn test_parse_simple_relation_query3() {
 #[test] 
 fn test_parse_nested_relation_query() {
     let query = "#LINKSTO , Big Whale , 354545 , Donald OR Trump";
-    let expected_root = vec!["Big".to_string(), "Whale".to_string()];
+    let expected_root = "Big Whale ".to_string();
     let expected_hops = 354545;
-    let expected_sub = Box::new(Some(Query::BinaryQuery{
+    let expected_sub = Box::new(Query::BinaryQuery{
         op : BinaryOp::Or,
         lhs : Box::new(Query::FreetextQuery{
             tokens: vec!["Donald".to_string()],
@@ -430,11 +430,11 @@ fn test_parse_nested_relation_query() {
         rhs : Box::new(Query::FreetextQuery{
             tokens: vec!["Trump".to_string()],
         })
-    }));
+    });
     let expected = Box::new(Query::RelationQuery{
         root: expected_root,
         hops: expected_hops,
-        sub: expected_sub,
+        sub: Some(expected_sub),
     });
     let (_, actual) = parse_relation_query(query).unwrap();
     assert_eq!(expected, actual);

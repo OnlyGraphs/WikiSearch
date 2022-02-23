@@ -56,7 +56,7 @@ pub enum Query {
         sub: Box<Query>,
     },
     RelationQuery {
-        root: Vec<String>,
+        root: String,
         hops: u32,
         sub: Option<Box<Query>>,
     },

@@ -5,10 +5,7 @@ use nom::{
     bytes::complete::{tag, tag_no_case, take_until, take_while, take_while1},
     character::complete::{digit0, digit1},
     character::{is_alphanumeric, is_space, is_digit},
-    multi::{many1, separated_list0},
-    character::complete::digit0,
-    character::{is_alphanumeric, is_space},
-    multi::{separated_list0, many_m_n},
+    multi::{separated_list0, many_m_n, many1},
     combinator::{opt},
     IResult,
 };
@@ -99,6 +96,15 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
 }
 
 pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
+
+    if nxt.chars().count() == 0 {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            //the new struct, instead of the tuple
+            "Empty query.",
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
     alt((
         parse_relational_query,
         parse_dist_query,
@@ -274,20 +280,9 @@ pub fn parse_wildcard_query(nxt: &str) -> IResult<&str, Box<Query>> {
 pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = tag_no_case("#LinksTo")(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, mut page_title) = many1(parse_token_in_phrase)(nxt)?;
-
-    let dst = page_title.pop();
-    let mut d : String = String::new();
-
-    match dst {
-        Some(x) => d = x.to_string(),
-        _ => { return Err(nom::Err::Error(nom::error::Error::new(
-            //the new struct, instead of the tuple
-            "Could not retrieve number of hops from query.",
-            nom::error::ErrorKind::Tag,
-            )));
-        }
-    }
+    let (nxt, page_title) = take_until(",")(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, d) = digit1(nxt)?;
 
     // Convert hops to int
     let mut hops: u32 = 0;
@@ -305,9 +300,9 @@ pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
     Ok((nxt, Box::new(
         Query::RelationQuery{
-            root: page_title,
+            root: page_title.to_string(),
             hops: hops,
-            sub: Box::new(None),
+            sub: None,
         }
     )))
 }
@@ -315,17 +310,11 @@ pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
 // TODO: What if the title contains integers?
 pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = tag_no_case("#LinksTo")(nxt)?;
-    let (nxt, _) = parse_whitespace0(nxt)?;
-    let (nxt, _) = parse_comma(nxt)?;
-    let (nxt, _) = parse_whitespace0(nxt)?;
-    let (nxt, page_title) = many1(parse_page_title)(nxt)?;
-    let (nxt, _) = parse_whitespace0(nxt)?;
-    let (nxt, _) = parse_comma(nxt)?;
-    let (nxt, _) = parse_whitespace0(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, page_title) = take_until(",")(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     let (nxt, d) = digit1(nxt)?;
-    let (nxt, _) = parse_whitespace0(nxt)?;
-    let (nxt, _) = parse_comma(nxt)?;
-    let (nxt, _) = parse_whitespace0(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     let (nxt, sub) = parse_query(nxt)?;
 
     // Convert hops to int
@@ -344,9 +333,9 @@ pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
     Ok((nxt, Box::new(
         Query::RelationQuery{
-            root: page_title,
+            root: page_title.to_string(),
             hops: hops,
-            sub: Box::new(Some(*sub)),
+            sub: Some(Box::new(*sub)),
         }
     )))
 }
