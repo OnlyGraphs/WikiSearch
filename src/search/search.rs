@@ -1,13 +1,13 @@
+use chrono::NaiveDateTime;
+use itertools::Itertools;
+use preprocessor::{Preprocessor, ProcessingOptions};
+use std::collections::HashSet;
 use crate::parser::errors::{QueryError, QueryErrorKind};
 use crate::index::index::Index;
 use crate::index::index_structs::Posting;
 use crate::index_structs::PosRange;
 use crate::parser::ast::{BinaryOp, Query, UnaryOp};
-use chrono::NaiveDateTime;
-use itertools::Itertools;
-use preprocessor::{Preprocessor, ProcessingOptions, TokenisationOptions, Normalisation};
-use std::cmp::Ordering;
-use std::collections::HashSet;
+use crate::utils::utils::merge;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct ScoredDocument {
@@ -15,6 +15,7 @@ pub struct ScoredDocument {
     doc_id: u32,
     last_updated_date: Option<NaiveDateTime>,
 }
+
 
 impl ScoredDocument {
     pub fn get_score(&self) -> f64 {
@@ -61,11 +62,22 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
 }
 
 //TODO: get rid of posting copying, do stuff by reference, + batch postings list in case we run out of memory
-pub fn execute_query(query: Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> {
-    match *query {
-        Query::RelationQuery { root, hops, sub } => Vec::default(), // TODO: needs graph crawling
-        Query::WildcardQuery { prefix, postfix } => Vec::default(), // TODO: needs index support
-        Query::StructureQuery { elem, sub } => execute_query(sub, index)
+pub fn execute_query(query: &Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> {
+    match **query {
+        Query::RelationQuery { ref root,ref hops,ref sub } => {
+            let id = match index.title_to_id(root.clone()) {Some(v) => v, None => return Vec::default()} ;
+            let mut subset = HashSet::default();
+            get_docs_within_hops(id, *hops, &mut subset , index);
+
+            match sub {
+                Some(v) => return execute_query(v, index).into_iter().filter(|c| subset.contains(&c.document_id)).collect(),
+                None => {let mut o : Vec<Posting> = subset.into_iter().map(|c| Posting{ document_id: c, position: 0}).collect();
+                             o.sort(); 
+                             return o},
+            };
+        }
+        Query::WildcardQuery { ref prefix,ref postfix } => Vec::default(), // TODO: needs index support
+        Query::StructureQuery { ref elem, ref sub } => execute_query(sub, index)
             .into_iter()
             .filter(
                 |c| match index.get_extent_for(elem.clone().into(), &c.document_id) {
@@ -76,7 +88,7 @@ pub fn execute_query(query: Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> 
                 },
             )
             .collect(),
-        Query::PhraseQuery { tks } => tks.iter().tuple_windows().enumerate().fold(
+        Query::PhraseQuery { ref tks } => tks.iter().tuple_windows().enumerate().fold(
             Vec::default(),
             |a, (i, (prev, current))| {
                 let curr = distance_merge(
@@ -99,29 +111,29 @@ pub fn execute_query(query: Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> 
                 }
             },
         ),
-        Query::DistanceQuery { dst, lhs, rhs } => distance_merge(
+        Query::DistanceQuery { ref dst, ref lhs,ref rhs } => distance_merge(
             index
                 .as_ref()
-                .get_postings(&lhs)
+                .get_postings(lhs)
                 .unwrap_or_default()
                 .to_vec(),
             index
                 .as_ref()
-                .get_postings(&rhs)
+                .get_postings(rhs)
                 .unwrap_or_default()
                 .to_vec(),
-            dst,
+            *dst,
         ),
-        Query::UnaryQuery { op, sub } => match op {
+        Query::UnaryQuery { ref op, ref sub } => match op {
             UnaryOp::Not => difference_merge(index.get_all_postings(), execute_query(sub, index)),
         },
-        Query::BinaryQuery { op, lhs, rhs } => match op {
+        Query::BinaryQuery { ref op, ref lhs, ref rhs } => match op {
             BinaryOp::And => {
                 intersection_merge(execute_query(lhs, index), execute_query(rhs, index))
             }
             BinaryOp::Or => union_merge(execute_query(lhs, index), execute_query(rhs, index)),
         },
-        Query::FreetextQuery { tokens } => tokens.iter().fold(Vec::default(), |a, t| {
+        Query::FreetextQuery { ref tokens } => tokens.iter().fold(Vec::default(), |a, t| {
             union_merge(
                 a,
                 index.as_ref().get_postings(t).unwrap_or_default().to_vec(),
@@ -130,9 +142,31 @@ pub fn execute_query(query: Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> 
     }
 }
 
+
+pub fn get_docs_within_hops(docid: u32, hops: u32, out: &mut HashSet::<u32>, index : &Box<dyn Index>){
+    out.insert(docid);
+
+    if hops == 0 {
+        return;
+    }
+
+
+    let out_l = index.get_links(docid).unwrap_or(&[]);
+    let in_l = index.get_incoming_links(docid);
+    let all_l = merge(in_l,out_l);
+
+    all_l.iter().for_each(|v| {
+        if !out.contains(v){
+            out.insert(*v);
+            get_docs_within_hops(*v, hops - 1, out, index);
+
+        }
+    })
+}
+
 //TODO! Current naive implementation is added with dummy scores for Search API (endpoints.rs). Might be better to remove hashset
 pub fn score_query(
-    query: Box<Query>,
+    query: &Box<Query>,
     index: &Box<dyn Index>,
     postings: &Vec<Posting>,
 ) -> Vec<ScoredDocument> {
@@ -144,7 +178,7 @@ pub fn score_query(
             scored_documents.push(ScoredDocument {
                 doc_id: post.document_id,
                 score: 0.0,
-                last_updated_date: index.get_last_updated_date(&post.document_id),
+                last_updated_date: index.get_last_updated_date(post.document_id),
             });
         }
     }

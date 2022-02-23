@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use crate::index::index_structs::{DocumentMetaData, PosRange, Posting, PostingNode};
 use bimap::BiMap;
 use chrono::NaiveDateTime;
@@ -110,5 +111,35 @@ impl MemFootprintCalculator for NaiveDateTime {
         let naive_date_size = size_of::<i32>(); // for the field "ymdf" in NaiveDate, which is
         let naive_time_size = size_of::<u32>() + size_of::<u32>(); //secs + fracs, calculated from chrono crate
         (naive_date_size + naive_time_size) as u64
+    }
+}
+
+
+
+
+pub fn merge<T>(arr1: &[T], arr2: &[T]) -> Vec<T>
+where 
+    T: Ord + Copy + Sized
+{
+    let mut ret : Vec<T> = Vec::with_capacity(arr1.len() + arr2.len());
+    
+    let mut l_iter = arr1.iter();
+    let mut r_iter = arr2.iter();
+
+    let mut l_side = l_iter.next();
+    let mut r_side = r_iter.next();
+
+    // Compare element and insert back to result array.
+    loop{
+        match (l_side,r_side) {
+            (Some(l),None) => {ret.push(*l);l_side = l_iter.next()},
+            (None,Some(r)) => {ret.push(*r);r_side = r_iter.next()},
+            (Some(l),Some(r)) if l < r => {ret.push(*l);l_side = l_iter.next()},
+            (Some(l),Some(r)) if l > r => {ret.push(*r);r_side = r_iter.next()},
+            (Some(l),Some(r)) if l == r => {ret.push(*r);r_side = r_iter.next();
+                                            ret.push(*l);l_side = l_iter.next();
+                                        },
+            _ => {return ret},
+        };
     }
 }

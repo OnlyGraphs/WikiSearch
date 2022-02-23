@@ -31,7 +31,7 @@ impl From<&str> for StructureElem {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Query {
     BinaryQuery {
         op: BinaryOp,

@@ -1,3 +1,4 @@
+use crate::search::search::preprocess_query;
 use crate::api::structs::default_results_per_page;
 use crate::api::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
@@ -71,10 +72,12 @@ pub async fn search(
     let idx = data.index_rest.read().unwrap();
     //Parse the query given by user
     debug!("Query Before Parsing: {:?}", &_q.query);
-    let (_, query) = parse_query(&_q.query).unwrap();
+    let (_,ref mut query) = parse_query(&_q.query).unwrap();
+    preprocess_query(query);
+
     debug!("Query Form After Parsing: {:?}", query);
     //Retrieve the scored documents
-    let postings = execute_query(query.clone(), &idx);
+    let postings = execute_query(query, &idx);
     let mut scored_documents = score_query(query, &idx, &postings);
     debug!("Number of documents found: {:?}", scored_documents.len());
     //Sort documents returned depending on SortType parameter requested by user

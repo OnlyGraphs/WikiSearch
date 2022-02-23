@@ -2,22 +2,25 @@
 use crate::parser::ast::{Query, BinaryOp, UnaryOp, StructureElem};
 use crate::search::search::{preprocess_query};
 
+
+
+
+
 #[test]
 fn test_single_word(){
 
     let mut q = Query::FreetextQuery{
-        tokens: vec!["BarCeLOna".to_string()]
+        tokens: vec!["bOrIs".to_string()]
     };
 
     preprocess_query(&mut q).unwrap();
 
     assert_eq!(q,
         Query::FreetextQuery{
-            tokens: vec!["barcelona".to_string()]
+            tokens: vec!["bori".to_string()]
         }
     )
 }
-
 
 #[test]
 fn test_multiple_words(){
