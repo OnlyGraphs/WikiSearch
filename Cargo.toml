@@ -21,6 +21,7 @@ futures = "0.3"
 async-trait = "0.1.52"
 either = "1.6.1"
 api-rs = { git = "https://github.com/OnlyGraphs/api" }
+preprocessor = { git = "https://github.com/OnlyGraphs/Preprocessor" }
 tonic = "0.6.2"
 nom = "6.1.2"
 tokio = "1.0.1"

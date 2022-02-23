@@ -1,14 +1,45 @@
+use crate::parser::errors::{QueryError, QueryErrorKind};
 use crate::index::index::Index;
 use crate::index::index_structs::Posting;
 use crate::index_structs::PosRange;
 use crate::parser::ast::{BinaryOp, Query, UnaryOp};
 use itertools::Itertools;
-use std::cmp::Ordering;
+use preprocessor::{Preprocessor, ProcessingOptions, TokenisationOptions, Normalisation};
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ScoredDocument {
     score: u32,
     doc_id: u32,
+}
+
+
+pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
+
+    // first pass, preprocess
+    let ref opts = ProcessingOptions::default();
+
+    match *query {
+        Query::RelationQuery { ref mut sub, .. } => drop(sub.as_mut().map(|c| Some(preprocess_query(c).ok()?))),
+        Query::StructureQuery { ref mut sub, .. } => preprocess_query(sub)?,
+        Query::UnaryQuery { ref mut sub, .. } => preprocess_query(sub)?,
+        Query::BinaryQuery { ref mut lhs, ref mut rhs, .. } => {
+            preprocess_query(lhs)?; 
+            preprocess_query(rhs)?;
+        },
+        Query::PhraseQuery { ref mut tks } => *tks = tks.into_iter().flat_map(|c| Preprocessor::process(opts,c.to_string())).filter(|w| !w.trim().is_empty()).collect(),
+        Query::FreetextQuery { ref mut tokens } => *tokens = tokens.into_iter().flat_map(|c| Preprocessor::process(opts,c.to_string())).filter(|w| !w.trim().is_empty()).collect(),
+        Query::DistanceQuery { ref mut lhs, ref mut rhs, .. } => {
+            *lhs = Preprocessor::process(opts,lhs.clone()).into_iter().next().ok_or(QueryError{kind:QueryErrorKind::InvalidSyntax,msg:"Distance query requires at least one individual word on each side".to_string(),pos:lhs.to_string()})?; 
+            *rhs = Preprocessor::process(opts,rhs.clone()).into_iter().next().ok_or(QueryError{kind:QueryErrorKind::InvalidSyntax,msg:"Distance query requires at least one individual word on each side".to_string(),pos:rhs.to_string()})?;
+        }, 
+        Query::WildcardQuery {ref mut prefix, ref mut postfix} => {
+            *prefix = prefix.to_lowercase(); // needs a more thorough look
+            *postfix = postfix.to_lowercase();
+        },
+
+    };
+
+    Ok(())
 }
 
 //TODO: get rid of posting copying, do stuff by reference, + batch postings list in case we run out of memory

@@ -58,7 +58,7 @@ pub enum Query {
     RelationQuery {
         root: String,
         hops: u32,
-        sub: Box<Option<Query>>,
+        sub: Option<Box<Query>>,
     },
     WildcardQuery {
         prefix: String,  // before wildcard
