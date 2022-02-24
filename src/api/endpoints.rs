@@ -123,6 +123,7 @@ pub async fn search(
                 .map(|p| ScoredDocument{doc_id: p.document_id, score: 1.0})
                 .collect()
         }
+
     };
 
     let future_documents = ordered_docs.into_iter() // consumes ordered_docs

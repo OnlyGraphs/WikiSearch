@@ -27,6 +27,7 @@ pub struct SearchParameters {
     #[serde(default)]
     pub sortby: SortType,
 
+
     #[serde(default)]
     pub page: DefaultPage,
 
