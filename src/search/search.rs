@@ -11,25 +11,10 @@ use crate::utils::utils::merge;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct ScoredDocument {
-    score: f64,
-    doc_id: u32,
-    last_updated_date: Option<NaiveDateTime>,
+    pub score: f64,
+    pub doc_id: u32,
 }
 
-
-impl ScoredDocument {
-    pub fn get_score(&self) -> f64 {
-        self.score
-    }
-
-    pub fn get_doc_id(&self) -> u32 {
-        self.doc_id
-    }
-
-    pub fn get_date(&self) -> Option<NaiveDateTime> {
-        self.last_updated_date
-    }
-}
 
 
 pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
@@ -178,7 +163,6 @@ pub fn score_query(
             scored_documents.push(ScoredDocument {
                 doc_id: post.document_id,
                 score: 0.0,
-                last_updated_date: index.get_last_updated_date(post.document_id),
             });
         }
     }

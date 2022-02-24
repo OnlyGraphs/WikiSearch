@@ -1,5 +1,7 @@
 use std::fmt;
-use tonic::Status;
+use actix_web::{
+    error, get, http::header, http::StatusCode, HttpResponse,ResponseError
+};
 
 #[derive(Debug, Clone)]
 pub enum QueryErrorKind {
