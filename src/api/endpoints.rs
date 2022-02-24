@@ -1,44 +1,76 @@
+use std::fmt::Debug;
+use futures::StreamExt;
+use crate::search::search::ScoredDocument;
+use crate::index_structs::Posting;
+use futures::stream::FuturesUnordered;
+use crate::parser::errors::QueryError;
+use actix_web::ResponseError;
 use crate::search::search::preprocess_query;
-use crate::api::structs::default_results_per_page;
 use crate::api::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
     SearchParameters, UserFeedback,
 };
-use crate::index::index::{BasicIndex, Index};
-use crate::index_structs::Posting;
 use crate::parser::parser::parse_query;
 use crate::search::search::{execute_query, score_query};
 use crate::structs::SortType;
 use actix_web::{
     get,
     web::{Data, Json, Query},
-    HttpResponse, Responder, ResponseError, Result,
+    HttpResponse, Responder, Result,http::StatusCode
 };
 use sqlx::Row;
-use sqlx::{postgres::PgPoolOptions, query, query_scalar};
-use std::collections::HashSet;
-use std::{
-    env,
-    sync::{Arc, RwLock},
-};
+use sqlx::{postgres::PgPoolOptions};
+use log::{debug};
+use std::fmt;
+use futures::future;
 
-use log::{debug, info};
-
-#[derive(Debug)]
-pub enum APIError {
-    DatabaseError,
-    QueryFormattingError,
-    EmptyQueryError,
+#[derive(Debug, Clone)]
+pub struct APIError {
+    pub code: StatusCode,
+    pub msg: String,
 }
 
-impl std::fmt::Display for APIError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Oh no. something happened") //TODO!: Write a meaningful error
+impl fmt::Display for APIError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,"{:?}",self.msg)
     }
 }
-impl ResponseError for APIError {}
 
-// impl sqlx::Error for APIError {}
+impl ResponseError for APIError{
+
+    fn status_code(&self) -> StatusCode{
+        self.code
+    }
+}
+
+impl APIError{
+    fn from_status_code(s : StatusCode) -> Self {
+        APIError{
+            code: s,
+            msg: "".to_string()
+        }
+    }
+
+    fn from_printable<T : Debug>(p : T, s : StatusCode) -> Self{
+        APIError{
+            code: s,
+            msg: format!("{:?}",p)
+        }
+    }
+}
+
+impl From<QueryError> for APIError {
+    fn from(e: QueryError) -> Self {
+        APIError{
+            code: StatusCode::OK,
+            msg: format!("{:?}",e)
+        }
+    }
+}
+
+
+impl std::error::Error for APIError {}
+
 
 //TODO!:
 //1) if index doesnt find id, return error to check implementation of index builder or retrieval.
@@ -52,83 +84,85 @@ impl ResponseError for APIError {}
 #[get("/api/v1/search")]
 pub async fn search(
     data: Data<RESTSearchData>,
-    _q: Query<SearchParameters>,
+    q: Query<SearchParameters>,
 ) -> Result<impl Responder, APIError> {
     //Initialise Database connection to retrieve article title and abstract for each document found for the query
     let pool = PgPoolOptions::new()
         .max_connections(1)
         .connect(&data.connection_string)
         .await
-        .expect("DB error"); //TODO! Handle error appropriately
+        .map_err(|e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?; 
 
-    // Retrieve the parameters requested from user
-    let results_per_page = _q.results_per_page.unwrap();
-    debug!("Results Per Page: {:?}", results_per_page);
-    let page = _q.page.unwrap();
-    debug!("Current Page Number: {:?}", page);
-    let sortby = _q.sortby.as_ref().unwrap();
-    debug!("Sort by: {:?}", sortby);
 
-    let idx = data.index_rest.read().unwrap();
-    //Parse the query given by user
-    debug!("Query Before Parsing: {:?}", &_q.query);
-    let (_,ref mut query) = parse_query(&_q.query).unwrap();
-    preprocess_query(query);
+    // construct + execute query
+    let idx = data.index_rest.read()
+        .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+    let (_,ref mut query) = parse_query(&q.query)
+        .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+    preprocess_query(query)?;
 
-    debug!("Query Form After Parsing: {:?}", query);
-    //Retrieve the scored documents
-    let postings = execute_query(query, &idx);
-    let mut scored_documents = score_query(query, &idx, &postings);
-    debug!("Number of documents found: {:?}", scored_documents.len());
-    //Sort documents returned depending on SortType parameter requested by user
-    match sortby {
-        SortType::Relevance => scored_documents
-            .sort_by(|doc1, doc2| doc2.get_score().partial_cmp(&doc1.get_score()).unwrap()),
-        SortType::LastEdited => scored_documents.sort_by_key(|doc| doc.get_date()),
+    let mut postings = execute_query(query, &idx);
+
+    // score documents if necessary and sort appropriately
+    let ordered_docs : Vec<ScoredDocument> = match q.sortby {
+        SortType::Relevance => {
+            let mut scored_documents = score_query(query, &idx, &postings);
+            scored_documents.sort_unstable_by(|doc1, doc2| doc2.score.partial_cmp(&doc1.score).unwrap());
+            scored_documents.into_iter() // consumes scored_documents
+                .skip((q.results_per_page.0 * (q.page.0 - 1)) as usize)
+                .take(q.results_per_page.0 as usize)
+                .collect()
+            
+        },
+        SortType::LastEdited => {
+            postings.sort_by_cached_key(|Posting{document_id , ..}| idx.get_last_updated_date(*document_id));
+            postings.into_iter() // consumes postings
+                .skip((q.results_per_page.0 * (q.page.0 - 1)) as usize)
+                .take(q.results_per_page.0 as usize)
+                .map(|p| ScoredDocument{doc_id: p.document_id, score: 1.0})
+                .collect()
+        }
     };
 
-    //Compute which documents to return depending on page number and the results to be shown per page
-    //TODO! Make sure to return first page if second page is not available, and other types of edge cases
-    let mut doc_index: usize = ((page - 1) * (results_per_page as u32)).try_into().unwrap();
-    let doc_index_end: usize = (page * (results_per_page as u32)).try_into().unwrap();
-    debug!("Start Doc: {:?}", doc_index);
-    debug!("End Doc: {:?}", doc_index_end);
+    let future_documents = ordered_docs.into_iter() // consumes ordered_docs
+        .map(|doc| {
+                let pool_cpy = pool.clone();
+                async move {
+                    let sql = sqlx::query(
+                        "SELECT a.title, c.abstracts
+                    From article as a, \"content\" as c
+                    where a.articleid= $1 AND a.articleid = c.articleid",
+                    )
+                    .bind(doc.doc_id as i64)
+                    .fetch_one(&pool_cpy)
+                    .await
+                    .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
-    let mut docs = Vec::new(); //TODO! perhaps a better way would be to pop from scored_documents, saving on memory for huge results
-    while doc_index < scored_documents.len() && doc_index + 1 <= doc_index_end {
-        let articleid = scored_documents[doc_index].get_doc_id();
-        debug!("Document: {:?}", articleid);
-        debug!("Date: {:?}", scored_documents[doc_index].get_date());
-        //Retrieve article title and abstract from database
-        let sql = sqlx::query(
-            "SELECT a.title, c.abstracts
-        From article as a, \"content\" as c
-        where a.articleid= $1 AND a.articleid = c.articleid",
-        )
-        .bind(articleid)
-        .fetch_one(&pool)
+                    let title : String = sql.try_get("title").map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                    let abstracts : String = sql.try_get("abstracts").map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                    Ok::<Document,APIError>(Document {
+                        title: title,
+                        article_abstract: abstracts,
+                        score: doc.score
+                    })
+                }
+            }
+            )
+        .collect::<FuturesUnordered<_>>()
+        .collect::<Vec<Result<Document,APIError>>>()
         .await
-        .expect("Query error"); //TODO! Handle error appropriately
+        .into_iter()
+        .collect::<Result<Vec<Document>,APIError>>()?; // fail on a single internal error
 
-        let title: String = sql.try_get("title").unwrap_or_default();
-        let article_abstract: String = sql.try_get("abstracts").unwrap_or_default();
-
-        docs.push(Document {
-            title: title,
-            article_abstract: article_abstract,
-            score: scored_documents[doc_index].get_score(),
-        });
-        //Go to the next document
-        doc_index += 1;
-    }
-    debug!("Number of results returned: {:?}", docs.len());
-
-    Ok(Json(docs))
+    Ok(Json(future_documents))
 }
 
 /// Endpoint for performing relational searches stretching from a given root
 #[get("/api/v1/relational")]
 pub async fn relational(_q: Query<RelationalSearchParameters>) -> Result<impl Responder> {
+
+
+
     let document1 = Document{
         title: "April".to_string(),
         article_abstract: "April is the fourth month of the year in the Gregorian calendar, the fifth in the early Julian, the first of four months to have a length of 30 days, and the second of five months to have a length of less than 31 days.".to_string(),
