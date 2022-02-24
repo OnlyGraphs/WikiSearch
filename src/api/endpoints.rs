@@ -1,3 +1,4 @@
+use crate::index::errors::IndexError;
 use std::fmt::Debug;
 use futures::StreamExt;
 use crate::search::search::ScoredDocument;
@@ -63,7 +64,16 @@ impl APIError{
 impl From<QueryError> for APIError {
     fn from(e: QueryError) -> Self {
         APIError{
-            code: StatusCode::OK,
+            code: StatusCode::UNPROCESSABLE_ENTITY,
+            msg: format!("{:?}",e)
+        }
+    }
+}
+
+impl From<IndexError> for APIError {
+    fn from(e: IndexError) -> Self {
+        APIError{
+            code: StatusCode::INTERNAL_SERVER_ERROR,
             msg: format!("{:?}",e)
         }
     }
@@ -161,41 +171,82 @@ pub async fn search(
 
 /// Endpoint for performing relational searches stretching from a given root
 #[get("/api/v1/relational")]
-pub async fn relational(_q: Query<RelationalSearchParameters>) -> Result<impl Responder> {
+pub async fn relational(data: Data<RESTSearchData>,q: Query<RelationalSearchParameters>) -> Result<impl Responder, APIError> {
 
+    let pool = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&data.connection_string)
+        .await
+        .map_err(|e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?; 
 
+    // construct + execute query
+    let idx = data.index_rest.read()
+        .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+    let (_,ref mut query) = parse_query(
+            &format!("#LINKEDTO, {},{} {}",q.root,q.hops,q.query.clone().map(|v| 
+                format!(",{}",v)).unwrap_or("".to_string())))
+        .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
 
-    let document1 = Document{
-        title: "April".to_string(),
-        article_abstract: "April is the fourth month of the year in the Gregorian calendar, the fifth in the early Julian, the first of four months to have a length of 30 days, and the second of five months to have a length of less than 31 days.".to_string(),
-        score: 0.5,
-    };
+    debug!("Query: {:?}",query);
 
-    let document2 = Document{
-        title: "May".to_string(),
-        article_abstract: "May is the fifth month of the year in the Julian and Gregorian calendars and the third of seven months to have a length of 31 days.".to_string(),
-        score: 0.6,
-    };
+    preprocess_query(query)?;
 
-    let relation1 = Relation {
-        source: "April".to_string(),
-        destination: "May".to_string(),
-    };
+    let mut postings = execute_query(query, &idx);
+    let mut scored_documents = score_query(query, &idx, &postings); // page rank and stuff
+    
+    // get documents 
+    let documents = scored_documents.iter() 
+    .map(|doc| {
+            let pool_cpy = pool.clone();
+            async move {
+                let sql = sqlx::query(
+                    "SELECT a.title, c.abstracts
+                From article as a, \"content\" as c
+                where a.articleid= $1 AND a.articleid = c.articleid",
+                )
+                .bind(doc.doc_id as i64)
+                .fetch_one(&pool_cpy)
+                .await
+                .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
-    let relation2 = Relation {
-        source: "May".to_string(),
-        destination: "April".to_string(),
-    };
+                let title : String = sql.try_get("title").map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                let abstracts : String = sql.try_get("abstracts").map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                Ok::<Document,APIError>(Document {
+                    title: title,
+                    article_abstract: abstracts,
+                    score: doc.score
+                })
+            }
+        }
+        )
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<Document,APIError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<Document>,APIError>>()?; // fail on a single internal error
 
-    let docs = vec![document1, document2];
-    let relations = vec![relation1, relation2];
+    // find links 
+    // TODO: this is extremely inefficient, we only need links between documents retrieved
+    // also there may be duplicates, need to retrieve this while crawling the graph
+    let relations : Vec<Relation> = scored_documents.iter().flat_map(|ScoredDocument{doc_id, score}|{
+        debug!("{:?},{:?}", *doc_id,idx.get_links(*doc_id));
+        idx.get_links(*doc_id).unwrap()
+            .iter().map(|id| { debug!("{:?}",id); Relation {
+                source: idx.id_to_title(*doc_id).unwrap().to_string(),
+                destination: idx.id_to_title(*id).unwrap().to_string(),
+            }})
+            // .chain(idx.get_incoming_links(*doc_id).iter().map(|id| Relation{
+            //     source: idx.id_to_title(*id).unwrap().to_string(),
+            //     destination: idx.id_to_title(*doc_id).unwrap().to_string()
+            // }))
+            .collect::<Vec<Relation>>()
+        }
+    ).collect();
 
-    let out = RelationSearchOutput {
-        documents: docs,
+    Ok(Json(RelationSearchOutput{
+        documents: documents,
         relations: relations,
-    };
-
-    Ok(Json(out))
+    }))
 }
 
 #[get("/api/v1/feedback")]
