@@ -23,6 +23,7 @@ use sqlx::{postgres::PgPoolOptions};
 use log::{debug};
 use std::fmt;
 use futures::future;
+use std::cmp::Ordering;
 
 #[derive(Debug, Clone)]
 pub struct APIError {
@@ -107,7 +108,7 @@ pub async fn search(
     let ordered_docs : Vec<ScoredDocument> = match q.sortby {
         SortType::Relevance => {
             let mut scored_documents = score_query(query, &idx, &postings);
-            scored_documents.sort_unstable_by(|doc1, doc2| doc2.score.partial_cmp(&doc1.score).unwrap());
+            scored_documents.sort_unstable_by(|doc1, doc2| doc2.score.partial_cmp(&doc1.score).unwrap_or(Ordering::Equal));
             scored_documents.into_iter() // consumes scored_documents
                 .skip((q.results_per_page.0 * (q.page.0 - 1)) as usize)
                 .take(q.results_per_page.0 as usize)
