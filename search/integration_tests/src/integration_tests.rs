@@ -1,9 +1,6 @@
 
-use crate::parser::ast::{Query, BinaryOp, UnaryOp, StructureElem};
-use crate::search::search::{preprocess_query};
-
-
-
+use parser::ast::{Query, BinaryOp, UnaryOp, StructureElem};
+use retrieval::search::{preprocess_query};
 
 
 #[test]

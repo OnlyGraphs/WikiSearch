@@ -36,7 +36,7 @@ build:
 	cd search && cargo build --release 
 
 test:
-	cd search && cargo test
+	cd search && cargo test --workspace
 
 docs:
 	cd search && cargo doc --open --no-deps

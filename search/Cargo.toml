@@ -6,6 +6,7 @@ members = [
     "parser",
     "scoring",
     "retrieval",
-    "utils"
+    "utils",
+    "integration_tests"
 ]
 

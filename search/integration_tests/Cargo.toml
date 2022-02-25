@@ -1,0 +1,16 @@
+[package]
+name = "integration_tests"
+version = "0.1.1"
+edition = "2021"
+
+[lib]
+name = "integration_tests"
+path = "src/lib.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+index = { path = "../index" }
+parser = { path = "../parser" }
+retrieval = { path = "../retrieval" }
+utils = { path = "../utils" }

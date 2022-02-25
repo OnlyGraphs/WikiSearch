@@ -1,14 +1,12 @@
-use crate::{
-    index::{
+use index::{
         collections::SmallPostingMap,
         index::{BasicIndex, Index},
-    },
-};
-use crate::utils::test_utils::get_document_with_text;
-use crate::parser::{
+    };
+use index::utils::get_document_with_text;
+use parser::{
     ast::{Query, BinaryOp, UnaryOp},
 };
-use crate::scoring::{
+use crate::{
     scoring::{
     tfidf_query,
     idf,
