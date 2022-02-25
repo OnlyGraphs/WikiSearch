@@ -5,11 +5,17 @@ use crate::index::index::Index;
 use std::sync::{Arc, RwLock};
 
 /// Represents the type of order to be imposed on list of documents
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum SortType {
     Relevance,
     LastEdited, //Sort in descending order of dates
+}
+
+impl Default for SortType {
+    fn default() -> Self {
+        SortType::Relevance
+    }
 }
 
 /// Represents the parameters of a given standard search
@@ -18,14 +24,15 @@ pub enum SortType {
 pub struct SearchParameters {
     pub query: String,
 
-    #[serde(default = "default_sortby")]
-    pub sortby: Option<SortType>,
+    #[serde(default)]
+    pub sortby: SortType,
 
-    #[serde(default = "default_page")]
-    pub page: Option<u32>,
 
-    #[serde(default = "default_results_per_page")]
-    pub results_per_page: Option<u16>,
+    #[serde(default)]
+    pub page: DefaultPage,
+
+    #[serde(default)]
+    pub results_per_page: ResultsCount,
 }
 
 /// Represents the parameters of a given relational search
@@ -35,11 +42,11 @@ pub struct RelationalSearchParameters {
     pub hops: u8,
     pub root: String,
 
-    #[serde(default = "default_query_relational")]
+    #[serde(default)]
     pub query: Option<String>,
 
-    #[serde(default = "default_results_per_page")]
-    pub max_results: Option<u16>,
+    #[serde(default)]
+    pub max_results: ResultsCount,
 }
 
 /// Represents a piece of feedback related to a user
@@ -49,7 +56,7 @@ pub struct UserFeedback {
     pub query: String,
     pub result_page: u8,
 
-    #[serde(default = "default_chosen_result")]
+    #[serde(default)]
     pub chosen_result: Option<String>,
 }
 
@@ -80,29 +87,25 @@ pub struct RelationSearchOutput {
     pub relations: Vec<Relation>,
 }
 
-// TODO: Implement the Default trait
-fn default_sortby() -> Option<SortType> {
-    Option::from(SortType::Relevance)
+
+
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ResultsCount(pub u16);
+impl Default for ResultsCount {
+    fn default() -> Self {
+        ResultsCount(20)
+    }
 }
 
-// TODO: Implement the Default trait
-fn default_page() -> Option<u32> {
-    Option::from(1)
+#[derive(Deserialize, Debug, Clone)]
+pub struct DefaultPage(pub u16);
+impl Default for DefaultPage {
+    fn default() -> Self {
+        DefaultPage(1)
+    }
 }
 
-// TODO: Implement the Default trait
-pub fn default_results_per_page() -> Option<u16> {
-    Option::from(20)
-}
-
-// TODO: Implement the Default trait
-fn default_query_relational() -> Option<String> {
-    Option::None
-}
-
-fn default_chosen_result() -> Option<String> {
-    Option::None
-}
 
 #[derive(Debug)]
 pub struct RESTSearchData {

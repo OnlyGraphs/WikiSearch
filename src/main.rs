@@ -186,8 +186,6 @@ async fn run_rest(
                     .index_file("index.html")
                     .default_handler(|req: ServiceRequest| {
                         let (http_req, _payload) = req.into_parts();
-                        error!("HELLO");
-
                         async {
                             let root = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string()); // stupid af, can't just use the static_dir variable cuz of moves and lifetimes
 
