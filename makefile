@@ -30,13 +30,13 @@ update-schema:
 	cargo sqlx prepare -- --lib 
 
 run:
-	cargo run
+	cd search && cargo run
 
 build:
-	cargo build --release
+	cd search && cargo build --release 
 
 test:
-	cargo test
+	cd search && cargo test
 
 docs:
-	cargo doc --open --no-deps
+	cd search && cargo doc --open --no-deps

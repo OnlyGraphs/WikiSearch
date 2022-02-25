@@ -1,0 +1,37 @@
+[package]
+name = "parser"
+version = "0.1.1"
+edition = "2021"
+
+[lib]
+name = "parser"
+path = "src/lib.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# utils = { path = "../utils" }
+# parser = { path = "../parser" }
+# sqlx = { version = "0.5", features = [ "runtime-actix-native-tls" , "postgres", "offline" ] }
+# actix-web = "4.0.0-beta"
+# serde = "1.0.135"
+# futures = "0.3"
+# async-trait = "0.1.52"
+# api-rs = { git = "https://github.com/OnlyGraphs/api" }
+# preprocessor = { git = "https://github.com/OnlyGraphs/Preprocessor" }
+# tonic = "0.6.2"
+nom = "6.1.2"
+# tokio = "1.0.1"
+# actix-files = "0.6.0-beta.2"
+# unicode-segmentation = "1.9.0"
+# actix-cors="0.6.0-beta.10"
+# log = "0.4"
+# pretty_env_logger = "0.3"
+# mockall = "0.11.0"
+# itertools = "0.10.3"
+# actix-rt = "2.6.0"
+strum_macros = "0.23"
+# strum = "0.23"
+# chrono = "0.4"
+# bimap="0.6.2"
+# either = "1.6.1"

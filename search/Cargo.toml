@@ -1,0 +1,11 @@
+
+[workspace]
+members = [
+    "api",
+    "index",
+    "parser",
+    "scoring",
+    "retrieval",
+    "utils"
+]
+
