@@ -39,6 +39,7 @@ pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
     fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange>;
     fn df(&self, token: &str) -> u32;
     fn tf(&self, token: &str, docid: u32) -> u32;
+    fn get_number_of_documents(&self) -> u32;
     fn finalize(&mut self) -> Result<(), IndexError>;
 
     fn get_links(&self, source: u32) -> Result<&[u32], IndexError>;
@@ -235,6 +236,10 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
             Some(v) => v.tf.get(&docid).cloned().unwrap_or(0),
             None => 0,
         }
+    }
+
+    fn get_number_of_documents(&self) -> u32 {
+        return self.id_title_map.len() as u32;
     }
 
     // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory

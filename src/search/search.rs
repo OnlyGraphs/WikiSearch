@@ -8,6 +8,8 @@ use crate::index::index_structs::Posting;
 use crate::index_structs::PosRange;
 use crate::parser::ast::{BinaryOp, Query, UnaryOp};
 use crate::utils::utils::merge;
+use crate::scoring::scoring::{tfidf_query};
+use std::cmp::Ordering;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct ScoredDocument {
@@ -157,12 +159,14 @@ pub fn score_query(
 ) -> Vec<ScoredDocument> {
     let mut scored_documents = Vec::default();
     let mut doc_retrieved_set = HashSet::new();
+
     for post in postings {
         if doc_retrieved_set.get(&post.document_id) == None {
             doc_retrieved_set.insert(post.document_id);
             scored_documents.push(ScoredDocument {
                 doc_id: post.document_id,
-                score: 0.0,
+                score: tfidf_query(post.document_id, query, index),
+                last_updated_date: index.get_last_updated_date(post.document_id),
             });
         }
     }
