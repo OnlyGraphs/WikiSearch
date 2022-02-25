@@ -1,3 +1,5 @@
+use crate::parser::parser::parse_simple_relation_query;
+use crate::parser::parser::parse_nested_relation_query;
 use crate::parser::{
     ast::{BinaryOp, Query, StructureElem, UnaryOp},
     parser::{
@@ -66,8 +68,8 @@ fn test_dist_query_as_query() {
 }
 
 #[test]
-fn test_simple_relational_query_no_sub() {
-    let query = "#LINKEDTO , Pumpernickel hello, 3";
+fn test_simple_relational_query_as_query() {
+    let query = "#LINKsTO , Pumpernickel hello, 3";
     assert_eq!(parse_query(query).unwrap().1,
         Box::new(Query::RelationQuery{
             root: "Pumpernickel hello".to_string(),
@@ -77,9 +79,34 @@ fn test_simple_relational_query_no_sub() {
 }
 
 #[test]
-fn test_simple_relational_query() {
-    let query = "#LINKEDTO , Pumpernickel hello, 3, hello";
+fn test_nested_relational_query_as_query() {
+    let query = "#LINKsTO , Pumpernickel hello, 3, hello";
     assert_eq!(parse_query(query).unwrap().1,
+        Box::new(Query::RelationQuery{
+            root: "Pumpernickel hello".to_string(),
+            sub: Some(Box::new(Query::FreetextQuery{
+                tokens: vec!["hello".to_string()]
+            })),
+            hops: 3,
+    }))
+}
+
+
+#[test]
+fn test_simple_relational_query() {
+    let query = "#LINKSTO , Pumpernickel hello, 3";
+    assert_eq!(parse_simple_relation_query(query).unwrap().1,
+        Box::new(Query::RelationQuery{
+            root: "Pumpernickel hello".to_string(),
+            sub: None,
+            hops: 3,
+    }))
+}
+
+#[test]
+fn test_nested_relational_query() {
+    let query = "#LINKSTO , Pumpernickel hello, 3, hello";
+    assert_eq!(parse_nested_relation_query(query).unwrap().1,
         Box::new(Query::RelationQuery{
             root: "Pumpernickel hello".to_string(),
             sub: Some(Box::new(Query::FreetextQuery{

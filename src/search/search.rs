@@ -166,7 +166,6 @@ pub fn score_query(
             scored_documents.push(ScoredDocument {
                 doc_id: post.document_id,
                 score: tfidf_query(post.document_id, query, index),
-                last_updated_date: index.get_last_updated_date(post.document_id),
             });
         }
     }
