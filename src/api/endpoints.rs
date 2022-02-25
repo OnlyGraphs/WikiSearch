@@ -235,10 +235,10 @@ pub async fn relational(data: Data<RESTSearchData>,q: Query<RelationalSearchPara
                 source: idx.id_to_title(*doc_id).unwrap().to_string(),
                 destination: idx.id_to_title(*id).unwrap().to_string(),
             }})
-            // .chain(idx.get_incoming_links(*doc_id).iter().map(|id| Relation{
-            //     source: idx.id_to_title(*id).unwrap().to_string(),
-            //     destination: idx.id_to_title(*doc_id).unwrap().to_string()
-            // }))
+            .chain(idx.get_incoming_links(*doc_id).iter().map(|id| Relation{
+                source: idx.id_to_title(*id).unwrap().to_string(),
+                destination: idx.id_to_title(*doc_id).unwrap().to_string()
+            }))
             .collect::<Vec<Relation>>()
         }
     ).collect();
