@@ -25,7 +25,7 @@ pub struct SearchParameters {
     pub query: String,
 
     #[serde(default)]
-    pub sortby: SortType,
+    pub sort_by: SortType,
 
     #[serde(default)]
     pub page: DefaultPage,

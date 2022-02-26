@@ -2,24 +2,18 @@ use criterion::{black_box, criterion_group, criterion_main, BatchSize, Benchmark
 use index::{
     index::{BasicIndex, Index},
     index_structs::{Citation, Document, Infobox},
-    SmallPostingMap, PostingNode,
+    PostingNode, SmallPostingMap,
 };
-use parser::{
-    ast::{Query,UnaryOp,BinaryOp,StructureElem},
-};
+use parser::ast::{BinaryOp, Query, StructureElem, UnaryOp};
 
-use retrieval::{
-    search::{preprocess_query,score_query,execute_query}
-};
+use retrieval::search::{execute_query, preprocess_query, score_query};
 
 use std::{
-    fmt::{Debug, Display}, collections::HashMap,
+    collections::HashMap,
+    fmt::{Debug, Display},
 };
 
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
-
-
-
 
 pub const VOCAB: &'static [&'static str] = &[
     "the",
@@ -96,10 +90,8 @@ impl Default for IndexBenchParameters {
     }
 }
 
-
 pub fn get_random_string(w: u32, rng: &mut StdRng) -> String {
-    get_random_strings(w,rng)
-        .join(" ")
+    get_random_strings(w, rng).join(" ")
 }
 
 pub fn get_random_strings(w: u32, rng: &mut StdRng) -> Vec<String> {
@@ -107,7 +99,6 @@ pub fn get_random_strings(w: u32, rng: &mut StdRng) -> Vec<String> {
         .map(|c| VOCAB.choose(rng).expect("empty vocabulary").to_string())
         .collect::<Vec<String>>()
 }
-
 
 /// builds index with n documents with w words and each with the given number of links
 pub fn get_random_documents(p: &IndexBenchParameters) -> Vec<Box<Document>> {
@@ -146,39 +137,38 @@ pub fn get_random_documents(p: &IndexBenchParameters) -> Vec<Box<Document>> {
 pub fn get_random_query(p: &IndexBenchParameters) -> Box<Query> {
     let ref mut rng = StdRng::seed_from_u64(69420); // <- Here we set the seed
 
-
-    let fq = Box::new(Query::FreetextQuery{
-        tokens: get_random_strings(5,rng)
+    let fq = Box::new(Query::FreetextQuery {
+        tokens: get_random_strings(5, rng),
     });
-    
-    let dist_q = Box::new(Query::DistanceQuery{
+
+    let dist_q = Box::new(Query::DistanceQuery {
         dst: 3,
-        lhs: get_random_string(1,rng),
-        rhs: get_random_string(1,rng),
+        lhs: get_random_string(1, rng),
+        rhs: get_random_string(1, rng),
     });
 
-    let and_q = Box::new(Query::BinaryQuery{
+    let and_q = Box::new(Query::BinaryQuery {
         lhs: fq,
         op: BinaryOp::And,
         rhs: dist_q,
     });
 
-    let phrase_q = Box::new(Query::PhraseQuery{
-        tks: get_random_strings(5,rng),
+    let phrase_q = Box::new(Query::PhraseQuery {
+        tks: get_random_strings(5, rng),
     });
 
-    let not_q = Box::new(Query::UnaryQuery{
+    let not_q = Box::new(Query::UnaryQuery {
         op: UnaryOp::Not,
         sub: phrase_q,
     });
 
-    let or_q = Box::new(Query::BinaryQuery{
+    let or_q = Box::new(Query::BinaryQuery {
         lhs: and_q,
         op: BinaryOp::Or,
         rhs: not_q,
     });
 
-    let rel_q = Box::new(Query::RelationQuery{
+    let rel_q = Box::new(Query::RelationQuery {
         root: rng.gen_range(0..p.articles_count).to_string(),
         hops: 5,
         sub: Some(or_q),
@@ -187,7 +177,7 @@ pub fn get_random_query(p: &IndexBenchParameters) -> Box<Query> {
     rel_q
 }
 
-pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Box<dyn Index>{
+pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Box<dyn Index> {
     let mut idx = Box::new(BasicIndex::<SmallPostingMap>::default());
 
     docs.into_iter().for_each(|d| {
@@ -197,12 +187,11 @@ pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Box<dyn Index>{
     idx
 }
 
-pub fn execute_query_with_index(idx: Box<dyn Index>, mut q : Box<Query>) {
-    preprocess_query(&mut*q).unwrap();
+pub fn execute_query_with_index(idx: Box<dyn Index>, mut q: Box<Query>) {
+    preprocess_query(&mut *q).unwrap();
     let mut postings = execute_query(&q, &idx);
-    score_query(&q, &idx, &postings);
+    score_query(&q, &idx, &mut postings);
 }
-
 
 impl IndexBenchParameters {
     fn from_article_count(c: u32) -> Self {
@@ -257,7 +246,7 @@ pub fn query_execution_time(c: &mut Criterion) {
     let mut group = c.benchmark_group("query execution time: article size");
     group.sample_size(20);
 
-    for size in [100,1000,10000].iter() {
+    for size in [100, 1000, 10000].iter() {
         let ref param = IndexBenchParameters::from_article_count(*size);
         group.bench_with_input(BenchmarkId::from_parameter(param), param, |b, i| {
             b.iter_batched(
@@ -266,20 +255,16 @@ pub fn query_execution_time(c: &mut Criterion) {
 
                     let qs = get_random_query(i);
 
-                    (idx,qs)
+                    (idx, qs)
                 },
-                |(idx,qs)| {
-                    execute_query_with_index(idx, qs)
-                },
+                |(idx, qs)| execute_query_with_index(idx, qs),
                 BatchSize::PerIteration,
             )
         });
-    }    
+    }
 
     group.finish();
 }
-
-
 
 criterion_group!(benches, index_build_time, query_execution_time);
 criterion_main!(benches);

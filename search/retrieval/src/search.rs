@@ -11,6 +11,7 @@ use scoring::scoring::tfidf_query;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use utils::utils::merge;
+use log::{debug};
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct ScoredDocument {
@@ -217,23 +218,19 @@ pub fn get_docs_within_hops(docid: u32, hops: u32, out: &mut HashSet<u32>, index
     })
 }
 
-//TODO! Current naive implementation is added with dummy scores for Search API (endpoints.rs). Might be better to remove hashset
 pub fn score_query(
     query: &Box<Query>,
     index: &Box<dyn Index>,
-    postings: &Vec<Posting>,
+    postings: &mut Vec<Posting>,
 ) -> Vec<ScoredDocument> {
+    postings.dedup_by_key(|v| v.document_id);
     let mut scored_documents = Vec::default();
-    let mut doc_retrieved_set = HashSet::new();
 
     for post in postings {
-        if doc_retrieved_set.get(&post.document_id) == None {
-            doc_retrieved_set.insert(post.document_id);
-            scored_documents.push(ScoredDocument {
-                doc_id: post.document_id,
-                score: tfidf_query(post.document_id, query, index),
-            });
-        }
+        scored_documents.push(ScoredDocument {
+            doc_id: post.document_id,
+            score: tfidf_query(post.document_id, query, index),
+        });
     }
     return scored_documents;
 }

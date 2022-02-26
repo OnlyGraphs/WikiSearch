@@ -5,7 +5,7 @@ GRPC_PORT=50051
 export SQLX_OFFLINE=true
 export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
 export SEARCH_PORT=8000
-export RUST_LOG=info
+export RUST_LOG=debug
 export BACKEND=http://localhost:8000
 
 run_img: #build_img

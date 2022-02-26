@@ -10,7 +10,6 @@ use actix_web::{
     web::{Data, Json, Query},
     HttpResponse, Responder, Result,
 };
-use futures::future;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use index::errors::IndexError;
@@ -112,9 +111,9 @@ pub async fn search(
     let mut postings = execute_query(query, &idx);
 
     // score documents if necessary and sort appropriately
-    let ordered_docs: Vec<ScoredDocument> = match q.sortby {
+    let ordered_docs: Vec<ScoredDocument> = match q.sort_by {
         SortType::Relevance => {
-            let mut scored_documents = score_query(query, &idx, &postings);
+            let mut scored_documents = score_query(query, &idx, &mut postings);
             scored_documents.sort_unstable_by(|doc1, doc2| {
                 doc2.score
                     .partial_cmp(&doc1.score)
@@ -127,6 +126,7 @@ pub async fn search(
                 .collect()
         }
         SortType::LastEdited => {
+            postings.dedup_by_key(|v| v.document_id);
             postings.sort_by_cached_key(|Posting { document_id, .. }| {
                 idx.get_last_updated_date(*document_id)
             });
@@ -212,7 +212,7 @@ pub async fn relational(
     preprocess_query(query)?;
 
     let mut postings = execute_query(query, &idx);
-    let mut scored_documents = score_query(query, &idx, &postings); // page rank and stuff
+    let mut scored_documents = score_query(query, &idx, &mut postings); // page rank and stuff
 
     // get documents
     let documents = scored_documents
