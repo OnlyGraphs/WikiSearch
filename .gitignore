@@ -19,4 +19,7 @@ search/**/target/
 !search/target/
 search/target/**
 !search/target/criterion/
+search/target/criterion/**/new/
+search/target/criterion/**/report/
+
 !search/target/criterion/**
