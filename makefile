@@ -48,3 +48,5 @@ benchmark_baseline:
 benchmark_new_baseline:
 	cd search && cargo bench --bench benchmarks -- --save-baseline master
 
+benchmark_baseline_mem_monitor:
+	cd search && heaptrack cargo bench --bench benchmarks -- --verbose
