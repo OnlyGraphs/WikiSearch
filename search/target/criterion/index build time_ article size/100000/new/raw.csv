@@ -1,0 +1,21 @@
+group,function,value,throughput_num,throughput_type,sample_measured_value,unit,iteration_count
+index build time: article size,,100000,,,1272.0,ns,1
+index build time: article size,,100000,,,1204.0,ns,1
+index build time: article size,,100000,,,1195.0,ns,1
+index build time: article size,,100000,,,1306.0,ns,1
+index build time: article size,,100000,,,1247.0,ns,1
+index build time: article size,,100000,,,1914.0,ns,1
+index build time: article size,,100000,,,1334.0,ns,1
+index build time: article size,,100000,,,1595.0,ns,1
+index build time: article size,,100000,,,1184.0,ns,1
+index build time: article size,,100000,,,1683.0,ns,1
+index build time: article size,,100000,,,1177.0,ns,1
+index build time: article size,,100000,,,1293.0,ns,1
+index build time: article size,,100000,,,1335.0,ns,1
+index build time: article size,,100000,,,1281.0,ns,1
+index build time: article size,,100000,,,1296.0,ns,1
+index build time: article size,,100000,,,1217.0,ns,1
+index build time: article size,,100000,,,1210.0,ns,1
+index build time: article size,,100000,,,1276.0,ns,1
+index build time: article size,,100000,,,1301.0,ns,1
+index build time: article size,,100000,,,1215.0,ns,1

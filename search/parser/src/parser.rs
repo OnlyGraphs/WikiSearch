@@ -4,9 +4,9 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, tag_no_case, take_until, take_while, take_while1},
     character::complete::{digit0, digit1},
-    character::{is_alphanumeric, is_space, is_digit},
-    multi::{separated_list0, many_m_n, many1},
-    combinator::{opt},
+    character::{is_alphanumeric, is_digit, is_space},
+    combinator::opt,
+    multi::{many1, many_m_n, separated_list0},
     IResult,
 };
 use std::str::FromStr;
@@ -23,7 +23,7 @@ pub fn parse_whitespace(nxt: &str) -> IResult<&str, &str> {
     take_while1(is_whitespace)(nxt)
 }
 
-pub fn parse_whitespace0(nxt: &str) ->IResult<&str, &str> {
+pub fn parse_whitespace0(nxt: &str) -> IResult<&str, &str> {
     take_while(is_whitespace)(nxt)
 }
 
@@ -96,7 +96,6 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
 }
 
 pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
-
     if nxt.chars().count() == 0 {
         return Err(nom::Err::Error(nom::error::Error::new(
             //the new struct, instead of the tuple
@@ -130,7 +129,6 @@ pub fn parse_structure_query(nxt: &str) -> IResult<&str, Box<Query>> {
     ))
 }
 
-
 pub fn parse_relational_query(nxt: &str) -> IResult<&str, Box<Query>> {
     //  `#LINKEDTO` `,` <multiple_terms> `,` <number> [`,` <query>]?
     let (nxt, _) = tag_no_case("#LINKEDTO")(nxt)?;
@@ -143,21 +141,20 @@ pub fn parse_relational_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let res = opt(parse_query)(nxt);
 
     let sub_query = match res {
-        Ok((_,Some(v))) => match *v {
-            Query::FreetextQuery {tokens} if tokens.len() == 0 => None,
-            _ => Some(v), 
+        Ok((_, Some(v))) => match *v {
+            Query::FreetextQuery { tokens } if tokens.len() == 0 => None,
+            _ => Some(v),
         },
-        _ => None  
+        _ => None,
     };
 
     Ok((
         nxt,
         Box::new(Query::RelationQuery {
             root: title.to_string(),
-            hops: hops.parse().map_err(|e| nom::Err::Error(nom::error::Error::new(
-                hops,
-                nom::error::ErrorKind::Digit,
-            )))?,
+            hops: hops.parse().map_err(|e| {
+                nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit))
+            })?,
             sub: sub_query,
         }),
     ))
@@ -181,9 +178,8 @@ pub fn parse_token(nxt: &str) -> IResult<&str, String> {
     take_while1(is_token_char)(nxt).map(|(nxt, res)| (nxt, res.to_string()))
 }
 
-pub fn parse_token0(nxt : &str) -> IResult<&str, String> {
-    take_while(is_token_char)(nxt)
-        .map(|(nxt,res)| (nxt, res.to_string()))
+pub fn parse_token0(nxt: &str) -> IResult<&str, String> {
+    take_while(is_token_char)(nxt).map(|(nxt, res)| (nxt, res.to_string()))
 }
 
 pub fn parse_token_in_phrase(nxt: &str) -> IResult<&str, String> {
@@ -255,10 +251,7 @@ pub fn parse_and_query(nxt: &str) -> IResult<&str, Box<Query>> {
 }
 
 pub fn parse_binary_query(nxt: &str) -> IResult<&str, Box<Query>> {
-   alt((
-       parse_and_query,
-       parse_or_query
-   ))(nxt)
+    alt((parse_and_query, parse_or_query))(nxt)
 }
 
 // TODO: Remove separators
@@ -270,10 +263,13 @@ pub fn parse_wildcard_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, rhs) = parse_token0(nxt)?;
 
-    Ok((nxt, Box::new(Query::WildcardQuery{
-        prefix: lhs.to_string(),
-        postfix: rhs.to_string(),
-    })))
+    Ok((
+        nxt,
+        Box::new(Query::WildcardQuery {
+            prefix: lhs.to_string(),
+            postfix: rhs.to_string(),
+        }),
+    ))
 }
 
 pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
@@ -297,13 +293,14 @@ pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
         }
     };
 
-    Ok((nxt, Box::new(
-        Query::RelationQuery{
+    Ok((
+        nxt,
+        Box::new(Query::RelationQuery {
             root: page_title.to_string(),
             hops: hops,
             sub: None,
-        }
-    )))
+        }),
+    ))
 }
 
 // TODO: What if the title contains integers?
@@ -330,25 +327,21 @@ pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
         }
     };
 
-    Ok((nxt, Box::new(
-        Query::RelationQuery{
+    Ok((
+        nxt,
+        Box::new(Query::RelationQuery {
             root: page_title.to_string(),
             hops: hops,
             sub: Some(Box::new(*sub)),
-        }
-    )))
+        }),
+    ))
 }
 
 pub fn parse_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
-    alt((
-        parse_nested_relation_query,
-        parse_simple_relation_query
-    ))(nxt)
+    alt((parse_nested_relation_query, parse_simple_relation_query))(nxt)
 }
 
 pub fn parse_phrase_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, tokens) = many1(parse_token_in_phrase)(nxt)?;
-    Ok((nxt, Box::new(Query::PhraseQuery{
-        tks: tokens,
-    })))
+    Ok((nxt, Box::new(Query::PhraseQuery { tks: tokens })))
 }

@@ -1,10 +1,10 @@
 use crate::index_structs::PostingNode;
-use utils::MemFootprintCalculator;
 use std::collections::hash_map::Entry;
 use std::collections::hash_map::Iter;
 use std::collections::hash_map::IterMut;
 use std::collections::hash_map::Values;
 use std::{borrow::Borrow, collections::HashMap, hash::Hash};
+use utils::MemFootprintCalculator;
 
 pub type SmallPostingMap = HashMap<String, PostingNode>;
 

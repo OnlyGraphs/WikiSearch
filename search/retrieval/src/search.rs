@@ -1,13 +1,16 @@
 use chrono::NaiveDateTime;
+use index::{
+    index::Index,
+    index_structs::{PosRange, Posting},
+};
 use itertools::Itertools;
-use preprocessor::{Preprocessor, ProcessingOptions};
-use std::collections::HashSet;
-use parser::errors::{QueryError, QueryErrorKind};
-use index::{index_structs::{Posting, PosRange}, index::Index};
 use parser::ast::{BinaryOp, Query, UnaryOp};
-use utils::utils::merge;
-use scoring::scoring::{tfidf_query};
+use parser::errors::{QueryError, QueryErrorKind};
+use preprocessor::{Preprocessor, ProcessingOptions};
+use scoring::scoring::tfidf_query;
 use std::cmp::Ordering;
+use std::collections::HashSet;
+use utils::utils::merge;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct ScoredDocument {
@@ -15,32 +18,69 @@ pub struct ScoredDocument {
     pub doc_id: u32,
 }
 
-
-
 pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
-
     // first pass, preprocess
     let ref opts = ProcessingOptions::default();
 
     match *query {
-        Query::RelationQuery { ref mut sub, .. } => drop(sub.as_mut().map(|c| Some(preprocess_query(c).ok()?))),
+        Query::RelationQuery { ref mut sub, .. } => {
+            drop(sub.as_mut().map(|c| Some(preprocess_query(c).ok()?)))
+        }
         Query::StructureQuery { ref mut sub, .. } => preprocess_query(sub)?,
         Query::UnaryQuery { ref mut sub, .. } => preprocess_query(sub)?,
-        Query::BinaryQuery { ref mut lhs, ref mut rhs, .. } => {
-            preprocess_query(lhs)?; 
+        Query::BinaryQuery {
+            ref mut lhs,
+            ref mut rhs,
+            ..
+        } => {
+            preprocess_query(lhs)?;
             preprocess_query(rhs)?;
-        },
-        Query::PhraseQuery { ref mut tks } => *tks = tks.into_iter().flat_map(|c| Preprocessor::process(opts,c.to_string())).filter(|w| !w.trim().is_empty()).collect(),
-        Query::FreetextQuery { ref mut tokens } => *tokens = tokens.into_iter().flat_map(|c| Preprocessor::process(opts,c.to_string())).filter(|w| !w.trim().is_empty()).collect(),
-        Query::DistanceQuery { ref mut lhs, ref mut rhs, .. } => {
-            *lhs = Preprocessor::process(opts,lhs.clone()).into_iter().next().ok_or(QueryError{kind:QueryErrorKind::InvalidSyntax,msg:"Distance query requires at least one individual word on each side".to_string(),pos:lhs.to_string()})?; 
-            *rhs = Preprocessor::process(opts,rhs.clone()).into_iter().next().ok_or(QueryError{kind:QueryErrorKind::InvalidSyntax,msg:"Distance query requires at least one individual word on each side".to_string(),pos:rhs.to_string()})?;
-        }, 
-        Query::WildcardQuery {ref mut prefix, ref mut postfix} => {
+        }
+        Query::PhraseQuery { ref mut tks } => {
+            *tks = tks
+                .into_iter()
+                .flat_map(|c| Preprocessor::process(opts, c.to_string()))
+                .filter(|w| !w.trim().is_empty())
+                .collect()
+        }
+        Query::FreetextQuery { ref mut tokens } => {
+            *tokens = tokens
+                .into_iter()
+                .flat_map(|c| Preprocessor::process(opts, c.to_string()))
+                .filter(|w| !w.trim().is_empty())
+                .collect()
+        }
+        Query::DistanceQuery {
+            ref mut lhs,
+            ref mut rhs,
+            ..
+        } => {
+            *lhs = Preprocessor::process(opts, lhs.clone())
+                .into_iter()
+                .next()
+                .ok_or(QueryError {
+                    kind: QueryErrorKind::InvalidSyntax,
+                    msg: "Distance query requires at least one individual word on each side"
+                        .to_string(),
+                    pos: lhs.to_string(),
+                })?;
+            *rhs = Preprocessor::process(opts, rhs.clone())
+                .into_iter()
+                .next()
+                .ok_or(QueryError {
+                    kind: QueryErrorKind::InvalidSyntax,
+                    msg: "Distance query requires at least one individual word on each side"
+                        .to_string(),
+                    pos: rhs.to_string(),
+                })?;
+        }
+        Query::WildcardQuery {
+            ref mut prefix,
+            ref mut postfix,
+        } => {
             *prefix = prefix.to_lowercase(); // needs a more thorough look
             *postfix = postfix.to_lowercase();
-        },
-
+        }
     };
 
     Ok(())
@@ -49,19 +89,42 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
 //TODO: get rid of posting copying, do stuff by reference, + batch postings list in case we run out of memory
 pub fn execute_query(query: &Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> {
     match **query {
-        Query::RelationQuery { ref root,ref hops,ref sub } => {
-            let id = match index.title_to_id(root.clone()) {Some(v) => v, None => return Vec::default()} ;
+        Query::RelationQuery {
+            ref root,
+            ref hops,
+            ref sub,
+        } => {
+            let id = match index.title_to_id(root.clone()) {
+                Some(v) => v,
+                None => return Vec::default(),
+            };
             let mut subset = HashSet::default();
-            get_docs_within_hops(id, *hops, &mut subset , index);
+            get_docs_within_hops(id, *hops, &mut subset, index);
 
             match sub {
-                Some(v) => return execute_query(v, index).into_iter().filter(|c| subset.contains(&c.document_id)).collect(),
-                None => {let mut o : Vec<Posting> = subset.into_iter().map(|c| Posting{ document_id: c, position: 0}).collect();
-                             o.sort(); 
-                             return o},
+                Some(v) => {
+                    return execute_query(v, index)
+                        .into_iter()
+                        .filter(|c| subset.contains(&c.document_id))
+                        .collect()
+                }
+                None => {
+                    let mut o: Vec<Posting> = subset
+                        .into_iter()
+                        .map(|c| Posting {
+                            document_id: c,
+                            position: 0,
+                        })
+                        .collect();
+                    o.sort();
+                    return o;
+                }
             };
         }
-        Query::WildcardQuery { ref prefix,ref postfix } => Vec::default(), // TODO: needs index support
+        Query::WildcardQuery {
+            ref prefix,
+            ref postfix,
+        } => Vec::default(), // TODO: needs index support
         Query::StructureQuery { ref elem, ref sub } => execute_query(sub, index)
             .into_iter()
             .filter(
@@ -96,7 +159,11 @@ pub fn execute_query(query: &Box<Query>, index: &Box<dyn Index>) -> Vec<Posting>
                 }
             },
         ),
-        Query::DistanceQuery { ref dst, ref lhs,ref rhs } => distance_merge(
+        Query::DistanceQuery {
+            ref dst,
+            ref lhs,
+            ref rhs,
+        } => distance_merge(
             index
                 .as_ref()
                 .get_postings(lhs)
@@ -112,7 +179,11 @@ pub fn execute_query(query: &Box<Query>, index: &Box<dyn Index>) -> Vec<Posting>
         Query::UnaryQuery { ref op, ref sub } => match op {
             UnaryOp::Not => difference_merge(index.get_all_postings(), execute_query(sub, index)),
         },
-        Query::BinaryQuery { ref op, ref lhs, ref rhs } => match op {
+        Query::BinaryQuery {
+            ref op,
+            ref lhs,
+            ref rhs,
+        } => match op {
             BinaryOp::And => {
                 intersection_merge(execute_query(lhs, index), execute_query(rhs, index))
             }
@@ -127,24 +198,21 @@ pub fn execute_query(query: &Box<Query>, index: &Box<dyn Index>) -> Vec<Posting>
     }
 }
 
-
-pub fn get_docs_within_hops(docid: u32, hops: u32, out: &mut HashSet::<u32>, index : &Box<dyn Index>){
+pub fn get_docs_within_hops(docid: u32, hops: u32, out: &mut HashSet<u32>, index: &Box<dyn Index>) {
     out.insert(docid);
 
     if hops == 0 {
         return;
     }
 
-
     let out_l = index.get_links(docid).unwrap_or(&[]);
     let in_l = index.get_incoming_links(docid);
-    let all_l = merge(in_l,out_l);
+    let all_l = merge(in_l, out_l);
 
     all_l.iter().for_each(|v| {
-        if !out.contains(v){
+        if !out.contains(v) {
             out.insert(*v);
             get_docs_within_hops(*v, hops - 1, out, index);
-
         }
     })
 }

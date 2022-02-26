@@ -8,4 +8,6 @@ pub mod utils;
 #[cfg(test)]
 pub mod index_tests;
 
-pub use {collections::*,errors::*,crate::index::*,index_builder::*,index_structs::*, crate::utils::*};
+pub use {
+    crate::index::*, crate::utils::*, collections::*, errors::*, index_builder::*, index_structs::*,
+};

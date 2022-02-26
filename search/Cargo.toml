@@ -7,6 +7,7 @@ members = [
     "scoring",
     "retrieval",
     "utils",
-    "integration_tests"
+    "integration_tests",
+    "benchmarks"
 ]
 

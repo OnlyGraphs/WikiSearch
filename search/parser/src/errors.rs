@@ -20,10 +20,9 @@ impl fmt::Display for QueryError {
         write!(
             f,
             "{:?} Error in query at: ({:?}) - {:?}",
-            self.kind,self.pos, self.msg
+            self.kind, self.pos, self.msg
         )
     }
 }
 
 impl std::error::Error for QueryError {}
-

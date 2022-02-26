@@ -27,7 +27,6 @@ pub struct SearchParameters {
     #[serde(default)]
     pub sortby: SortType,
 
-
     #[serde(default)]
     pub page: DefaultPage,
 
@@ -87,9 +86,6 @@ pub struct RelationSearchOutput {
     pub relations: Vec<Relation>,
 }
 
-
-
-
 #[derive(Deserialize, Debug, Clone)]
 pub struct ResultsCount(pub u16);
 impl Default for ResultsCount {
@@ -105,7 +101,6 @@ impl Default for DefaultPage {
         DefaultPage(1)
     }
 }
-
 
 #[derive(Debug)]
 pub struct RESTSearchData {

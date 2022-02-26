@@ -40,3 +40,11 @@ test:
 
 docs:
 	cd search && cargo doc --open --no-deps
+
+
+benchmark_baseline:
+	cd search && cargo bench --bench benchmarks -- --verbose
+
+benchmark_new_baseline:
+	cd search && cargo bench --bench benchmarks -- --save-baseline master
+

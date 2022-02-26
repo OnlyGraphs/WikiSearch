@@ -1,4 +1,3 @@
 pub mod search;
 
-
-pub use {search::*};
+pub use search::*;

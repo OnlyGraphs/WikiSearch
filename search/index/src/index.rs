@@ -1,4 +1,3 @@
-
 use utils::MemFootprintCalculator;
 
 use bimap::BiMap;
@@ -13,15 +12,13 @@ use std::{
     marker::{Send, Sync},
 };
 
-
-
 use crate::{
     collections::StringPostingMap,
     errors::{IndexError, IndexErrorKind},
     index_structs::{Document, DocumentMetaData, PosRange, Posting, DATE_TIME_FORMAT},
 };
-use parser::ast::StructureElem;
 use chrono::NaiveDateTime;
+use parser::ast::StructureElem;
 /**
  * BasicIndex Structure:
  * Metadata <NOT included in postings>
@@ -142,15 +139,11 @@ impl<M: StringPostingMap> Debug for BasicIndex<M> {
 }
 
 impl<M: StringPostingMap> Index for BasicIndex<M> {
-
-    fn get_incoming_links(&self, source: u32) -> &[u32]{
-        match self
-        .incoming_links
-        .get(&source)
-    {
-        Some(v) => v,
-        None => &[],
-    }
+    fn get_incoming_links(&self, source: u32) -> &[u32] {
+        match self.incoming_links.get(&source) {
+            Some(v) => v,
+            None => &[],
+        }
     }
 
     fn get_links(&self, source: u32) -> Result<&[u32], IndexError> {
@@ -205,20 +198,15 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
                         .or_default()
                         .push(*id);
                 });
-
             });
 
             let _ = id_links.insert(*id, targets);
         }
-        // sort links, and incoming links 
-        id_links.iter_mut()
-            .for_each(|(_,v)| v.sort());
-        self.incoming_links.iter_mut()
-            .for_each(|(_,v)| v.sort());
+        // sort links, and incoming links
+        id_links.iter_mut().for_each(|(_, v)| v.sort());
+        self.incoming_links.iter_mut().for_each(|(_, v)| v.sort());
 
         self.links = Right(id_links);
-
-
 
         // sort postings
         self.posting_nodes

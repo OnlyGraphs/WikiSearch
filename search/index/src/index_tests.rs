@@ -1,13 +1,13 @@
 use crate::utils::get_document_with_date_time;
 use crate::utils::{get_document_with_links, get_document_with_text};
-use utils::utils::MemFootprintCalculator;
 use crate::{
-        collections::SmallPostingMap,
-        index::{BasicIndex, Index},
-        index_structs::{PosRange, Posting,DATE_TIME_FORMAT},
-    };
+    collections::SmallPostingMap,
+    index::{BasicIndex, Index},
+    index_structs::{PosRange, Posting, DATE_TIME_FORMAT},
+};
 use std::array::IntoIter;
 use std::collections::HashMap;
+use utils::utils::MemFootprintCalculator;
 
 use chrono::NaiveDateTime;
 
@@ -245,42 +245,42 @@ fn test_basic_index_get_all_postings_sorted() {
 
     assert_eq!(
         *idx.get_all_postings(),
-        vec![Posting {
-            document_id: 2,
-            position: 0,
-        },
-        Posting {
-            document_id: 2,
-            position: 1,
-        },
-        Posting {
-            document_id: 2,
-            position: 2,
-        },
-        Posting {
-            document_id: 2,
-            position: 3,
-        },
-        Posting {
-            document_id: 2,
-            position: 4,
-        },
-        Posting {
-            document_id: 2,
-            position: 5,
-        },
-        Posting {
-            document_id: 2,
-            position: 6,
-        },
-        Posting {
-            document_id: 2,
-            position: 7,
-        }]
+        vec![
+            Posting {
+                document_id: 2,
+                position: 0,
+            },
+            Posting {
+                document_id: 2,
+                position: 1,
+            },
+            Posting {
+                document_id: 2,
+                position: 2,
+            },
+            Posting {
+                document_id: 2,
+                position: 3,
+            },
+            Posting {
+                document_id: 2,
+                position: 4,
+            },
+            Posting {
+                document_id: 2,
+                position: 5,
+            },
+            Posting {
+                document_id: 2,
+                position: 6,
+            },
+            Posting {
+                document_id: 2,
+                position: 7,
+            }
+        ]
     );
-
 }
-
 
 // #[test] TEMP REMOVAL
 // fn test_basic_index_get_extent() {
@@ -391,7 +391,7 @@ fn test_basic_index_df() {
 fn test_basic_index_links() {
     let mut idx = BasicIndex::<SmallPostingMap>::default();
 
-    idx.add_document(get_document_with_links(0, "source", "target1, target2")) 
+    idx.add_document(get_document_with_links(0, "source", "target1, target2"))
         .unwrap();
     idx.add_document(get_document_with_links(1, "target1", "target2, target1"))
         .unwrap();
@@ -401,12 +401,12 @@ fn test_basic_index_links() {
     idx.finalize().unwrap();
 
     assert_eq!(idx.get_links(0).unwrap(), vec![1, 2]);
-    assert_eq!(idx.get_links(1).unwrap(), vec![1,2]);
-    assert_eq!(idx.get_links(2).unwrap(), vec![0,1]);
+    assert_eq!(idx.get_links(1).unwrap(), vec![1, 2]);
+    assert_eq!(idx.get_links(2).unwrap(), vec![0, 1]);
 
     assert_eq!(idx.get_incoming_links(0), vec![2]);
-    assert_eq!(idx.get_incoming_links(1), vec![0,1,2]);
-    assert_eq!(idx.get_incoming_links(2), vec![0,1]);
+    assert_eq!(idx.get_incoming_links(1), vec![0, 1, 2]);
+    assert_eq!(idx.get_incoming_links(2), vec![0, 1]);
 
     assert_eq!(idx.id_to_title(0), Some(&"source".to_string()));
     assert_eq!(idx.title_to_id("source".to_string()), Some(0));

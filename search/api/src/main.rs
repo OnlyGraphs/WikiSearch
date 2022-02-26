@@ -1,19 +1,19 @@
-use actix_web::dev::ServiceResponse;
-use actix_web::dev::ServiceRequest;
 use actix_cors::Cors;
-use actix_files::{NamedFile,Files};
+use actix_files::{Files, NamedFile};
+use actix_web::dev::ServiceRequest;
+use actix_web::dev::ServiceResponse;
 use actix_web::{App, HttpServer};
-use log::{error, info};
-use pretty_env_logger;
 use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
     CheckIndexRequest,
 };
-use search_lib::endpoints;
-use search_lib::structs::RESTSearchData;
-use search_lib::grpc_server::CheckIndexService;
 use index::collections::SmallPostingMap;
 use index::index::{BasicIndex, Index};
+use log::{error, info};
+use pretty_env_logger;
+use search_lib::endpoints;
+use search_lib::grpc_server::CheckIndexService;
+use search_lib::structs::RESTSearchData;
 use std::process;
 use std::{
     env,
@@ -37,14 +37,16 @@ fn main() -> std::io::Result<()> {
             process::exit(1);
         })
         .to_string();
-    info!("Using DATABASE_URL: {:?}",connection_string);
+    info!("Using DATABASE_URL: {:?}", connection_string);
     let grpc_address = env::var("GRPC_ADDRESS").unwrap_or(DEFAULT_GRPC_ADDRESS.to_string());
     let rest_ip: String = env::var("SEARCH_IP").unwrap_or(DEFAULT_REST_IP.to_string());
     let rest_port = env::var("SEARCH_PORT").unwrap_or(DEFAULT_REST_PORT.to_string());
     let static_serve_dir = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string());
 
     // create shared memory for index
-    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::<SmallPostingMap>::default())));
+    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::<
+        SmallPostingMap,
+    >::default())));
 
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
@@ -167,7 +169,6 @@ async fn run_rest(
 
     info!("Binding to: {}", bind_address);
 
-
     HttpServer::new(move || {
         let cors = Cors::permissive();
         let data = RESTSearchData {
@@ -187,23 +188,23 @@ async fn run_rest(
                     .default_handler(|req: ServiceRequest| {
                         let (http_req, _payload) = req.into_parts();
                         async {
-                            let root = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string()); // stupid af, can't just use the static_dir variable cuz of moves and lifetimes
+                            let root = env::var("STATIC_DIR")
+                                .unwrap_or(DEFAULT_STATICFILES_DIR.to_string()); // stupid af, can't just use the static_dir variable cuz of moves and lifetimes
 
-
-                            let with_extension = format!("{}{}{}",root,http_req.path(),".html");
+                            let with_extension = format!("{}{}{}", root, http_req.path(), ".html");
                             let file = match NamedFile::open_async(with_extension).await {
                                 Ok(v) => v,
-                                Err(_) => NamedFile::open_async(format!("{}/{}",root,"404.html")).await.expect("No file named 404.html in staticfiles!")
+                                Err(_) => NamedFile::open_async(format!("{}/{}", root, "404.html"))
+                                    .await
+                                    .expect("No file named 404.html in staticfiles!"),
                             };
-                            
+
                             let res = file.into_response(&http_req);
                             Ok(ServiceResponse::new(http_req, res))
-                    
                         }
                     }),
             )
     })
-    
     .bind(bind_address)?
     .run()
     .await?;

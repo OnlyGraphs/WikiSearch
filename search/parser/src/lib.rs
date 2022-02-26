@@ -1,7 +1,7 @@
 pub mod ast;
-pub mod parser;
 pub mod errors;
+pub mod parser;
 
 #[cfg(test)]
 pub mod parser_tests;
-pub use {ast::*,crate::parser::*,errors::*};
+pub use {crate::parser::*, ast::*, errors::*};

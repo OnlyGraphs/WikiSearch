@@ -1,6 +1,8 @@
-use crate::index_structs::{Citation, Document, Infobox, PostingNode, DocumentMetaData, Posting, PosRange};
-use utils::MemFootprintCalculator;
+use crate::index_structs::{
+    Citation, Document, DocumentMetaData, Infobox, PosRange, Posting, PostingNode,
+};
 use std::mem::size_of;
+use utils::MemFootprintCalculator;
 
 macro_rules! implMemFootprintCalculatorFor {
     ( $($t:ty),* ) => {
@@ -11,7 +13,6 @@ macro_rules! implMemFootprintCalculatorFor {
     }) *
     }
 }
-
 
 implMemFootprintCalculatorFor!(Posting, PosRange);
 
@@ -37,13 +38,12 @@ pub fn get_document_with_text_and_links(
     main_text: &str,
     citations: Vec<&str>,
     categories: &str,
-    links: &str
+    links: &str,
 ) -> Box<Document> {
     let mut a = get_document_with_text(id, title, infoboxes, main_text, citations, categories);
     a.article_links = links.to_string();
     return a;
 }
-
 
 #[allow(dead_code)]
 pub fn get_document_with_text(

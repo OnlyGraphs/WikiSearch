@@ -1,8 +1,8 @@
-use std::fmt::Debug;
 use bimap::BiMap;
 use chrono::NaiveDateTime;
 use either::Either;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::mem::size_of;
 
@@ -32,7 +32,6 @@ macro_rules! implMemFootprintCalculatorFor {
 }
 
 implMemFootprintCalculatorFor!(u64, u32, u16, u8, i64, i32, i16, i8);
-
 
 impl<T> MemFootprintCalculator for Option<T>
 where
@@ -100,15 +99,12 @@ impl MemFootprintCalculator for NaiveDateTime {
     }
 }
 
-
-
-
 pub fn merge<T>(arr1: &[T], arr2: &[T]) -> Vec<T>
-where 
-    T: Ord + Copy + Sized
+where
+    T: Ord + Copy + Sized,
 {
-    let mut ret : Vec<T> = Vec::with_capacity(arr1.len() + arr2.len());
-    
+    let mut ret: Vec<T> = Vec::with_capacity(arr1.len() + arr2.len());
+
     let mut l_iter = arr1.iter();
     let mut r_iter = arr2.iter();
 
@@ -116,16 +112,31 @@ where
     let mut r_side = r_iter.next();
 
     // Compare element and insert back to result array.
-    loop{
-        match (l_side,r_side) {
-            (Some(l),None) => {ret.push(*l);l_side = l_iter.next()},
-            (None,Some(r)) => {ret.push(*r);r_side = r_iter.next()},
-            (Some(l),Some(r)) if l < r => {ret.push(*l);l_side = l_iter.next()},
-            (Some(l),Some(r)) if l > r => {ret.push(*r);r_side = r_iter.next()},
-            (Some(l),Some(r)) if l == r => {ret.push(*r);r_side = r_iter.next();
-                                            ret.push(*l);l_side = l_iter.next();
-                                        },
-            _ => {return ret},
+    loop {
+        match (l_side, r_side) {
+            (Some(l), None) => {
+                ret.push(*l);
+                l_side = l_iter.next()
+            }
+            (None, Some(r)) => {
+                ret.push(*r);
+                r_side = r_iter.next()
+            }
+            (Some(l), Some(r)) if l < r => {
+                ret.push(*l);
+                l_side = l_iter.next()
+            }
+            (Some(l), Some(r)) if l > r => {
+                ret.push(*r);
+                r_side = r_iter.next()
+            }
+            (Some(l), Some(r)) if l == r => {
+                ret.push(*r);
+                r_side = r_iter.next();
+                ret.push(*l);
+                l_side = l_iter.next();
+            }
+            _ => return ret,
         };
     }
 }

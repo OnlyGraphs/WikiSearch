@@ -1,6 +1,6 @@
+use api_rs::wiki_search::{wiki_search_server::WikiSearch, CheckIndexReply, CheckIndexRequest};
 use index::index::Index;
 use index::index_builder::{IndexBuilder, SqlIndexBuilder};
-use api_rs::wiki_search::{wiki_search_server::WikiSearch, CheckIndexReply, CheckIndexRequest};
 use log::info;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
