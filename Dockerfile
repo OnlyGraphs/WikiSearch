@@ -12,13 +12,13 @@ FROM rust:latest AS backend
 MAINTAINER Kyle Cotton <kylecottonkc@gmail.com>
 WORKDIR /usr/src/search
 COPY . .
-RUN cargo build --release
+RUN cd search && cargo build --release -p api
 COPY ./staticfiles/* ./out/*
 COPY --from=frontend /usr/app/FrontEnd/out ./out
 
 FROM gcr.io/distroless/cc-debian10
 MAINTAINER Kyle Cotton <kylecottonkc@gmail.com>
-COPY --from=backend /usr/src/search/target/release/search_api .
+COPY --from=backend /usr/src/search/search/target/release/search_api .
 COPY --from=backend /usr/src/search/out ./out
 
 CMD ["./search_api"]
