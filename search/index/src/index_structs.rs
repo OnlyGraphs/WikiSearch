@@ -5,7 +5,7 @@ use std::collections::HashMap;
 pub const DATE_TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 /// stores an appearance of a token in an article
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)] //TODO: get rid of Copy and correct parts of program which use it
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Default)] //TODO: get rid of Copy and correct parts of program which use it
 pub struct Posting {
     pub document_id: u32, //TODO: double check memory requirements, highest article word count etc
     pub position: u32,
