@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use utils::MemFootprintCalculator;
 
 
@@ -42,35 +43,22 @@ pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
 
     fn get_links(&self, source: u32) -> &[u32];
     fn get_incoming_links(&self, source: u32) -> &[u32];
-    // fn id_to_title(&self, source: u32) -> Option<&String>;
-    // fn title_to_id(&self, source: String) -> Option<u32>;
-    // fn get_last_updated_date(&self, source: u32) -> Option<NaiveDateTime>;
+    fn get_last_updated_date(&self, source: u32) -> Option<NaiveDateTime>;
 }
 
 //TODO:
 //Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
 
+#[derive(Default)]
 pub struct BasicIndex {
     pub dump_id: u32,
     pub posting_nodes: HashMap<String, PostingNode>,
     pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
-    // pub id_title_map: BiMap<u32, String>,
+    pub last_updated_docs: HashMap<u32, NaiveDateTime>,
 }
 
-impl Default for BasicIndex {
-    fn default() -> Self {
-        BasicIndex {
-            dump_id: 0,
-            posting_nodes: HashMap::default(),
-            links: HashMap::new(),
-            incoming_links: HashMap::new(),
-            extent: HashMap::new(),
-            // id_title_map: BiMap::new(),
-        }
-    }
-}
 
 impl MemFootprintCalculator for BasicIndex {
     fn real_mem(&self) -> u64 {
@@ -183,12 +171,9 @@ impl Index for BasicIndex {
         return self.dump_id;
     }
 
-    // fn get_last_updated_date(&self, doc_id: u32) -> Option<NaiveDateTime> {
-    //     return self
-    //         .document_metadata
-    //         .get(&doc_id)
-    //         .and_then(|metadata| metadata.last_updated_date);
-    // }
+    fn get_last_updated_date(&self, doc_id: u32) -> Option<NaiveDateTime> {
+        self.last_updated_docs.get(&doc_id).cloned()
+    }
 
     
 }
@@ -205,6 +190,7 @@ impl BasicIndex {
             links: HashMap::with_capacity(articles),
             incoming_links: HashMap::with_capacity(articles),
             extent: HashMap::with_capacity(struct_elem_type_count),
+            last_updated_docs: HashMap::with_capacity(articles),
         })
     }
 
@@ -249,6 +235,7 @@ impl BasicIndex {
                 links: links,
                 incoming_links: back_links,
                 extent: p.extent,
+                last_updated_docs: p.last_updated_docs,
             }
         )
 

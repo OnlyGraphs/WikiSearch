@@ -127,10 +127,7 @@ pub async fn search(
         }
         SortType::LastEdited => {
             postings.dedup_by_key(|v| v.document_id);
-            postings.sort_by_cached_key(|Posting { document_id: _, .. }| {
-                // idx.get_last_updated_date(*document_id) TODO: fix 
-                todo!()
-            });
+            postings.sort_by_cached_key(|Posting { document_id, .. }| idx.get_last_updated_date(*document_id));
             postings
                 .into_iter() // consumes postings
                 .skip((q.results_per_page.0 * (q.page.0 - 1)) as usize)
@@ -193,10 +190,8 @@ pub async fn relational(
         .map_err(|_e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
     // construct + execute query
-    let idx = data
-        .index_rest
-        .read()
-        .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+    let idx = data.index_rest.read().map_err(|e| 
+        APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
     let (_, ref mut query) = parse_query(&format!(
         "#LINKEDTO, {},{} {}",
         q.root,
@@ -205,8 +200,8 @@ pub async fn relational(
             .clone()
             .map(|v| format!(",{}", v))
             .unwrap_or("".to_string())
-    ))
-    .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+    )).map_err(|e| 
+        APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
 
     debug!("Query: {:?}", query);
 
@@ -225,17 +220,14 @@ pub async fn relational(
                     "SELECT a.title, c.abstracts
                 From article as a, \"content\" as c
                 where a.articleid= $1 AND a.articleid = c.articleid",
-                )
-                .bind(doc.doc_id as i64)
+                ).bind(doc.doc_id as i64)
                 .fetch_one(&pool_cpy)
                 .await
                 .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
-                let title: String = sql
-                    .try_get("title")
+                let title: String = sql.try_get("title")
                     .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
-                let abstracts: String = sql
-                    .try_get("abstracts")
+                let abstracts: String = sql.try_get("abstracts")
                     .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
                 Ok::<Document, APIError>(Document {
                     title: title,

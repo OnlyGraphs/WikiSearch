@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use bimap::BiMap;
+use chrono::NaiveDateTime;
 use parser::StructureElem;
-use crate::{PosRange, DiskHashMap, PostingNode, Document, IndexError, IndexErrorKind, Posting};
+use crate::{PosRange, DiskHashMap, PostingNode, Document, IndexError, IndexErrorKind, Posting, DATE_TIME_FORMAT};
 
 
 
@@ -9,11 +10,11 @@ use crate::{PosRange, DiskHashMap, PostingNode, Document, IndexError, IndexError
 #[derive(Default)]
 pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String,PostingNode,1000>,
+    pub posting_nodes: DiskHashMap<String,PostingNode,10000>,
     pub links: HashMap<u32, Vec<String>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub id_title_map: BiMap<u32, String>,
-
+    pub last_updated_docs: HashMap<u32, NaiveDateTime>,
     // for keeping track of unique token appearances in the current document
     curr_doc_appearances: HashSet<String>
 }
@@ -28,6 +29,12 @@ impl PreIndex {
 
         let mut word_pos = 0;
 
+        // metadata
+        self.last_updated_docs.insert(document.doc_id,
+            NaiveDateTime::parse_from_str(&document.last_updated_date, DATE_TIME_FORMAT)
+                .unwrap_or(NaiveDateTime::from_timestamp(0, 0)));
+            
+        // titles 
         self.id_title_map
             .insert_no_overwrite(document.doc_id, document.title.clone())
             .map_err(|_c| IndexError {

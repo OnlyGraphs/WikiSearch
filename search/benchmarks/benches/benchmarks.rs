@@ -167,7 +167,7 @@ pub fn get_random_query(p: &IndexBenchParameters) -> Box<Query> {
     });
 
     let rel_q = Box::new(Query::RelationQuery {
-        root: rng.gen_range(0..p.articles_count).to_string(),
+        root: rng.gen_range(0..p.articles_count),
         hops: 5,
         sub: Some(or_q),
     });
@@ -226,7 +226,7 @@ pub fn index_build_time(c: &mut Criterion) {
     let mut group = c.benchmark_group("index build time: article size");
     group.sample_size(20);
 
-    for size in [10000].iter() {
+    for size in [200000].iter() {
         let ref param = IndexBenchParameters::from_article_count(*size);
         group.bench_with_input(BenchmarkId::from_parameter(param), param, |b, i| {
             b.iter_batched(

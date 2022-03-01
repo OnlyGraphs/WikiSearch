@@ -127,7 +127,7 @@ fn test_relational_query() {
         sub: Some(Box::new(Query::FreetextQuery {
             tokens: vec!["the".to_string()],
         })),
-        root: "AasdaSD ASDASd".to_string(),
+        root: 34,
         hops: 2,
     };
 
@@ -139,7 +139,7 @@ fn test_relational_query() {
             sub: Some(Box::new(Query::FreetextQuery {
                 tokens: Vec::default()
             })),
-            root: "AasdaSD ASDASd".to_string(), // cannot be preprocessed
+            root: 34, // cannot be preprocessed
             hops: 2,
         }
     )

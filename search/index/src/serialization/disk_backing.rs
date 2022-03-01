@@ -228,7 +228,7 @@ where
     pub fn get_or_insert_default_mut(&mut self, k: K) -> Result<&mut V, Box<dyn Error>>
     where
     {
-        if self.contains_key(&k) {
+        if self.contains_key_mem(&k) {
              return Ok(self.online_map.get_mut(&k).unwrap());
         } else {
             self.insert(k,V::default())?;

@@ -38,15 +38,13 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
             preprocess_query(rhs)?;
         }
         Query::PhraseQuery { ref mut tks } => {
-            *tks = tks
-                .into_iter()
+            *tks = tks.into_iter()
                 .flat_map(|c| Preprocessor::process(opts, c.to_string()))
                 .filter(|w| !w.trim().is_empty())
                 .collect()
         }
         Query::FreetextQuery { ref mut tokens } => {
-            *tokens = tokens
-                .into_iter()
+            *tokens = tokens.into_iter()
                 .flat_map(|c| Preprocessor::process(opts, c.to_string()))
                 .filter(|w| !w.trim().is_empty())
                 .collect()
@@ -91,15 +89,10 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
 pub fn execute_query(query: &Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> {
     match **query {
         Query::RelationQuery {
-            root: _,
+            root: id,
             ref hops,
             ref sub,
         } => {
-            let id = 0;
-            // match index.title_to_id(root.clone()) {
-            //     Some(v) => v,
-            //     None => return Vec::default(),
-            // };
             let mut subset = HashSet::default();
             get_docs_within_hops(id, *hops, &mut subset, index);
 

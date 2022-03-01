@@ -129,36 +129,33 @@ pub fn parse_structure_query(nxt: &str) -> IResult<&str, Box<Query>> {
     ))
 }
 
-pub fn parse_relational_query(nxt: &str) -> IResult<&str, Box<Query>> {
-    //  `#LINKEDTO` `,` <multiple_terms> `,` <number> [`,` <query>]?
-    let (nxt, _) = tag_no_case("#LINKEDTO")(nxt)?;
-    let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, mut title) = take_until(",")(nxt)?;
-    title = title.trim();
-    let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, hops) = digit0(nxt)?;
-    let (nxt, _) = parse_separator(nxt)?;
-    let res = opt(parse_query)(nxt);
+// pub fn parse_relational_query(nxt: &str) -> IResult<&str, Box<Query>> {
+//     //  `#LINKEDTO` `,` <multiple_terms> `,` <number> [`,` <query>]?
+//     let (nxt, _) = tag_no_case("#LINKEDTO")(nxt)?;
+//     let (nxt, _) = parse_separator(nxt)?;
+//     let (nxt, mut id) = digit0(nxt)?;
+//     let (nxt, _) = parse_separator(nxt)?;
+//     let (nxt, hops) = digit0(nxt)?;
+//     let (nxt, _) = parse_separator(nxt)?;
+//     let res = opt(parse_query)(nxt);
 
-    let sub_query = match res {
-        Ok((_, Some(v))) => match *v {
-            Query::FreetextQuery { tokens } if tokens.len() == 0 => None,
-            _ => Some(v),
-        },
-        _ => None,
-    };
+//     let sub_query = match res {
+//         Ok((_, Some(v))) => match *v {
+//             Query::FreetextQuery { tokens } if tokens.len() == 0 => None,
+//             _ => Some(v),
+//         },
+//         _ => None,
+//     };
 
-    Ok((
-        nxt,
-        Box::new(Query::RelationQuery {
-            root: title.to_string(),
-            hops: hops.parse().map_err(|_e| {
-                nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit))
-            })?,
-            sub: sub_query,
-        }),
-    ))
-}
+//     Ok((
+//         nxt,
+//         Box::new(Query::RelationQuery {
+//             root: id.parse().map_err(|_e| nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit)))?,
+//             hops: hops.parse().map_err(|_e|nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit)))?,
+//             sub: sub_query,
+//         }),
+//     ))
+// }
 
 pub fn parse_freetext_query(nxt: &str) -> IResult<&str, Box<Query>> {
     separated_list0(parse_whitespace, parse_token)(nxt)
@@ -275,29 +272,17 @@ pub fn parse_wildcard_query(nxt: &str) -> IResult<&str, Box<Query>> {
 pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = tag_no_case("#LinksTo")(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, page_title) = take_until(",")(nxt)?;
+    let (nxt, id) = digit0(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, d) = digit1(nxt)?;
-
-    // Convert hops to int
-    let hops;
-
-    match d.parse::<u32>() {
-        Ok(n) => hops = n,
-        Err(_e) => {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                //the new struct, instead of the tuple
-                "Cannot convert string containing distance to integer.",
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-    };
+    let (nxt, hops) = digit1(nxt)?;
 
     Ok((
         nxt,
         Box::new(Query::RelationQuery {
-            root: page_title.to_string(),
-            hops: hops,
+            root: id.parse().map_err(|_e| 
+                nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit)))?,
+            hops: hops.parse().map_err(|_e| 
+                nom::Err::Error(nom::error::Error::new("Cannot convert string containing distance to integer.",nom::error::ErrorKind::Tag)))?,
             sub: None,
         }),
     ))
@@ -307,31 +292,19 @@ pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
 pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = tag_no_case("#LinksTo")(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, page_title) = take_until(",")(nxt)?;
+    let (nxt, id) = digit0(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, d) = digit1(nxt)?;
+    let (nxt, hops) = digit1(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, sub) = parse_query(nxt)?;
-
-    // Convert hops to int
-    let hops;
-
-    match d.parse::<u32>() {
-        Ok(n) => hops = n,
-        Err(_e) => {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                //the new struct, instead of the tuple
-                "Cannot convert string containing distance to integer.",
-                nom::error::ErrorKind::Tag,
-            )));
-        }
-    };
 
     Ok((
         nxt,
         Box::new(Query::RelationQuery {
-            root: page_title.to_string(),
-            hops: hops,
+            root: id.parse().map_err(|_e| 
+                nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit)))?,
+            hops: hops.parse().map_err(|_e| 
+                nom::Err::Error(nom::error::Error::new("Cannot convert string containing distance to integer.",nom::error::ErrorKind::Tag)))?,
             sub: Some(Box::new(*sub)),
         }),
     ))
