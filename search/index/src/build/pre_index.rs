@@ -1,40 +1,39 @@
-use std::collections::{HashMap, HashSet};
+use crate::{
+    DiskHashMap, Document, IndexError, IndexErrorKind, PosRange, Posting, PostingNode,
+    DATE_TIME_FORMAT,
+};
 use bimap::BiMap;
 use chrono::NaiveDateTime;
 use parser::StructureElem;
-use crate::{PosRange, DiskHashMap, PostingNode, Document, IndexError, IndexErrorKind, Posting, DATE_TIME_FORMAT};
-
-
+use std::collections::{HashMap, HashSet};
 
 /// a common backbone from which any index can be intialized
 #[derive(Default)]
 pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String,PostingNode,10000>,
+    pub posting_nodes: DiskHashMap<String, PostingNode, 10000>,
     pub links: HashMap<u32, Vec<String>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub id_title_map: BiMap<u32, String>,
     pub last_updated_docs: HashMap<u32, NaiveDateTime>,
     // for keeping track of unique token appearances in the current document
-    curr_doc_appearances: HashSet<String>
+    curr_doc_appearances: HashSet<String>,
 }
 
 impl PreIndex {
+    pub fn finalize() {}
 
-    pub fn finalize(){
-        
-    }
-
-    pub fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError>{
-
+    pub fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError> {
         let mut word_pos = 0;
 
         // metadata
-        self.last_updated_docs.insert(document.doc_id,
+        self.last_updated_docs.insert(
+            document.doc_id,
             NaiveDateTime::parse_from_str(&document.last_updated_date, DATE_TIME_FORMAT)
-                .unwrap_or(NaiveDateTime::from_timestamp(0, 0)));
-            
-        // titles 
+                .unwrap_or(NaiveDateTime::from_timestamp(0, 0)),
+        );
+
+        // titles
         self.id_title_map
             .insert_no_overwrite(document.doc_id, document.title.clone())
             .map_err(|_c| IndexError {
@@ -67,9 +66,9 @@ impl PreIndex {
         self.add_links(document.doc_id, &document.article_links)?;
 
         // collect DF values
-        for s in self.curr_doc_appearances.drain(){
+        for s in self.curr_doc_appearances.drain() {
             self.posting_nodes.get_mut(&s).unwrap().unwrap().df += 1;
-        };
+        }
 
         Ok(())
     }
@@ -83,7 +82,10 @@ impl PreIndex {
     }
 
     fn add_posting(&mut self, token: &str, docid: u32, word_pos: u32) {
-        let node = self.posting_nodes.get_or_insert_default_mut(token.to_string()).unwrap();
+        let node = self
+            .posting_nodes
+            .get_or_insert_default_mut(token.to_string())
+            .unwrap();
         self.curr_doc_appearances.insert(token.to_owned());
 
         node.postings.push(Posting {
@@ -102,9 +104,7 @@ impl PreIndex {
             .collect();
 
         // in links
-        self.links
-            .insert(doc_id, link_titles);
-        
+        self.links.insert(doc_id, link_titles);
 
         Ok(())
     }

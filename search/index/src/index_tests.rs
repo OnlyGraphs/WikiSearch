@@ -1,9 +1,9 @@
-use crate::{PreIndex, get_document_with_date_time, DATE_TIME_FORMAT};
+use crate::{get_document_with_date_time, PreIndex, DATE_TIME_FORMAT};
 
 use crate::utils::{get_document_with_links, get_document_with_text};
 use crate::{
     index::{BasicIndex, Index},
-    index_structs::{Posting},
+    index_structs::Posting,
 };
 use std::array::IntoIter;
 use std::collections::HashMap;
@@ -45,17 +45,19 @@ fn test_index_date_time_parsing_correct() {
     let actual_str2 = "2015-7-1 08:09:06";
 
     //First example
-    pre_idx.add_document(get_document_with_date_time(1, "1", str1))
+    pre_idx
+        .add_document(get_document_with_date_time(1, "1", str1))
         .unwrap();
 
     let datetime_correct1 = NaiveDateTime::parse_from_str(str1, DATE_TIME_FORMAT).unwrap();
     //Second Example
-    pre_idx.add_document(get_document_with_date_time(2, "2", test_str2))
+    pre_idx
+        .add_document(get_document_with_date_time(2, "2", test_str2))
         .unwrap();
     let datetime_correct2 = NaiveDateTime::parse_from_str(actual_str2, DATE_TIME_FORMAT).unwrap();
 
     let idx = BasicIndex::from_pre_index(pre_idx);
-    
+
     assert_eq!(idx.get_last_updated_date(1), Some(datetime_correct1));
     assert_eq!(idx.get_last_updated_date(2), Some(datetime_correct2));
 }
@@ -71,19 +73,25 @@ fn test_index_date_time_parsing_incorrect() {
     let incorrect_str5 = "9999-99-99 99:99:99";
     let incorrect_str6 = "0000-00-00 00:00:00";
 
-    pre_idx.add_document(get_document_with_date_time(1, "1", incorrect_str1))
+    pre_idx
+        .add_document(get_document_with_date_time(1, "1", incorrect_str1))
         .unwrap();
-    pre_idx.add_document(get_document_with_date_time(2, "2", incorrect_str2))
+    pre_idx
+        .add_document(get_document_with_date_time(2, "2", incorrect_str2))
         .unwrap();
-    pre_idx.add_document(get_document_with_date_time(3, "3", incorrect_str3))
+    pre_idx
+        .add_document(get_document_with_date_time(3, "3", incorrect_str3))
         .unwrap();
-    pre_idx.add_document(get_document_with_date_time(4, "4", incorrect_str4))
+    pre_idx
+        .add_document(get_document_with_date_time(4, "4", incorrect_str4))
         .unwrap();
-    pre_idx.add_document(get_document_with_date_time(5, "5", incorrect_str5))
+    pre_idx
+        .add_document(get_document_with_date_time(5, "5", incorrect_str5))
         .unwrap();
-    pre_idx.add_document(get_document_with_date_time(6, "6", incorrect_str6))
+    pre_idx
+        .add_document(get_document_with_date_time(6, "6", incorrect_str6))
         .unwrap();
-        
+
     let idx = BasicIndex::default();
 
     for i in 1..7 {
@@ -91,21 +99,20 @@ fn test_index_date_time_parsing_incorrect() {
     }
 }
 
-
-
 #[test]
 fn test_add_duplicate_article() {
     let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d0",
-        vec![("", "aaa bbb")],
-        "ccc ddd",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d0",
+            vec![("", "aaa bbb")],
+            "ccc ddd",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     let res = pre_idx.add_document(get_document_with_text(
         2,
@@ -123,16 +130,16 @@ fn test_add_duplicate_article() {
 fn test_basic_index_get_postings() {
     let mut pre_idx = PreIndex::default();
 
-
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d0",
-        vec![("", "aaa bbb")],
-        "ccc ddd",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d0",
+            vec![("", "aaa bbb")],
+            "ccc ddd",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     let idx = BasicIndex::from_pre_index(pre_idx);
 
@@ -167,26 +174,27 @@ fn test_basic_index_get_postings() {
 fn test_sorted_postings() {
     let mut pre_idx = PreIndex::default();
 
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d1",
+            vec![("", "ggg bbb")],
+            "ccc ddd",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d1",
-        vec![("", "ggg bbb")],
-        "ccc ddd",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
-
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d0",
-        vec![("", "ggg bbb")],
-        "ccc ddd",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d0",
+            vec![("", "ggg bbb")],
+            "ccc ddd",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     let idx = BasicIndex::from_pre_index(pre_idx);
 
@@ -217,16 +225,16 @@ fn test_sorted_postings() {
 fn test_basic_index_get_all_postings_sorted() {
     let mut pre_idx = PreIndex::default();
 
-
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d0",
-        vec![("", "aaa eee")],
-        "ccc ddd",
-        vec!["eee fff"],
-        "fff fff",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d0",
+            vec![("", "aaa eee")],
+            "ccc ddd",
+            vec!["eee fff"],
+            "fff fff",
+        ))
+        .unwrap();
 
     let idx = BasicIndex::from_pre_index(pre_idx);
 
@@ -322,16 +330,16 @@ fn test_basic_index_get_all_postings_sorted() {
 fn test_basic_index_tf() {
     let mut pre_idx = PreIndex::default();
 
-
-    pre_idx.add_document(get_document_with_text(
-        0,
-        "d0",
-        vec![("infobox", "hello world"), ("infobox2", "hello")],
-        "eggs world",
-        vec!["this that", "that", "eggs"],
-        "hello world",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            0,
+            "d0",
+            vec![("infobox", "hello world"), ("infobox2", "hello")],
+            "eggs world",
+            vec!["this that", "that", "eggs"],
+            "hello world",
+        ))
+        .unwrap();
 
     let idx = BasicIndex::from_pre_index(pre_idx);
 
@@ -347,26 +355,27 @@ fn test_basic_index_tf() {
 fn test_basic_index_df() {
     let mut pre_idx = PreIndex::default();
 
+    pre_idx
+        .add_document(get_document_with_text(
+            0,
+            "d0",
+            vec![("infobox", "hello world"), ("infobox2", "hello")],
+            "eggs world",
+            vec!["this that", "that", "eggs"],
+            "hello world",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        0,
-        "d0",
-        vec![("infobox", "hello world"), ("infobox2", "hello")],
-        "eggs world",
-        vec!["this that", "that", "eggs"],
-        "hello world",
-    ))
-    .unwrap();
-
-    pre_idx.add_document(get_document_with_text(
-        1,
-        "d1",
-        vec![("infobox", "aaa aa"), ("infobox2", "aaa")],
-        "eggs world",
-        vec!["aaa aa", "aaa", "aa"],
-        "aaa aaa",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "d1",
+            vec![("infobox", "aaa aa"), ("infobox2", "aaa")],
+            "eggs world",
+            vec!["aaa aa", "aaa", "aa"],
+            "aaa aaa",
+        ))
+        .unwrap();
 
     let idx = BasicIndex::from_pre_index(pre_idx);
 
@@ -382,13 +391,14 @@ fn test_basic_index_df() {
 fn test_basic_index_links() {
     let mut pre_idx = PreIndex::default();
 
-
-
-    pre_idx.add_document(get_document_with_links(0, "source", "target1, target2"))
+    pre_idx
+        .add_document(get_document_with_links(0, "source", "target1, target2"))
         .unwrap();
-    pre_idx.add_document(get_document_with_links(1, "target1", "target2, target1"))
+    pre_idx
+        .add_document(get_document_with_links(1, "target1", "target2, target1"))
         .unwrap();
-    pre_idx.add_document(get_document_with_links(2, "target2", "source, target1"))
+    pre_idx
+        .add_document(get_document_with_links(2, "target2", "source, target1"))
         .unwrap();
 
     let idx = BasicIndex::from_pre_index(pre_idx);

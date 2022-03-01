@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 
 use std::collections::HashMap;
 
-use crate::{SequentialEncoder, EncodedPostingList};
+use crate::{EncodedPostingList, SequentialEncoder};
 
 pub const DATE_TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -21,14 +21,14 @@ pub struct PostingNode {
 }
 
 #[derive(Debug, Eq, PartialEq, Default)]
-pub struct EncodedPostingNode<E> where 
-    E : SequentialEncoder<Posting>, 
+pub struct EncodedPostingNode<E>
+where
+    E: SequentialEncoder<Posting>,
 {
     pub postings: EncodedPostingList<E>,
     pub df: u32,
     pub tf: HashMap<u32, u32>,
 }
-
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PosRange {

@@ -10,7 +10,6 @@ use nom::{
     IResult,
 };
 
-
 const DIST_TAG: &str = "#DIST";
 
 // Helper functions
@@ -279,10 +278,15 @@ pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
     Ok((
         nxt,
         Box::new(Query::RelationQuery {
-            root: id.parse().map_err(|_e| 
-                nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit)))?,
-            hops: hops.parse().map_err(|_e| 
-                nom::Err::Error(nom::error::Error::new("Cannot convert string containing distance to integer.",nom::error::ErrorKind::Tag)))?,
+            root: id.parse().map_err(|_e| {
+                nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit))
+            })?,
+            hops: hops.parse().map_err(|_e| {
+                nom::Err::Error(nom::error::Error::new(
+                    "Cannot convert string containing distance to integer.",
+                    nom::error::ErrorKind::Tag,
+                ))
+            })?,
             sub: None,
         }),
     ))
@@ -301,10 +305,15 @@ pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
     Ok((
         nxt,
         Box::new(Query::RelationQuery {
-            root: id.parse().map_err(|_e| 
-                nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit)))?,
-            hops: hops.parse().map_err(|_e| 
-                nom::Err::Error(nom::error::Error::new("Cannot convert string containing distance to integer.",nom::error::ErrorKind::Tag)))?,
+            root: id.parse().map_err(|_e| {
+                nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit))
+            })?,
+            hops: hops.parse().map_err(|_e| {
+                nom::Err::Error(nom::error::Error::new(
+                    "Cannot convert string containing distance to integer.",
+                    nom::error::ErrorKind::Tag,
+                ))
+            })?,
             sub: Some(Box::new(*sub)),
         }),
     ))

@@ -128,7 +128,9 @@ pub async fn search(
         }
         SortType::LastEdited => {
             postings.dedup_by_key(|v| v.document_id);
-            postings.sort_by_cached_key(|Posting { document_id, .. }| idx.get_last_updated_date(*document_id));
+            postings.sort_by_cached_key(|Posting { document_id, .. }| {
+                idx.get_last_updated_date(*document_id)
+            });
             postings
                 .into_iter() // consumes postings
                 .skip((q.results_per_page.0 * (q.page.0 - 1)) as usize)
@@ -196,24 +198,30 @@ pub async fn relational(
         "SELECT a.articleid
         From article as a
         where a.title=`$1`",
-    ).bind(&q.root)
+    )
+    .bind(&q.root)
     .fetch_one(&pool)
     .await
     .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
-    let root_id : i64 = root_article.try_get("articleid")
+    let root_id: i64 = root_article
+        .try_get("articleid")
         .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
-    let idx = data.index_rest.read().map_err(|e| 
-        APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
-    let (_, ref mut query) = parse_query(
-        &format!("#LINKEDTO, {},{} {}",root_id,q.hops,
-            q.query
+    let idx = data
+        .index_rest
+        .read()
+        .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+    let (_, ref mut query) = parse_query(&format!(
+        "#LINKEDTO, {},{} {}",
+        root_id,
+        q.hops,
+        q.query
             .clone()
             .map(|v| format!(",{}", v))
             .unwrap_or("".to_string())
-        )).map_err(|e| 
-            APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+    ))
+    .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
 
     debug!("Query: {:?}", query);
 
@@ -222,7 +230,7 @@ pub async fn relational(
     let mut postings = execute_query(query, &idx);
     let scored_documents = score_query(query, &idx, &mut postings); // page rank and stuff
 
-    // keep track of the translations between titles and ids 
+    // keep track of the translations between titles and ids
     // as well as the documents present in the query for later
     // get documents
     let documents = scored_documents
@@ -234,16 +242,19 @@ pub async fn relational(
                     "SELECT a.title, c.abstracts
                 From article as a, \"content\" as c
                 where a.articleid= $1 AND a.articleid = c.articleid",
-                ).bind(doc.doc_id as i64)
+                )
+                .bind(doc.doc_id as i64)
                 .fetch_one(&pool_cpy)
                 .await
                 .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
-                let title: String = sql.try_get("title")
+                let title: String = sql
+                    .try_get("title")
                     .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
-                let abstracts: String = sql.try_get("abstracts")
+                let abstracts: String = sql
+                    .try_get("abstracts")
                     .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
-                
+
                 Ok::<Document, APIError>(Document {
                     id: doc.doc_id,
                     title: title,
@@ -257,9 +268,11 @@ pub async fn relational(
         .await
         .into_iter()
         .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
-    
-    let mut title_map : HashMap::<u32, &str> = HashMap::with_capacity(documents.len());
-    documents.iter().for_each(|d| {title_map.insert(d.id,&d.title);});
+
+    let mut title_map: HashMap<u32, &str> = HashMap::with_capacity(documents.len());
+    documents.iter().for_each(|d| {
+        title_map.insert(d.id, &d.title);
+    });
 
     // find links
     // TODO: this is extremely inefficient, we only need links between documents retrieved
@@ -270,8 +283,8 @@ pub async fn relational(
             idx.get_links(*doc_id)
                 .iter()
                 .filter_map(|target| {
-                    if !title_map.contains_key(target){
-                        None 
+                    if !title_map.contains_key(target) {
+                        None
                     } else {
                         Some(Relation {
                             source: title_map.get(&doc_id).unwrap().to_string(),
@@ -279,10 +292,8 @@ pub async fn relational(
                         })
                     }
                 })
-                .chain(idx.get_incoming_links(*doc_id)
-                .iter()
-                .filter_map(|source| {
-                    if !title_map.contains_key(source){
+                .chain(idx.get_incoming_links(*doc_id).iter().filter_map(|source| {
+                    if !title_map.contains_key(source) {
                         None
                     } else {
                         Some(Relation {
@@ -292,7 +303,7 @@ pub async fn relational(
                     }
                 }))
                 .collect::<Vec<Relation>>()
-            })
+        })
         .collect();
 
     Ok(Json(RelationSearchOutput {

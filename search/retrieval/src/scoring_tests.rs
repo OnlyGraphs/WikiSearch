@@ -1,9 +1,7 @@
 use crate::scoring::{idf, tfidf_query, tfidf_term};
-use index::PreIndex;
+use index::index::{BasicIndex, Index};
 use index::utils::get_document_with_text;
-use index::{
-    index::{BasicIndex, Index},
-};
+use index::PreIndex;
 use parser::ast::{BinaryOp, Query, UnaryOp};
 
 #[test]
@@ -19,15 +17,16 @@ fn test_idf() {
 fn test_tfidf_term() {
     let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        1,
-        "Strictly non-aquatic mammals",
-        vec![("", "aaa bbb")],
-        "While this text mentions a whale it is in no way dedicated to aquatic mammals",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "Strictly non-aquatic mammals",
+            vec![("", "aaa bbb")],
+            "While this text mentions a whale it is in no way dedicated to aquatic mammals",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     pre_idx.add_document(get_document_with_text(
         2,
@@ -59,15 +58,16 @@ fn test_tfidf_term() {
 fn test_tfidf_term_2() {
     let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        1,
-        "Strictly non-aquatic mammals",
-        vec![("", "aaa bbb")],
-        "While this text mentions a whale it is in no way dedicated to aquatic mammals",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "Strictly non-aquatic mammals",
+            vec![("", "aaa bbb")],
+            "While this text mentions a whale it is in no way dedicated to aquatic mammals",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     pre_idx.add_document(get_document_with_text(
         2,
@@ -97,15 +97,16 @@ fn test_tfidf_term_2() {
 #[test]
 fn test_tfidf_simple_phrase_query() {
     let mut pre_idx = PreIndex::default();
-    pre_idx.add_document(get_document_with_text(
-        1,
-        "Strictly non aquatic mammals",
-        vec![("", "aaa bbb")],
-        "While this text mentions a whale it is in no way dedicated to aquatic mammals",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "Strictly non aquatic mammals",
+            vec![("", "aaa bbb")],
+            "While this text mentions a whale it is in no way dedicated to aquatic mammals",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     pre_idx.add_document(get_document_with_text(
         2,
@@ -147,15 +148,16 @@ fn test_tfidf_simple_phrase_query() {
 #[test]
 fn test_simple_binary_query() {
     let mut pre_idx = PreIndex::default();
-    pre_idx.add_document(get_document_with_text(
-        1,
-        "Strictly non aquatic mammals",
-        vec![("", "aaa bbb")],
-        "While this text mentions a whale it is in no way dedicated to aquatic mammals",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "Strictly non aquatic mammals",
+            vec![("", "aaa bbb")],
+            "While this text mentions a whale it is in no way dedicated to aquatic mammals",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     pre_idx.add_document(get_document_with_text(
         2,
@@ -203,15 +205,16 @@ fn test_simple_binary_query() {
 #[test]
 fn test_nested_binary_query() {
     let mut pre_idx = PreIndex::default();
-    pre_idx.add_document(get_document_with_text(
-        1,
-        "Strictly non aquatic mammals",
-        vec![("", "aaa bbb")],
-        "While this text mentions a whale it is in no way dedicated to aquatic mammals",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "Strictly non aquatic mammals",
+            vec![("", "aaa bbb")],
+            "While this text mentions a whale it is in no way dedicated to aquatic mammals",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     pre_idx.add_document(get_document_with_text(
         2,
@@ -262,15 +265,16 @@ fn test_nested_binary_query() {
 #[test]
 fn test_simple_relation_query() {
     let mut pre_idx = PreIndex::default();
-    pre_idx.add_document(get_document_with_text(
-        1,
-        "Strictly non aquatic mammals",
-        vec![("", "aaa bbb")],
-        "While this text mentions a whale it is in no way dedicated to aquatic mammals",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "Strictly non aquatic mammals",
+            vec![("", "aaa bbb")],
+            "While this text mentions a whale it is in no way dedicated to aquatic mammals",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     let mut idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
@@ -287,16 +291,16 @@ fn test_simple_relation_query() {
 fn test_nested_relation_query() {
     let mut pre_idx = PreIndex::default();
 
-
-    pre_idx.add_document(get_document_with_text(
-        1,
-        "Strictly non aquatic mammals",
-        vec![("", "aaa bbb")],
-        "While this text mentions a whale it is in no way dedicated to aquatic mammals",
-        vec!["eee fff"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "Strictly non aquatic mammals",
+            vec![("", "aaa bbb")],
+            "While this text mentions a whale it is in no way dedicated to aquatic mammals",
+            vec!["eee fff"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     pre_idx.add_document(get_document_with_text(
         2,

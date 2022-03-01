@@ -1,5 +1,4 @@
-
-use crate::{PreIndex};
+use crate::PreIndex;
 use crate::{
     errors::{IndexError, IndexErrorKind},
     index::{BasicIndex, Index},
@@ -12,7 +11,6 @@ use std::collections::HashMap;
 #[async_trait]
 pub trait IndexBuilder {
     async fn build_index_if_needed(&self) -> Result<Option<Box<dyn Index>>, IndexError>;
-
 }
 
 pub struct SqlIndexBuilder {

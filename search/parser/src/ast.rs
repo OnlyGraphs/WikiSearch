@@ -1,4 +1,3 @@
-
 use strum_macros::IntoStaticStr;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -56,7 +55,7 @@ pub enum Query {
         sub: Box<Query>,
     },
     RelationQuery {
-        root: u32, 
+        root: u32,
         hops: u32,
         sub: Option<Box<Query>>,
     },

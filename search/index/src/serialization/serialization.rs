@@ -1,15 +1,16 @@
-use crate::{Posting, EncodedPostingNode, PostingNode};
+use crate::{EncodedPostingNode, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use core::fmt::Debug;
 use std::{
+    collections::HashMap,
     io::{Read, Write},
-    marker::PhantomData, collections::HashMap,
+    marker::PhantomData,
 };
 
 /// Implementations encapsulate any sort of encoding mechanism
 /// an encoder is the bridge between a list of bytes [u8] and the in-memory object representation
 /// an example would be a V-byte encoder, which saves space using the fact that intermediate values are close to each other
-pub trait SequentialEncoder<T: Serializable> : Default {
+pub trait SequentialEncoder<T: Serializable>: Default {
     fn encode(prev: &Option<T>, curr: &T) -> Vec<u8>;
     fn decode<R: Read>(prev: &Option<T>, bytes: R) -> (T, usize);
 }
@@ -205,12 +206,12 @@ impl Serializable for Posting {
     }
 }
 
-impl <E : Serializable> Serializable for Vec<E> {
+impl<E: Serializable> Serializable for Vec<E> {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         let mut count = 4;
         buf.write_u32::<NativeEndian>(self.len() as u32).unwrap();
-        count = self.iter().fold(count,|a,v| a + v.serialize(buf));
-        count 
+        count = self.iter().fold(count, |a, v| a + v.serialize(buf));
+        count
     }
 
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
@@ -226,7 +227,7 @@ impl <E : Serializable> Serializable for Vec<E> {
     }
 }
 
-impl <K : Serializable, V : Serializable> Serializable for HashMap<K,V> {
+impl<K: Serializable, V: Serializable> Serializable for HashMap<K, V> {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         let count = 4;
         buf.write_u32::<NativeEndian>(self.len() as u32).unwrap();
@@ -236,19 +237,17 @@ impl <K : Serializable, V : Serializable> Serializable for HashMap<K,V> {
 
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
         let count = 4;
-        let _len = buf.read_u32::<NativeEndian>().unwrap();   
-        
+        let _len = buf.read_u32::<NativeEndian>().unwrap();
+
         count
     }
-
 }
-
 
 pub type EncodedPostingList<E> = EncodedSequentialObject<Posting, E>;
 
-
-impl <E>Serializable for EncodedPostingNode<E> where 
-    E: SequentialEncoder<Posting> 
+impl<E> Serializable for EncodedPostingNode<E>
+where
+    E: SequentialEncoder<Posting>,
 {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         let mut count = 0;
@@ -267,8 +266,7 @@ impl <E>Serializable for EncodedPostingNode<E> where
     }
 }
 
-impl Serializable for PostingNode where 
-{
+impl Serializable for PostingNode {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         let mut count = 0;
         count += self.postings.serialize(buf);

@@ -38,13 +38,15 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
             preprocess_query(rhs)?;
         }
         Query::PhraseQuery { ref mut tks } => {
-            *tks = tks.into_iter()
+            *tks = tks
+                .into_iter()
                 .flat_map(|c| Preprocessor::process(opts, c.to_string()))
                 .filter(|w| !w.trim().is_empty())
                 .collect()
         }
         Query::FreetextQuery { ref mut tokens } => {
-            *tokens = tokens.into_iter()
+            *tokens = tokens
+                .into_iter()
                 .flat_map(|c| Preprocessor::process(opts, c.to_string()))
                 .filter(|w| !w.trim().is_empty())
                 .collect()

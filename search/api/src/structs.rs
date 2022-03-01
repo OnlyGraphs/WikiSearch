@@ -65,7 +65,7 @@ pub struct UserFeedback {
 pub struct Document {
     #[serde(skip_serializing)]
     pub id: u32,
-    
+
     pub title: String,
     pub score: f64,
 

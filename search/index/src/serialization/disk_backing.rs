@@ -2,11 +2,11 @@ use std::{
     borrow::Borrow,
     env,
     error::Error,
-    fmt::{Debug},
+    fmt::Debug,
     fs::{create_dir, remove_dir_all, remove_file, rename, File},
     hash::Hash,
-    io::{Read},
-    path::{PathBuf},
+    io::Read,
+    path::PathBuf,
 };
 
 use crate::{IndexError, IndexErrorKind, Serializable};
@@ -171,24 +171,23 @@ where
 
     /// removes the most recently inserted element
     /// if not in cache brings it in automatically
-    pub fn remove_first(&mut self) -> Result<(K,V), Box<dyn Error>>
-    {
+    pub fn remove_first(&mut self) -> Result<(K, V), Box<dyn Error>> {
         // RAM first
-        if self.online_map.len() > 0{
+        if self.online_map.len() > 0 {
             self.online_map.pop().ok_or(Box::new(IndexError {
                 msg: format!(""),
                 kind: IndexErrorKind::LogicError,
             }))
         } else if self.offline_set.len() > 0 {
             let k = self.offline_set.last().unwrap().clone();
-            return Ok((k.clone(),self.fetch_no_insert(&k)?));
+            return Ok((k.clone(), self.fetch_no_insert(&k)?));
         } else {
             Err(Box::new(IndexError {
                 msg: format!(""),
                 kind: IndexErrorKind::LogicError,
             }))
         }
-        
+
         // let (_, v) = self.get_from_mem(&k).ok_or(Box::new(IndexError {
         //     msg: format!(""),
         //     kind: IndexErrorKind::LogicError,
@@ -202,7 +201,7 @@ where
         K: Borrow<Q> + Eq + Hash,
         Q: Hash + Eq + ToOwned<Owned = K>,
     {
-        return self.get_mut(k).map(|k| k.map(|v| &*v))
+        return self.get_mut(k).map(|k| k.map(|v| &*v));
     }
 
     pub fn get_mut<Q: ?Sized>(&mut self, k: &Q) -> Result<Option<&mut V>, Box<dyn Error>>
@@ -226,14 +225,13 @@ where
     }
 
     pub fn get_or_insert_default_mut(&mut self, k: K) -> Result<&mut V, Box<dyn Error>>
-    where
-    {
+where {
         if self.contains_key_mem(&k) {
-             return Ok(self.online_map.get_mut(&k).unwrap());
+            return Ok(self.online_map.get_mut(&k).unwrap());
         } else {
-            self.insert(k,V::default())?;
+            self.insert(k, V::default())?;
             // get ref from top of online map
-            return Ok(self.online_map.last_mut().unwrap().1)
+            return Ok(self.online_map.last_mut().unwrap().1);
         }
     }
 
@@ -387,8 +385,8 @@ where
     }
 }
 
-impl <K, V, const R: u32>Default for DiskHashMap<K,V,R>
-where 
+impl<K, V, const R: u32> Default for DiskHashMap<K, V, R>
+where
     K: Serializable + Debug + Hash + Eq + Clone,
     V: Serializable + Debug,
 {

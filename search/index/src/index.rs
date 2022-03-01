@@ -1,10 +1,6 @@
 use chrono::NaiveDateTime;
 use utils::MemFootprintCalculator;
 
-
-
-
-
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::{
@@ -13,12 +9,9 @@ use std::{
     marker::{Send, Sync},
 };
 
+use crate::index_structs::{PosRange, Posting};
 use crate::PostingNode;
 use crate::PreIndex;
-use crate::{
-    index_structs::{PosRange, Posting},
-};
-
 
 /**
  * BasicIndex Structure:
@@ -58,7 +51,6 @@ pub struct BasicIndex {
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub last_updated_docs: HashMap<u32, NaiveDateTime>,
 }
-
 
 impl MemFootprintCalculator for BasicIndex {
     fn real_mem(&self) -> u64 {
@@ -125,8 +117,7 @@ impl Index for BasicIndex {
     }
 
     fn get_links(&self, source: u32) -> &[u32] {
-        match self.links.get(&source)
-        {
+        match self.links.get(&source) {
             Some(v) => v,
             None => &[],
         }
@@ -159,7 +150,8 @@ impl Index for BasicIndex {
 
     // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
     fn get_all_postings(&self) -> Vec<Posting> {
-        let mut out = self.posting_nodes
+        let mut out = self
+            .posting_nodes
             .iter()
             .flat_map(|(_, v)| v.postings.clone())
             .collect::<Vec<Posting>>();
@@ -172,7 +164,6 @@ impl Index for BasicIndex {
         self.extent.get(itype).and_then(|r| r.get(doc_id))
     }
 
-
     fn get_dump_id(&self) -> u32 {
         return self.dump_id;
     }
@@ -180,8 +171,6 @@ impl Index for BasicIndex {
     fn get_last_updated_date(&self, doc_id: u32) -> Option<NaiveDateTime> {
         self.last_updated_docs.get(&doc_id).cloned()
     }
-
-    
 }
 
 impl BasicIndex {
@@ -200,21 +189,20 @@ impl BasicIndex {
         })
     }
 
-    pub fn from_pre_index(mut p : PreIndex) -> Box<Self> {
-
+    pub fn from_pre_index(mut p: PreIndex) -> Box<Self> {
         // extract postings and sort
         let mut posting_nodes = HashMap::with_capacity(p.posting_nodes.len());
         p.posting_nodes.iter_idx().for_each(|_| {
             // we do not use get_by_idx, since the indexes will change, we only care about what's next in order
-            let (k,mut v) = p.posting_nodes.remove_first().unwrap();
+            let (k, mut v) = p.posting_nodes.remove_first().unwrap();
             v.postings.sort();
-            posting_nodes.insert(k,v);
+            posting_nodes.insert(k, v);
         });
 
         // convert strings in the links to u32's
         // sort all links
         let mut links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(p.links.len());
-        p.links.iter().for_each(|(from,to)| {
+        p.links.iter().for_each(|(from, to)| {
             let mut targets: Vec<u32> = Vec::with_capacity(links.len());
             to.iter().for_each(|l| {
                 p.id_title_map.get_by_right(l).map(|v| {
@@ -227,24 +215,20 @@ impl BasicIndex {
 
         // back links
         let mut back_links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(p.links.len());
-        links.iter().for_each(|(source,target)| {
+        links.iter().for_each(|(source, target)| {
             target.iter().for_each(|v| {
                 back_links.entry(*v).or_default().push(*source);
             })
         });
         back_links.values_mut().for_each(|v| v.sort());
 
-        Box::new(
-            BasicIndex{
-                dump_id: p.dump_id,
-                posting_nodes: posting_nodes,
-                links: links,
-                incoming_links: back_links,
-                extent: p.extent,
-                last_updated_docs: p.last_updated_docs,
-            }
-        )
-
-        
+        Box::new(BasicIndex {
+            dump_id: p.dump_id,
+            posting_nodes: posting_nodes,
+            links: links,
+            incoming_links: back_links,
+            extent: p.extent,
+            last_updated_docs: p.last_updated_docs,
+        })
     }
 }
