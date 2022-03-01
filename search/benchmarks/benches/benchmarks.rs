@@ -1,15 +1,13 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use index::{
     index::{BasicIndex, Index},
-    index_structs::{Citation, Document, Infobox},
-    PostingNode, PreIndex,
+    index_structs::{Citation, Document, Infobox}, PreIndex,
 };
-use parser::ast::{BinaryOp, Query, StructureElem, UnaryOp};
+use parser::ast::{BinaryOp, Query, UnaryOp};
 
 use retrieval::search::{execute_query, preprocess_query, score_query};
 
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display},
 };
 
@@ -96,7 +94,7 @@ pub fn get_random_string(w: u32, rng: &mut StdRng) -> String {
 
 pub fn get_random_strings(w: u32, rng: &mut StdRng) -> Vec<String> {
     (0..w)
-        .map(|c| VOCAB.choose(rng).expect("empty vocabulary").to_string())
+        .map(|_c| VOCAB.choose(rng).expect("empty vocabulary").to_string())
         .collect::<Vec<String>>()
 }
 
