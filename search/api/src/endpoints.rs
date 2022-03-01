@@ -128,7 +128,8 @@ pub async fn search(
         SortType::LastEdited => {
             postings.dedup_by_key(|v| v.document_id);
             postings.sort_by_cached_key(|Posting { document_id, .. }| {
-                idx.get_last_updated_date(*document_id)
+                // idx.get_last_updated_date(*document_id) TODO: fix 
+                todo!()
             });
             postings
                 .into_iter() // consumes postings
@@ -257,19 +258,21 @@ pub async fn relational(
         .flat_map(|ScoredDocument { doc_id, score }| {
             debug!("{:?},{:?}", *doc_id, idx.get_links(*doc_id));
             idx.get_links(*doc_id)
-                .unwrap()
                 .iter()
                 .map(|id| {
                     debug!("{:?}", id);
-                    Relation {
-                        source: idx.id_to_title(*doc_id).unwrap().to_string(),
-                        destination: idx.id_to_title(*id).unwrap().to_string(),
-                    }
+                    todo!()
+                    // Relation {
+                    //     source: idx.id_to_title(*doc_id).unwrap().to_string(),
+                    //     destination: idx.id_to_title(*id).unwrap().to_string(),
+                    // }
                 })
-                .chain(idx.get_incoming_links(*doc_id).iter().map(|id| Relation {
-                    source: idx.id_to_title(*id).unwrap().to_string(),
-                    destination: idx.id_to_title(*doc_id).unwrap().to_string(),
-                }))
+                .chain(idx.get_incoming_links(*doc_id).iter().map(|id| todo!()
+                //     Relation {
+                //     source: idx.id_to_title(*id).unwrap().to_string(),
+                //     destination: idx.id_to_title(*doc_id).unwrap().to_string(),
+                // }
+            ))
                 .collect::<Vec<Relation>>()
         })
         .collect();

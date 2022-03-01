@@ -95,10 +95,11 @@ pub fn execute_query(query: &Box<Query>, index: &Box<dyn Index>) -> Vec<Posting>
             ref hops,
             ref sub,
         } => {
-            let id = match index.title_to_id(root.clone()) {
-                Some(v) => v,
-                None => return Vec::default(),
-            };
+            let id = 0;
+            // match index.title_to_id(root.clone()) {
+            //     Some(v) => v,
+            //     None => return Vec::default(),
+            // };
             let mut subset = HashSet::default();
             get_docs_within_hops(id, *hops, &mut subset, index);
 
@@ -206,7 +207,7 @@ pub fn get_docs_within_hops(docid: u32, hops: u32, out: &mut HashSet<u32>, index
         return;
     }
 
-    let out_l = index.get_links(docid).unwrap_or(&[]);
+    let out_l = index.get_links(docid);
     let in_l = index.get_incoming_links(docid);
     let all_l = merge(in_l, out_l);
 

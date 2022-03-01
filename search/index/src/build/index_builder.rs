@@ -1,4 +1,5 @@
 use crate::index_structs::PostingNode;
+use crate::{PreIndex};
 use crate::{
     errors::{IndexError, IndexErrorKind},
     index::{BasicIndex, Index},
@@ -11,6 +12,7 @@ use std::collections::HashMap;
 #[async_trait]
 pub trait IndexBuilder {
     async fn build_index_if_needed(&self) -> Result<Option<Box<dyn Index>>, IndexError>;
+
 }
 
 pub struct SqlIndexBuilder {
@@ -81,10 +83,11 @@ impl IndexBuilder for SqlIndexBuilder {
                 .push(Citation { text: i.body })
         }
 
-        let mut idx =
-            BasicIndex::<HashMap<String, PostingNode>>::with_capacity(main_query.len(), 1024, 512);
+        // let mut idx =
+        //     BasicIndex::<HashMap<String, PostingNode>>::with_capacity(main_query.len(), 1024, 512);
+        let mut pre_index = PreIndex::default();
 
-        idx.set_dump_id(highest_dump_id);
+        pre_index.dump_id = highest_dump_id;
 
         for row in main_query {
             let doc_id = row.articleid.ok_or(IndexError {
@@ -103,12 +106,12 @@ impl IndexBuilder for SqlIndexBuilder {
                 infoboxes: article_infoboxes.remove(&doc_id).unwrap_or_default(),
                 citations: article_citations.remove(&doc_id).unwrap_or_default(),
             });
-            idx.add_document(new_document)?;
+            pre_index.add_document(new_document)?;
         }
 
         pool.close().await;
 
-        idx.finalize()?;
+        let idx = BasicIndex::from_pre_index(pre_index);
 
         Ok(Some(idx))
     }

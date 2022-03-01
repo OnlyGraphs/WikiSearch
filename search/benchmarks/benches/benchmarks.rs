@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, BatchSize, Benchmark
 use index::{
     index::{BasicIndex, Index},
     index_structs::{Citation, Document, Infobox},
-    PostingNode, SmallPostingMap,
+    PostingNode, PreIndex,
 };
 use parser::ast::{BinaryOp, Query, StructureElem, UnaryOp};
 
@@ -178,13 +178,15 @@ pub fn get_random_query(p: &IndexBenchParameters) -> Box<Query> {
 }
 
 pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Box<dyn Index> {
-    let mut idx = Box::new(BasicIndex::<SmallPostingMap>::default());
+    let mut pre_idx = PreIndex::default();
 
     docs.into_iter().for_each(|d| {
-        idx.add_document(d)
+        pre_idx.add_document(d)
             .expect("Benchmarking failed, could not add document");
     });
-    idx
+    let idx : Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
+
+    Box::new(idx)
 }
 
 pub fn execute_query_with_index(idx: Box<dyn Index>, mut q: Box<Query>) {

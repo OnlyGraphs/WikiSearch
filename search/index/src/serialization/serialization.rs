@@ -1,16 +1,15 @@
-use crate::Posting;
+use crate::{Posting, EncodedPostingNode, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use core::fmt::Debug;
 use std::{
-    borrow::Borrow,
     io::{Read, Write},
-    marker::PhantomData,
+    marker::PhantomData, collections::HashMap,
 };
 
 /// Implementations encapsulate any sort of encoding mechanism
 /// an encoder is the bridge between a list of bytes [u8] and the in-memory object representation
 /// an example would be a V-byte encoder, which saves space using the fact that intermediate values are close to each other
-pub trait SequentialEncoder<T: Serializable> {
+pub trait SequentialEncoder<T: Serializable> : Default {
     fn encode(prev: &Option<T>, curr: &T) -> Vec<u8>;
     fn decode<R: Read>(prev: &Option<T>, bytes: R) -> (T, usize);
 }
@@ -206,4 +205,83 @@ impl Serializable for Posting {
     }
 }
 
+impl <E : Serializable> Serializable for Vec<E> {
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        let mut count = 4;
+        buf.write_u32::<NativeEndian>(self.len() as u32).unwrap();
+        count = self.iter().fold(count,|a,v| a + v.serialize(buf));
+        count 
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        let mut count = 4;
+        let len = buf.read_u32::<NativeEndian>().unwrap();
+        self.reserve(len as usize);
+        (0..len).for_each(|v| {
+            let mut d = E::default();
+            count += d.deserialize(buf);
+            self.push(d)
+        });
+        count
+    }
+}
+
+impl <K : Serializable, V : Serializable> Serializable for HashMap<K,V> {
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        let mut count = 4;
+        buf.write_u32::<NativeEndian>(self.len() as u32).unwrap();
+
+        count
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        let mut count = 4;
+        let len = buf.read_u32::<NativeEndian>().unwrap();   
+        
+        count
+    }
+
+}
+
+
 pub type EncodedPostingList<E> = EncodedSequentialObject<Posting, E>;
+
+
+impl <E>Serializable for EncodedPostingNode<E> where 
+    E: SequentialEncoder<Posting> 
+{
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        let mut count = 0;
+        count += self.postings.serialize(buf);
+        count += self.df.serialize(buf);
+        count += self.tf.serialize(buf);
+        count
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        let mut count = 0;
+        count += self.postings.deserialize(buf);
+        count += self.df.deserialize(buf);
+        count += self.tf.deserialize(buf);
+        count
+    }
+}
+
+impl Serializable for PostingNode where 
+{
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        let mut count = 0;
+        count += self.postings.serialize(buf);
+        count += self.df.serialize(buf);
+        count += self.tf.serialize(buf);
+        count
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        let mut count = 0;
+        count += self.postings.deserialize(buf);
+        count += self.df.deserialize(buf);
+        count += self.tf.deserialize(buf);
+        count
+    }
+}

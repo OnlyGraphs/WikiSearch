@@ -2,6 +2,8 @@ use chrono::NaiveDateTime;
 
 use std::collections::HashMap;
 
+use crate::{SequentialEncoder, EncodedPostingList};
+
 pub const DATE_TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 /// stores an appearance of a token in an article
@@ -17,6 +19,16 @@ pub struct PostingNode {
     pub df: u32,
     pub tf: HashMap<u32, u32>,
 }
+
+#[derive(Debug, Eq, PartialEq, Default)]
+pub struct EncodedPostingNode<E> where 
+    E : SequentialEncoder<Posting>, 
+{
+    pub postings: EncodedPostingList<E>,
+    pub df: u32,
+    pub tf: HashMap<u32, u32>,
+}
+
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PosRange {

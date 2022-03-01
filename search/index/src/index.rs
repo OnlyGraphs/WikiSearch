@@ -12,8 +12,9 @@ use std::{
     marker::{Send, Sync},
 };
 
+use crate::PostingNode;
+use crate::PreIndex;
 use crate::{
-    collections::StringPostingMap,
     errors::{IndexError, IndexErrorKind},
     index_structs::{Document, DocumentMetaData, PosRange, Posting, DATE_TIME_FORMAT},
 };
@@ -31,8 +32,6 @@ use parser::ast::StructureElem;
 
 //TODO: Interface to specify functions that should be shared among different types of indices created (Ternary Index Tree vs BasicIndex)
 pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
-    fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError>;
-    fn set_dump_id(&mut self, new_dump_id: u32);
     fn get_dump_id(&self) -> u32;
     fn get_postings(&self, token: &str) -> Option<&[Posting]>;
     fn get_all_postings(&self) -> Vec<Posting>;
@@ -41,72 +40,62 @@ pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
     fn df(&self, token: &str) -> u32;
     fn tf(&self, token: &str, docid: u32) -> u32;
     fn get_number_of_documents(&self) -> u32;
-    fn finalize(&mut self) -> Result<(), IndexError>;
 
-    fn get_links(&self, source: u32) -> Result<&[u32], IndexError>;
+    fn get_links(&self, source: u32) -> &[u32];
     fn get_incoming_links(&self, source: u32) -> &[u32];
-    fn id_to_title(&self, source: u32) -> Option<&String>;
-    fn title_to_id(&self, source: String) -> Option<u32>;
-    fn get_last_updated_date(&self, source: u32) -> Option<NaiveDateTime>;
+    // fn id_to_title(&self, source: u32) -> Option<&String>;
+    // fn title_to_id(&self, source: String) -> Option<u32>;
+    // fn get_last_updated_date(&self, source: u32) -> Option<NaiveDateTime>;
 }
 
 //TODO:
 //Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
 
-pub struct BasicIndex<M: StringPostingMap + ?Sized> {
-    pub dump_id: Option<u32>,
-    pub document_metadata: HashMap<u32, DocumentMetaData>,
-    pub posting_nodes: M,
-    pub links: Either<HashMap<u32, Vec<String>>, HashMap<u32, Vec<u32>>>,
+pub struct BasicIndex {
+    pub dump_id: u32,
+    pub posting_nodes: HashMap<String, PostingNode>,
+    pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
-
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
-    pub id_title_map: BiMap<u32, String>,
+    // pub id_title_map: BiMap<u32, String>,
 }
 
-impl<M: StringPostingMap> Default for BasicIndex<M> {
+impl Default for BasicIndex {
     fn default() -> Self {
         BasicIndex {
-            dump_id: None,
-            posting_nodes: M::default(),
-            links: Left(HashMap::new()),
+            dump_id: 0,
+            posting_nodes: HashMap::default(),
+            links: HashMap::new(),
             incoming_links: HashMap::new(),
-            document_metadata: HashMap::new(),
             extent: HashMap::new(),
-            id_title_map: BiMap::new(),
+            // id_title_map: BiMap::new(),
         }
     }
 }
 
-impl<M: StringPostingMap> MemFootprintCalculator for BasicIndex<M> {
+impl MemFootprintCalculator for BasicIndex {
     fn real_mem(&self) -> u64 {
         self.dump_id.real_mem()
             + self.posting_nodes.real_mem()
             + self.links.real_mem()
-            + self.document_metadata.real_mem()
             + self.extent.real_mem()
-            + self.id_title_map.real_mem()
     }
 }
 
-impl<M: StringPostingMap> Debug for BasicIndex<M> {
+impl Debug for BasicIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // split calculation to avoid recalculating
         let posting_mem = self.posting_nodes.real_mem();
-        let metadata_mem = self.document_metadata.real_mem();
         let links_mem = self.links.real_mem();
         let extent_mem = self.extent.real_mem();
-        let id_map_mem = self.id_title_map.real_mem();
 
         let real_mem = self.dump_id.real_mem()
             + posting_mem
             + links_mem
-            + metadata_mem
-            + extent_mem
-            + id_map_mem;
+            + extent_mem;
 
         let mem = real_mem as f64 / 1000000.0;
-        let docs = self.links.as_ref().either(|c| c.len(), |c| c.len());
+        let docs = self.links.len();
 
         write!(
             f,
@@ -118,10 +107,8 @@ impl<M: StringPostingMap> Debug for BasicIndex<M> {
             \tRAM/Docs={:.3}GB/1Million\n\
             \t{{\n\
             \t\tpostings:{:.3}Mb\n\
-            \t\tmetadata:{:.3}Mb\n\
             \t\tlinks:{:.3}Mb\n\
             \t\textent:{:.3}Mb\n\
-            \t\ttitles:{:.3}Mb\n\
             \t}}\n\
             }}",
             self.dump_id,
@@ -130,15 +117,13 @@ impl<M: StringPostingMap> Debug for BasicIndex<M> {
             mem,
             ((mem / 1000.0) / (docs as f64)) * 1000000.0,
             posting_mem as f64 / 1000000.0,
-            metadata_mem as f64 / 1000000.0,
             links_mem as f64 / 1000000.0,
             extent_mem as f64 / 1000000.0,
-            id_map_mem as f64 / 1000000.0,
         )
     }
 }
 
-impl<M: StringPostingMap> Index for BasicIndex<M> {
+impl Index for BasicIndex {
     fn get_incoming_links(&self, source: u32) -> &[u32] {
         match self.incoming_links.get(&source) {
             Some(v) => v,
@@ -146,74 +131,12 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
         }
     }
 
-    fn get_links(&self, source: u32) -> Result<&[u32], IndexError> {
-        match self
-            .links
-            .as_ref()
-            .right()
-            .ok_or(IndexError {
-                msg: "Cannot retrieve links, index was not finalized.".to_string(),
-                kind: IndexErrorKind::InvalidIndexState,
-            })?
-            .get(&source)
+    fn get_links(&self, source: u32) -> &[u32] {
+        match self.links.get(&source)
         {
-            Some(v) => Ok(v),
-            None => Ok(&[]),
+            Some(v) => v,
+            None => &[],
         }
-    }
-
-    fn id_to_title(&self, source: u32) -> Option<&String> {
-        self.id_title_map.get_by_left(&source)
-    }
-
-    fn title_to_id(&self, source: String) -> Option<u32> {
-        self.id_title_map.get_by_right(&source).cloned()
-    }
-
-    fn finalize(&mut self) -> Result<(), IndexError> {
-        // calculate df
-        for (_token, postings) in self.posting_nodes.iter_mut() {
-            let mut unique_docs: HashSet<u32> = HashSet::with_capacity(self.id_title_map.len());
-
-            for Posting { document_id, .. } in &postings.postings {
-                unique_docs.insert(*document_id);
-            }
-
-            postings.df = unique_docs.len() as u32;
-        }
-
-        // work out links
-        let mut id_links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(self.id_title_map.len());
-
-        for (id, links) in self.links.as_ref().left().ok_or(IndexError {
-            msg: "Index was already finalized, cannot finalize again.".to_string(),
-            kind: IndexErrorKind::InvalidIndexState,
-        })? {
-            let mut targets: Vec<u32> = Vec::with_capacity(links.len());
-            links.iter().for_each(|l| {
-                self.id_title_map.get_by_right(l).map(|v| {
-                    targets.push(*v);
-                    self.incoming_links // add link backwards as well
-                        .entry(*v)
-                        .or_default()
-                        .push(*id);
-                });
-            });
-
-            let _ = id_links.insert(*id, targets);
-        }
-        // sort links, and incoming links
-        id_links.iter_mut().for_each(|(_, v)| v.sort());
-        self.incoming_links.iter_mut().for_each(|(_, v)| v.sort());
-
-        self.links = Right(id_links);
-
-        // sort postings
-        self.posting_nodes
-            .iter_mut()
-            .for_each(|(_k, v)| v.postings.sort());
-
-        Ok(())
     }
 
     fn df(&self, token: &str) -> u32 {
@@ -231,7 +154,7 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
     }
 
     fn get_number_of_documents(&self) -> u32 {
-        return self.id_title_map.len() as u32;
+        return 0; //self.id_title_map.len() as u32;
     }
 
     // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
@@ -243,8 +166,7 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
 
     // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
     fn get_all_postings(&self) -> Vec<Posting> {
-        let mut out = self
-            .posting_nodes
+        let mut out = self.posting_nodes
             .iter()
             .flat_map(|(_, v)| v.postings.clone())
             .collect::<Vec<Posting>>();
@@ -257,176 +179,80 @@ impl<M: StringPostingMap> Index for BasicIndex<M> {
         self.extent.get(itype).and_then(|r| r.get(doc_id))
     }
 
-    fn set_dump_id(&mut self, new_dump_id: u32) {
-        self.dump_id = Some(new_dump_id);
-    }
 
     fn get_dump_id(&self) -> u32 {
-        return self.dump_id.unwrap_or(0).clone();
+        return self.dump_id;
     }
 
-    fn get_last_updated_date(&self, doc_id: u32) -> Option<NaiveDateTime> {
-        return self
-            .document_metadata
-            .get(&doc_id)
-            .and_then(|metadata| metadata.last_updated_date);
-    }
+    // fn get_last_updated_date(&self, doc_id: u32) -> Option<NaiveDateTime> {
+    //     return self
+    //         .document_metadata
+    //         .get(&doc_id)
+    //         .and_then(|metadata| metadata.last_updated_date);
+    // }
 
-    fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError> {
-        let mut word_pos = 0;
-
-        self.id_title_map
-            .insert_no_overwrite(document.doc_id, document.title.clone())
-            .map_err(|_c| IndexError {
-                msg: "Attempted to insert document into index which already exists.".to_string(),
-                kind: IndexErrorKind::InvalidOperation,
-            })?;
-
-        //Metadata
-        self.add_document_metadata(
-            document.doc_id,
-            document.title,
-            document.last_updated_date,
-            document.namespace,
-        );
-
-        //Infoboxes
-        word_pos = document.infoboxes.iter().fold(word_pos, |a, i| {
-            self.add_structure_elem(document.doc_id, &i.itype, &i.text, a)
-        });
-
-        //Main body
-        word_pos = self.add_main_text(document.doc_id, &document.main_text, word_pos);
-
-        //Citations
-        word_pos = document.citations.iter().fold(word_pos, |a, c| {
-            self.add_structure_elem(document.doc_id, StructureElem::Citation.into(), &c.text, a)
-        });
-
-        //Categories
-        let _ = self.add_structure_elem(
-            document.doc_id,
-            StructureElem::Category.into(),
-            &document.categories,
-            word_pos,
-        );
-
-        //Links
-        self.add_links(document.doc_id, &document.article_links)?;
-
-        Ok(())
-    }
+    
 }
 
-impl<M: StringPostingMap> BasicIndex<M> {
+impl BasicIndex {
     pub fn with_capacity(
         articles: usize,
         avg_tokens_per_article: usize,
         struct_elem_type_count: usize,
     ) -> Box<Self> {
         Box::new(BasicIndex {
-            dump_id: None,
-            posting_nodes: M::with_capacity(articles * avg_tokens_per_article),
-            links: Left(HashMap::with_capacity(articles)),
+            dump_id: 0,
+            posting_nodes: HashMap::with_capacity(articles * avg_tokens_per_article),
+            links: HashMap::with_capacity(articles),
             incoming_links: HashMap::with_capacity(articles),
-            document_metadata: HashMap::with_capacity(articles),
             extent: HashMap::with_capacity(struct_elem_type_count),
-            id_title_map: BiMap::with_capacity(articles),
         })
     }
 
-    fn add_tokens(&mut self, doc_id: u32, text_to_add: &str, mut word_pos: u32) -> u32 {
-        for token in text_to_add.split(" ") {
-            self.add_posting(token, doc_id, word_pos);
-            word_pos += 1;
-        }
-        return word_pos;
-    }
+    pub fn from_pre_index(mut p : PreIndex) -> Box<Self> {
 
-    fn add_posting(&mut self, token: &str, docid: u32, word_pos: u32) {
-        let node = self.posting_nodes.entry(token.to_string()).or_default();
-
-        node.postings.push(Posting {
-            document_id: docid,
-            position: word_pos,
+        // extract postings and sort
+        let mut posting_nodes = HashMap::with_capacity(p.posting_nodes.len());
+        p.posting_nodes.iter_idx().for_each(|_| {
+            // we do not use get_by_idx, since the indexes will change, we only care about what's next in order
+            let (k,mut v) = p.posting_nodes.remove_first().unwrap();
+            v.postings.sort();
+            posting_nodes.insert(k,v);
         });
 
-        *node.tf.entry(docid).or_default() += 1;
-    }
+        // convert strings in the links to u32's
+        // sort all links
+        let mut links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(p.links.len());
+        p.links.iter().for_each(|(from,to)| {
+            let mut targets: Vec<u32> = Vec::with_capacity(links.len());
+            to.iter().for_each(|l| {
+                p.id_title_map.get_by_right(l).map(|v| {
+                    targets.push(*v);
+                });
+            });
+            targets.sort();
+            let _ = links.insert(*from, targets);
+        });
 
-    fn add_document_metadata(
-        &mut self,
-        doc_id: u32,
-        title: String,
-        last_updated_date: String,
-        namespace: i16,
-    ) {
-        let last_updated_date =
-            match NaiveDateTime::parse_from_str(&last_updated_date, DATE_TIME_FORMAT) {
-                Ok(date) => Some(date),
-                Err(e) => {
-                    error!(
-                        "Article ID {:?} has incorrect Date Time Format: {:?}",
-                        doc_id, last_updated_date
-                    );
-                    None
-                }
-            };
-        self.document_metadata.insert(
-            doc_id,
-            DocumentMetaData {
-                title,
-                last_updated_date,
-                namespace,
-            },
-        );
-    }
-
-    fn add_links(&mut self, doc_id: u32, article_links: &str) -> Result<(), IndexError> {
-        // out links
-        let link_titles: Vec<String> = article_links
-            .split(",")
-            .map(|c| c.trim().to_string())
-            .collect();
-
-        self.links
-            .as_mut()
-            .left()
-            .ok_or(IndexError {
-                msg: "Attempted to add links to already finalized index.".to_string(),
-                kind: IndexErrorKind::InvalidIndexState,
-            })?
-            .insert(doc_id, link_titles);
-        // in links
-
-        Ok(())
-    }
-
-    fn add_structure_elem(
-        &mut self,
-        doc_id: u32,
-        structure_elem: &str,
-        text: &str,
-        mut word_pos: u32,
-    ) -> u32 {
-        let prev_pos = word_pos;
-        word_pos = self.add_tokens(doc_id, &text, word_pos);
-
-        self.extent
-            .entry(structure_elem.to_string())
-            .or_insert(HashMap::new())
-            .entry(doc_id)
-            .or_insert(PosRange {
-                start_pos: prev_pos, // if not exists, initialize range
-                end_pos: word_pos,
+        // back links
+        let mut back_links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(p.links.len());
+        links.iter().for_each(|(source,target)| {
+            target.iter().for_each(|v| {
+                back_links.entry(*v).or_default().push(*source);
             })
-            .end_pos = word_pos; // if exists, extend it
+        });
+        back_links.values_mut().for_each(|v| v.sort());
 
-        return word_pos;
-    }
+        Box::new(
+            BasicIndex{
+                dump_id: p.dump_id,
+                posting_nodes: posting_nodes,
+                links: links,
+                incoming_links: back_links,
+                extent: p.extent,
+            }
+        )
 
-    fn add_main_text(&mut self, doc_id: u32, main_text: &str, mut word_pos: u32) -> u32 {
-        word_pos = self.add_tokens(doc_id, main_text, word_pos);
-        return word_pos;
+        
     }
 }

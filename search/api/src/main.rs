@@ -7,7 +7,6 @@ use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
     CheckIndexRequest,
 };
-use index::collections::SmallPostingMap;
 use index::index::{BasicIndex, Index};
 use log::{error, info};
 use pretty_env_logger;
@@ -44,9 +43,7 @@ fn main() -> std::io::Result<()> {
     let static_serve_dir = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string());
 
     // create shared memory for index
-    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::<
-        SmallPostingMap,
-    >::default())));
+    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::default())));
 
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
