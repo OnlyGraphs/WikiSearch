@@ -1,16 +1,12 @@
 use std::{
     borrow::Borrow,
-    collections::HashSet,
     env,
     error::Error,
-    fmt::{Debug, Display},
+    fmt::{Debug},
     fs::{create_dir, remove_dir_all, remove_file, rename, File},
     hash::Hash,
-    io,
-    io::{ErrorKind, Read},
-    iter::Chain,
-    marker::PhantomData,
-    path::{Path, PathBuf},
+    io::{Read},
+    path::{PathBuf},
 };
 
 use crate::{IndexError, IndexErrorKind, Serializable};
@@ -139,7 +135,7 @@ where
     pub fn load_into_mem(&mut self, idx: usize) -> Result<K, Box<dyn Error>> {
         // RAM
         if idx < self.mem_len() {
-            let (k, v) = self.online_map.get_index(idx).ok_or(Box::new(IndexError {
+            let (k, _v) = self.online_map.get_index(idx).ok_or(Box::new(IndexError {
                 msg: format!("Expected key val at {}", idx),
                 kind: IndexErrorKind::LogicError,
             }))?;
@@ -247,7 +243,7 @@ where
         Q: Hash + Eq + ToOwned<Owned = K>,
     {
         // if available in RAM return it
-        return self.online_map.get_full(k).map(|(a, b, c)| (b, c));
+        return self.online_map.get_full(k).map(|(_a, b, c)| (b, c));
     }
 
     /// evicts a record determined by the eviction policy
@@ -289,7 +285,7 @@ where
         Q: Debug + Equivalent<K> + Hash + Eq,
     {
         // figure out identifiers
-        let (removed_filename, remove_idx) =
+        let (removed_filename, _remove_idx) =
             self.offline_file_name(k).ok_or(Box::new(IndexError {
                 msg: format!(
                     "Tried to remove from offline map, but {:?} was not in the offline_map",

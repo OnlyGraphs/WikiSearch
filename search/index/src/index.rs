@@ -1,9 +1,9 @@
 use utils::MemFootprintCalculator;
 
-use bimap::BiMap;
-use either::{Either, Left, Right};
-use log::error;
-use std::collections::HashSet;
+
+
+
+
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::{
@@ -15,11 +15,10 @@ use std::{
 use crate::PostingNode;
 use crate::PreIndex;
 use crate::{
-    errors::{IndexError, IndexErrorKind},
-    index_structs::{Document, DocumentMetaData, PosRange, Posting, DATE_TIME_FORMAT},
+    index_structs::{PosRange, Posting},
 };
-use chrono::NaiveDateTime;
-use parser::ast::StructureElem;
+
+
 /**
  * BasicIndex Structure:
  * Metadata <NOT included in postings>

@@ -31,7 +31,7 @@ fn test_is_not_tab() {
 // AST Parser Tests
 #[test]
 fn test_freehand_query() {
-    let (nxt, query) = parse_query("hello     world").unwrap();
+    let (_nxt, query) = parse_query("hello     world").unwrap();
 
     let tokens = match *query {
         Query::FreetextQuery { tokens } => tokens,
@@ -45,7 +45,7 @@ fn test_freehand_query() {
 #[test]
 fn test_dist_query() {
     let query = "#DIST,3,pumpkin,pie";
-    let (s, dist_node) = parse_dist_query(query).unwrap();
+    let (_s, dist_node) = parse_dist_query(query).unwrap();
     match *dist_node {
         Query::DistanceQuery { dst, lhs, rhs } => {
             assert!(dst == 3 && lhs == "pumpkin" && rhs == "pie")
@@ -57,7 +57,7 @@ fn test_dist_query() {
 #[test]
 fn test_dist_query_2() {
     let query = "#DIST 3 pumpkin pie";
-    let (s, dist_node) = parse_dist_query(query).unwrap();
+    let (_s, dist_node) = parse_dist_query(query).unwrap();
     match *dist_node {
         Query::DistanceQuery { dst, lhs, rhs } => {
             assert!(dst == 3 && lhs == "pumpkin" && rhs == "pie")
@@ -69,7 +69,7 @@ fn test_dist_query_2() {
 #[test]
 fn test_simple_structure_query() {
     let query = "#TITLE pumpkin";
-    let (s, struct_node) = parse_structure_query(query).unwrap();
+    let (_s, struct_node) = parse_structure_query(query).unwrap();
     match *struct_node {
         Query::StructureQuery { elem, sub } => assert!(
             elem == StructureElem::Title
@@ -85,7 +85,7 @@ fn test_simple_structure_query() {
 #[test]
 fn test_simple_not_query() {
     let query = "NOT pumpkin";
-    let (s, unary_node) = parse_not_query(query).unwrap();
+    let (_s, unary_node) = parse_not_query(query).unwrap();
     match *unary_node {
         Query::UnaryQuery { op, sub } => assert!(
             op == UnaryOp::Not
@@ -107,7 +107,7 @@ fn test_simple_or_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pie".to_string()],
     });
-    let (s, binary_node) = parse_or_query(query).unwrap();
+    let (_s, binary_node) = parse_or_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::Or && lhs == l && rhs == r),
         _ => assert!(false),
@@ -123,7 +123,7 @@ fn test_multitoken_or_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pumpkin".to_string(), "patch".to_string()],
     });
-    let (s, binary_node) = parse_or_query(query).unwrap();
+    let (_s, binary_node) = parse_or_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::Or && lhs == l && rhs == r),
         _ => assert!(false),
@@ -139,7 +139,7 @@ fn test_simple_and_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pie".to_string()],
     });
-    let (s, binary_node) = parse_and_query(query).unwrap();
+    let (_s, binary_node) = parse_and_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
         _ => assert!(false),
@@ -155,7 +155,7 @@ fn test_multitoken_and_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pumpkin".to_string(), "patch".to_string()],
     });
-    let (s, binary_node) = parse_and_query(query).unwrap();
+    let (_s, binary_node) = parse_and_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
         _ => assert!(false),
@@ -171,7 +171,7 @@ fn test_simple_binary_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pumpkin".to_string(), "patch".to_string()],
     });
-    let (s, binary_node) = parse_binary_query(query).unwrap();
+    let (_s, binary_node) = parse_binary_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
         _ => assert!(false),
@@ -187,7 +187,7 @@ fn test_simple_binary_query_2() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pumpkin".to_string(), "patch".to_string()],
     });
-    let (s, binary_node) = parse_binary_query(query).unwrap();
+    let (_s, binary_node) = parse_binary_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::Or && lhs == l && rhs == r),
         _ => assert!(false),
@@ -216,7 +216,7 @@ fn test_nested_binary_query() {
         rhs: r2,
     });
 
-    let (s, binary_node) = parse_binary_query(query).unwrap();
+    let (_s, binary_node) = parse_binary_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
         _ => assert!(false),
@@ -230,7 +230,7 @@ fn test_parse_simple_wildcard_query() {
         prefix: "p".to_string(),
         postfix: "kin".to_string(),
     };
-    let (s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
         _ => assert!(false),
@@ -244,7 +244,7 @@ fn test_parse_wildcard_query_with_whitespace() {
         prefix: "p".to_string(),
         postfix: "kin".to_string(),
     };
-    let (s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
         _ => assert!(false),
@@ -258,7 +258,7 @@ fn test_parse_wildcard_query_no_prefix() {
         prefix: "".to_string(),
         postfix: "kin".to_string(),
     };
-    let (s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
         _ => assert!(false),
@@ -272,7 +272,7 @@ fn test_parse_simple_wildcard_query_no_suffix() {
         prefix: "p".to_string(),
         postfix: "".to_string(),
     };
-    let (s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
         _ => assert!(false),

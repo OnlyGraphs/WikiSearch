@@ -1,9 +1,9 @@
 use crate::PreIndex;
-use crate::utils::get_document_with_date_time;
+
 use crate::utils::{get_document_with_links, get_document_with_text};
 use crate::{
     index::{BasicIndex, Index},
-    index_structs::{PosRange, Posting, DATE_TIME_FORMAT},
+    index_structs::{Posting},
 };
 use std::array::IntoIter;
 use std::collections::HashMap;
@@ -134,7 +134,7 @@ fn test_basic_index_get_postings() {
     ))
     .unwrap();
 
-    let mut idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = BasicIndex::from_pre_index(pre_idx);
 
     assert_eq!(
         *idx.get_postings("aaa").unwrap(),
@@ -188,7 +188,7 @@ fn test_sorted_postings() {
     ))
     .unwrap();
 
-    let mut idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = BasicIndex::from_pre_index(pre_idx);
 
     assert_eq!(
         *idx.get_postings("ggg").unwrap(),
@@ -333,7 +333,7 @@ fn test_basic_index_tf() {
     ))
     .unwrap();
 
-    let mut idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = BasicIndex::from_pre_index(pre_idx);
 
     assert_eq!(idx.tf("hello", 0), 3);
     assert_eq!(idx.tf("world", 0), 3);
@@ -368,7 +368,7 @@ fn test_basic_index_df() {
     ))
     .unwrap();
 
-    let mut idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = BasicIndex::from_pre_index(pre_idx);
 
     assert_eq!(idx.df("hello"), 1);
     assert_eq!(idx.df("world"), 2);
@@ -391,7 +391,7 @@ fn test_basic_index_links() {
     pre_idx.add_document(get_document_with_links(2, "target2", "source, target1"))
         .unwrap();
 
-    let mut idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = BasicIndex::from_pre_index(pre_idx);
 
     assert_eq!(idx.get_links(0), vec![1, 2]);
     assert_eq!(idx.get_links(1), vec![1, 2]);

@@ -1,4 +1,4 @@
-use crate::index_structs::PostingNode;
+
 use crate::{PreIndex};
 use crate::{
     errors::{IndexError, IndexErrorKind},

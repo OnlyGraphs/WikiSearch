@@ -4,12 +4,12 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, tag_no_case, take_until, take_while, take_while1},
     character::complete::{digit0, digit1},
-    character::{is_alphanumeric, is_digit, is_space},
+    character::{is_alphanumeric, is_space},
     combinator::opt,
-    multi::{many1, many_m_n, separated_list0},
+    multi::{many1, separated_list0},
     IResult,
 };
-use std::str::FromStr;
+
 
 const DIST_TAG: &str = "#DIST";
 
@@ -77,7 +77,7 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
     match d.parse::<u32>() {
         Ok(n) => dst = n,
-        Err(e) => {
+        Err(_e) => {
             return Err(nom::Err::Error(nom::error::Error::new(
                 //the new struct, instead of the tuple
                 "Cannot convert string containing distance to integer.",
@@ -152,7 +152,7 @@ pub fn parse_relational_query(nxt: &str) -> IResult<&str, Box<Query>> {
         nxt,
         Box::new(Query::RelationQuery {
             root: title.to_string(),
-            hops: hops.parse().map_err(|e| {
+            hops: hops.parse().map_err(|_e| {
                 nom::Err::Error(nom::error::Error::new(hops, nom::error::ErrorKind::Digit))
             })?,
             sub: sub_query,
@@ -218,7 +218,7 @@ pub fn parse_or_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (query2, _) = tag("OR")(query2)?;
     let (query2, _) = parse_separator(query2)?;
 
-    let (nxt, q1) = parse_query(query1)?;
+    let (_nxt, q1) = parse_query(query1)?;
     let (nxt, q2) = parse_query(query2)?;
 
     return Ok((
@@ -237,7 +237,7 @@ pub fn parse_and_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (query2, query1) = take_until("AND")(nxt)?;
     let (query2, _) = tag("AND")(query2)?;
     let (query2, _) = parse_separator(query2)?;
-    let (nxt, q1) = parse_query(query1)?;
+    let (_nxt, q1) = parse_query(query1)?;
     let (nxt, q2) = parse_query(query2)?;
 
     return Ok((
@@ -284,7 +284,7 @@ pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
     match d.parse::<u32>() {
         Ok(n) => hops = n,
-        Err(e) => {
+        Err(_e) => {
             return Err(nom::Err::Error(nom::error::Error::new(
                 //the new struct, instead of the tuple
                 "Cannot convert string containing distance to integer.",
@@ -318,7 +318,7 @@ pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
     match d.parse::<u32>() {
         Ok(n) => hops = n,
-        Err(e) => {
+        Err(_e) => {
             return Err(nom::Err::Error(nom::error::Error::new(
                 //the new struct, instead of the tuple
                 "Cannot convert string containing distance to integer.",

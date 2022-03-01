@@ -1,15 +1,15 @@
 use crate::tfidf_query;
-use chrono::NaiveDateTime;
+
 use index::{
     index::Index,
     index_structs::{PosRange, Posting},
 };
 use itertools::Itertools;
-use log::debug;
+
 use parser::ast::{BinaryOp, Query, UnaryOp};
 use parser::errors::{QueryError, QueryErrorKind};
 use preprocessor::{Preprocessor, ProcessingOptions};
-use std::cmp::Ordering;
+
 use std::collections::HashSet;
 use utils::utils::merge;
 
@@ -91,7 +91,7 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
 pub fn execute_query(query: &Box<Query>, index: &Box<dyn Index>) -> Vec<Posting> {
     match **query {
         Query::RelationQuery {
-            ref root,
+            root: _,
             ref hops,
             ref sub,
         } => {
@@ -124,8 +124,8 @@ pub fn execute_query(query: &Box<Query>, index: &Box<dyn Index>) -> Vec<Posting>
             };
         }
         Query::WildcardQuery {
-            ref prefix,
-            ref postfix,
+            prefix: _,
+            postfix: _,
         } => Vec::default(), // TODO: needs index support
         Query::StructureQuery { ref elem, ref sub } => execute_query(sub, index)
             .into_iter()

@@ -186,7 +186,7 @@ pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Box<dyn Index> {
     });
     let idx : Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
-    Box::new(idx)
+    idx
 }
 
 pub fn execute_query_with_index(idx: Box<dyn Index>, mut q: Box<Query>) {

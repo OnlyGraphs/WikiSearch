@@ -2,7 +2,7 @@ use bimap::BiMap;
 use chrono::NaiveDateTime;
 use either::Either;
 use std::collections::HashMap;
-use std::fmt::Debug;
+
 use std::hash::Hash;
 use std::mem::size_of;
 

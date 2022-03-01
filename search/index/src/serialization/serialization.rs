@@ -119,9 +119,9 @@ where
 pub struct IdentityEncoder {}
 
 impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
-    fn encode(prev: &Option<T>, curr: &T) -> Vec<u8> {
+    fn encode(_prev: &Option<T>, curr: &T) -> Vec<u8> {
         let mut bytes = Vec::default();
-        let count = curr.serialize(&mut bytes);
+        let _count = curr.serialize(&mut bytes);
         bytes
     }
 
@@ -217,7 +217,7 @@ impl <E : Serializable> Serializable for Vec<E> {
         let mut count = 4;
         let len = buf.read_u32::<NativeEndian>().unwrap();
         self.reserve(len as usize);
-        (0..len).for_each(|v| {
+        (0..len).for_each(|_v| {
             let mut d = E::default();
             count += d.deserialize(buf);
             self.push(d)
@@ -228,15 +228,15 @@ impl <E : Serializable> Serializable for Vec<E> {
 
 impl <K : Serializable, V : Serializable> Serializable for HashMap<K,V> {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
-        let mut count = 4;
+        let count = 4;
         buf.write_u32::<NativeEndian>(self.len() as u32).unwrap();
 
         count
     }
 
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
-        let mut count = 4;
-        let len = buf.read_u32::<NativeEndian>().unwrap();   
+        let count = 4;
+        let _len = buf.read_u32::<NativeEndian>().unwrap();   
         
         count
     }

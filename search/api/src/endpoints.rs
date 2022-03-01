@@ -97,7 +97,7 @@ pub async fn search(
         .max_connections(1)
         .connect(&data.connection_string)
         .await
-        .map_err(|e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map_err(|_e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
     // construct + execute query
     let idx = data
@@ -127,7 +127,7 @@ pub async fn search(
         }
         SortType::LastEdited => {
             postings.dedup_by_key(|v| v.document_id);
-            postings.sort_by_cached_key(|Posting { document_id, .. }| {
+            postings.sort_by_cached_key(|Posting { document_id: _, .. }| {
                 // idx.get_last_updated_date(*document_id) TODO: fix 
                 todo!()
             });
@@ -190,7 +190,7 @@ pub async fn relational(
         .max_connections(1)
         .connect(&data.connection_string)
         .await
-        .map_err(|e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map_err(|_e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
     // construct + execute query
     let idx = data
@@ -213,7 +213,7 @@ pub async fn relational(
     preprocess_query(query)?;
 
     let mut postings = execute_query(query, &idx);
-    let mut scored_documents = score_query(query, &idx, &mut postings); // page rank and stuff
+    let scored_documents = score_query(query, &idx, &mut postings); // page rank and stuff
 
     // get documents
     let documents = scored_documents
@@ -255,7 +255,7 @@ pub async fn relational(
     // also there may be duplicates, need to retrieve this while crawling the graph
     let relations: Vec<Relation> = scored_documents
         .iter()
-        .flat_map(|ScoredDocument { doc_id, score }| {
+        .flat_map(|ScoredDocument { doc_id, score: _ }| {
             debug!("{:?},{:?}", *doc_id, idx.get_links(*doc_id));
             idx.get_links(*doc_id)
                 .iter()
@@ -267,7 +267,7 @@ pub async fn relational(
                     //     destination: idx.id_to_title(*id).unwrap().to_string(),
                     // }
                 })
-                .chain(idx.get_incoming_links(*doc_id).iter().map(|id| todo!()
+                .chain(idx.get_incoming_links(*doc_id).iter().map(|_id| todo!()
                 //     Relation {
                 //     source: idx.id_to_title(*id).unwrap().to_string(),
                 //     destination: idx.id_to_title(*doc_id).unwrap().to_string(),
