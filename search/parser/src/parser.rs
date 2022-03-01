@@ -5,7 +5,6 @@ use nom::{
     bytes::complete::{tag, tag_no_case, take_until, take_while, take_while1},
     character::complete::{digit0, digit1},
     character::{is_alphanumeric, is_space},
-    combinator::opt,
     multi::{many1, separated_list0},
     IResult,
 };
