@@ -15,6 +15,7 @@ Cargo.lock
 
 
 # everything but criterion benches
+*heaptrack*.gz
 search/**/target/
 !search/target/
 search/target/**
