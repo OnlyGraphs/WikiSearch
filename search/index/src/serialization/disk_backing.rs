@@ -12,48 +12,31 @@ use std::{
 };
 
 use indexmap::{IndexMap, Equivalent, IndexSet};
-use streaming_iterator::StreamingIterator;
 use crate::{Serializable, IndexError, IndexErrorKind};
 use uuid::Uuid;
 
-pub struct Iter<'a,K,V,const R : u32>
+pub struct Iter
 where
-    K : Serializable + Debug + Hash + Eq + Clone ,
-    V : Serializable 
 {
-    map: &'a mut DiskHashMap<K,V,R>,
+    max_len: usize,
     curr_idx: usize,
-    curr_key: K,
-    done: bool,
-
 }
 
-impl <'a,K,V,const R : u32> StreamingIterator for Iter<'a,K,V,R>
+impl Iterator for Iter
 where 
-    K : Serializable + Debug + Hash + Eq + Clone + Display ,
-    V : Serializable + Debug 
 {
-    type Item = K;
+    type Item = usize;
 
-    fn advance(&mut self) {
-        if self.curr_idx < self.map.len() {
-            self.curr_key = self.map.load_into_mem(self.curr_idx).unwrap();
+    fn next(&mut self) -> Option<Self::Item> {
+        let o = if self.curr_idx < self.max_len {
+            Some(self.curr_idx)
         } else {
-            self.done = true;
-        }
+            None
+        };
 
         self.curr_idx += 1;
+        return o;
     }
-
-    fn get(&self) -> Option<&Self::Item> {
-        if self.done {
-            None
-        } else {
-            Some(&self.curr_key)
-        }
-        //return self.map.get_from_mem(&self.curr_key).map(|v| &v);
-    }
-
 }
 
 
@@ -75,7 +58,6 @@ V : Serializable
     /// offline, records stored on disk, for O(1) contains checks
     offline_set : IndexSet<K>,
 
-
     /// the root of the offline collection on disk
     root : PathBuf
 }
@@ -87,18 +69,15 @@ V: Serializable + Debug
 {
 
 
-    pub fn iter_keys(&mut self) -> Iter<K,V,R>
+    pub fn iter_idx(&mut self) -> Iter
     where
         K: Default
     {
        Iter {
-            map: self,
             curr_idx: 0,
-            curr_key: K::default(),
-            done: false,
+            max_len: self.len(),
         }
     }
-
 
 
     pub fn path(&self) -> PathBuf 
@@ -169,10 +148,7 @@ V: Serializable + Debug
     }
 
     /// makes sure given index is in memory
-    pub fn load_into_mem<Q : ?Sized>(&mut self, idx : usize) -> Result<K,Box<dyn Error>>
-    where
-        K: Borrow<Q> + Eq + Hash ,
-        Q: Hash + Eq + Display + ToOwned<Owned = K>
+    pub fn load_into_mem(&mut self, idx : usize) -> Result<K,Box<dyn Error>>
     {
         // RAM
         if idx < self.mem_len(){
@@ -187,7 +163,7 @@ V: Serializable + Debug
             let disk_idx = idx - self.mem_len();
             if disk_idx < self.disk_len() {
                 let k  = self.offline_set[disk_idx].clone();
-                self.fetch(&k);
+                self.fetch(&k)?;
                 return Ok(k);
             } else {
                 return Err(Box::new(IndexError{
@@ -202,26 +178,14 @@ V: Serializable + Debug
     /// each retrieval can change the index of some items, so only use if you know what you're doing
     /// fast tracks 
     pub fn get_by_index(&mut self, idx : usize) -> Result<(K,&V),Box<dyn Error>>{
-        if idx < self.mem_len(){
-            let (k,v)= self.online_map.get_index(idx).ok_or(
-                Box::new( IndexError{
-                    msg: format!("Expected key val at {}",idx),
-                    kind: IndexErrorKind::LogicError,
-                }))?;
 
-            Ok((k.clone(),v))
-        } else {
-            let disk_idx = idx - self.mem_len();
-            if disk_idx < self.disk_len() {
-                let k  = self.offline_set[disk_idx].clone();
-                return self.fetch(&k).map(|r| (k,r));
-            } else {
-                Err(Box::new(IndexError{
-                    msg: format!("Expected key val at {}",disk_idx),
-                    kind: IndexErrorKind::LogicError,
-                }))
-            }
-        }
+        let k = self.load_into_mem(idx)?;
+        let (_,v) = self.get_from_mem(&k).ok_or(Box::new(IndexError{
+            msg: format!(""),
+            kind: IndexErrorKind::LogicError
+        }))?;
+
+        Ok((k,v))
     }
 
     pub fn get< Q: ?Sized>(& mut self, k: & Q) -> Result<Option<& V>,Box<dyn Error>>

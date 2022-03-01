@@ -4,7 +4,6 @@ members = [
     "api",
     "index",
     "parser",
-    "scoring",
     "retrieval",
     "utils",
     "integration_tests",

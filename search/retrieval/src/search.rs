@@ -7,11 +7,11 @@ use itertools::Itertools;
 use parser::ast::{BinaryOp, Query, UnaryOp};
 use parser::errors::{QueryError, QueryErrorKind};
 use preprocessor::{Preprocessor, ProcessingOptions};
-use scoring::scoring::tfidf_query;
+use crate::{tfidf_query};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use utils::utils::merge;
-use log::{debug};
+use log::debug;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct ScoredDocument {

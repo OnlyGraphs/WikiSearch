@@ -12,7 +12,6 @@ path = "src/lib.rs"
 [dependencies]
 utils = { path = "../utils" }
 parser = { path = "../parser" }
-scoring = { path = "../scoring" }
 index = { path = "../index" }
 preprocessor = { git = "https://github.com/OnlyGraphs/Preprocessor", branch="makspll-patch-1" }
 itertools = "0.10.3"

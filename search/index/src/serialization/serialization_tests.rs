@@ -194,46 +194,46 @@ fn test_from_and_to_iter(){
     assert_eq!(iter.next().unwrap(),target_2);
 }
 
-#[test]
-fn test_disk_hash_map_above_capacity(){
-    let mut d = DiskHashMap::<String,u32,2>::new(2);
+// #[test]
+// fn test_disk_hash_map_above_capacity(){
+//     let mut d = DiskHashMap::<String,u32,2>::new(2);
 
-    d.insert("0123".to_string(),32).unwrap();
-    d.insert("3210".to_string(),16).unwrap();
-    d.insert("1023".to_string(),8).unwrap();
+//     d.insert("0123".to_string(),32).unwrap();
+//     d.insert("3210".to_string(),16).unwrap();
+//     d.insert("1023".to_string(),8).unwrap();
 
-    assert_eq!(*d.get("0123").unwrap().unwrap(),32 as u32);
-    assert_eq!(*d.get("1023").unwrap().unwrap(),8 as u32);
-    assert_eq!(d.disk_len(),1);
-    assert_eq!(d.len(),3);
+//     assert_eq!(*d.get("0123").unwrap().unwrap(),32 as u32);
+//     assert_eq!(*d.get("1023").unwrap().unwrap(),8 as u32);
+//     assert_eq!(d.disk_len(),1);
+//     assert_eq!(d.len(),3);
 
-}
+// }
 
-#[test]
-fn test_disk_hash_map_zero_capacity(){
-    let mut d = DiskHashMap::<String,u32,0>::new(2);
+// #[test]
+// fn test_disk_hash_map_zero_capacity(){
+//     let mut d = DiskHashMap::<String,u32,0>::new(2);
 
-    d.insert("0123".to_string(),32).unwrap();
-    d.insert("3210".to_string(),16).unwrap();
-    d.insert("1023".to_string(),8).unwrap();
+//     d.insert("0123".to_string(),32).unwrap();
+//     d.insert("3210".to_string(),16).unwrap();
+//     d.insert("1023".to_string(),8).unwrap();
 
-    assert_eq!(*d.get("1023").unwrap().unwrap(),8 as u32);
-    assert_eq!(d.disk_len(),2);
-    assert_eq!(d.len(),3);
-}
+//     assert_eq!(*d.get("1023").unwrap().unwrap(),8 as u32);
+//     assert_eq!(d.disk_len(),2);
+//     assert_eq!(d.len(),3);
+// }
 
-#[test]
-fn test_disk_hash_map_insert_existing(){
-    let mut d = DiskHashMap::<String,u32,1>::new(2);
+// #[test]
+// fn test_disk_hash_map_insert_existing(){
+//     let mut d = DiskHashMap::<String,u32,1>::new(2);
 
-    d.insert("0123".to_string(),32).unwrap();
-    let o = d.insert("0123".to_string(),16);
+//     d.insert("0123".to_string(),32).unwrap();
+//     let o = d.insert("0123".to_string(),16);
 
-    assert_eq!(*d.get("0123").unwrap().unwrap(),16  as u32);
-    assert_eq!(o.unwrap(),Some(32));
-    assert_eq!(d.len(),1);
-    assert_eq!(d.disk_len(),0);
-}
+//     assert_eq!(*d.get("0123").unwrap().unwrap(),16  as u32);
+//     assert_eq!(o.unwrap(),Some(32));
+//     assert_eq!(d.len(),1);
+//     assert_eq!(d.disk_len(),0);
+// }
 
 #[test]
 fn test_disk_hash_map_remove(){
@@ -329,27 +329,30 @@ fn test_disk_hash_map_clean_up(){
 }
 
 #[test]
-fn test_disk_hash_map_iter_keys(){
-    let mut d = DiskHashMap::<String,u32,0>::new(2);
+fn test_disk_hash_map_iter_idx(){
+    let mut d = DiskHashMap::<String,u32,0>::new(0);
 
     d.insert("0123".to_string(),16).unwrap();
     d.insert("0124".to_string(),32).unwrap();
 
-    let ref mut iter = d.iter_keys();
-    assert_eq!(*iter.next().unwrap(),"0124".to_string());
-    assert_eq!(*iter.next().unwrap(),"0123".to_string());
+    let ref mut iter = d.iter_idx();
+    assert_eq!(iter.next(),Some(0));
+    assert_eq!(iter.next(),Some(1));
 
 }
 
 #[test]
-fn test_disk_hash_map_iter_keys_collect(){
-    let mut d = DiskHashMap::<String,String,0>::new(2);
+fn test_disk_hash_map_iter_idx_retrieve_vals_and_keys(){
+    let mut d = DiskHashMap::<String,String,0>::new(0);
 
     d.insert("0123".to_string(),"a".to_string()).unwrap();
     d.insert("0124".to_string(),"b".to_string()).unwrap();
-    let a : Vec<String> = d.iter_keys().owned().collect();
+
+    let collect : Vec<String> = d.iter_idx().map(|s| {
+        d.get_by_index(s).unwrap().1.clone()
+    }).collect();
     
     assert_eq!(
-        a,
-        vec!["0124".to_string(),"0123".to_string()])
+        collect,
+        vec!["b".to_string(),"a".to_string()])
 }

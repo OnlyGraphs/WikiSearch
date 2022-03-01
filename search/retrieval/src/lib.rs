@@ -1,3 +1,4 @@
 pub mod search;
+pub mod scoring;
 
-pub use search::*;
+pub use {search::*, scoring::*};
