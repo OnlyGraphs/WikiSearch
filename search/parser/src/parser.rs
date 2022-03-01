@@ -52,11 +52,11 @@ pub fn parse_separator(nxt: &str) -> IResult<&str, &str> {
     take_while(is_seperator)(nxt)
 }
 
-pub fn is_OR(nxt: &str) -> bool {
+pub fn is_or(nxt: &str) -> bool {
     return nxt == "OR";
 }
 
-pub fn is_AND(nxt: &str) -> bool {
+pub fn is_and(nxt: &str) -> bool {
     return nxt == "AND";
 }
 
@@ -280,7 +280,7 @@ pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, d) = digit1(nxt)?;
 
     // Convert hops to int
-    let mut hops: u32 = 0;
+    let hops;
 
     match d.parse::<u32>() {
         Ok(n) => hops = n,
@@ -314,7 +314,7 @@ pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, sub) = parse_query(nxt)?;
 
     // Convert hops to int
-    let mut hops: u32 = 0;
+    let hops;
 
     match d.parse::<u32>() {
         Ok(n) => hops = n,

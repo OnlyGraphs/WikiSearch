@@ -233,7 +233,6 @@ fn test_parse_simple_wildcard_query() {
     let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
-        _ => assert!(false),
     }
 }
 
@@ -247,7 +246,6 @@ fn test_parse_wildcard_query_with_whitespace() {
     let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
-        _ => assert!(false),
     }
 }
 
@@ -261,7 +259,6 @@ fn test_parse_wildcard_query_no_prefix() {
     let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
-        _ => assert!(false),
     }
 }
 
@@ -275,7 +272,6 @@ fn test_parse_simple_wildcard_query_no_suffix() {
     let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
-        _ => assert!(false),
     }
 }
 
