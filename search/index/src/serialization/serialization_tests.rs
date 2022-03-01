@@ -1,7 +1,3 @@
-
-
-use streaming_iterator::StreamingIterator;
-
 use crate::{
     DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting, SequentialEncoder, Serializable,
 };

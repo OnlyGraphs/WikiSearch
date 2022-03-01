@@ -231,7 +231,7 @@ where
         if self.contains_key(&k) {
              return Ok(self.online_map.get_mut(&k).unwrap());
         } else {
-            self.insert(k,V::default());
+            self.insert(k,V::default())?;
             // get ref from top of online map
             return Ok(self.online_map.last_mut().unwrap().1)
         }
@@ -339,7 +339,7 @@ where
     {
         // TODO: bring in adjacent records into RAM as well
 
-        self.evict_victim_if_insert_overflows();
+        self.evict_victim_if_insert_overflows()?;
 
         // deserialize
         let key = k.to_owned();

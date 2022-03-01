@@ -201,19 +201,19 @@ impl IndexBenchParameters {
         o
     }
 
-    fn from_word_count(c: u32) -> Self {
-        let mut o = Self::default();
-        o.words_count = c;
-        o.id = o.words_count.to_string();
-        o
-    }
+    // fn from_word_count(c: u32) -> Self {
+    //     let mut o = Self::default();
+    //     o.words_count = c;
+    //     o.id = o.words_count.to_string();
+    //     o
+    // }
 
-    fn from_link_count(c: u32) -> Self {
-        let mut o = Self::default();
-        o.links_count = c;
-        o.id = o.links_count.to_string();
-        o
-    }
+    // fn from_link_count(c: u32) -> Self {
+    //     let mut o = Self::default();
+    //     o.links_count = c;
+    //     o.id = o.links_count.to_string();
+    //     o
+    // }
 }
 
 impl Display for IndexBenchParameters {
