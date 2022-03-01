@@ -9,6 +9,7 @@ pub enum IndexErrorKind {
     InvalidOperation,
     BuildFailed,
     GRPCBadStatus,
+    LogicError,
     Error,
 }
 
@@ -17,6 +18,7 @@ pub struct IndexError {
     pub msg: String,
     pub kind: IndexErrorKind,
 }
+
 
 impl fmt::Display for IndexError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -59,3 +61,4 @@ impl From<IndexError> for std::io::Error {
         std::io::Error::new(std::io::ErrorKind::Other, e)
     }
 }
+
