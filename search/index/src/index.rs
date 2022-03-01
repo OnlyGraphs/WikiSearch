@@ -74,12 +74,16 @@ impl Debug for BasicIndex {
         // split calculation to avoid recalculating
         let posting_mem = self.posting_nodes.real_mem();
         let links_mem = self.links.real_mem();
+        let incoming_links_mem = self.incoming_links.real_mem();
         let extent_mem = self.extent.real_mem();
+        let last_updated_docs_mem = self.last_updated_docs.real_mem();
 
         let real_mem = self.dump_id.real_mem()
             + posting_mem
             + links_mem
-            + extent_mem;
+            + incoming_links_mem
+            + extent_mem
+            + last_updated_docs_mem;
 
         let mem = real_mem as f64 / 1000000.0;
         let docs = self.links.len();
@@ -96,6 +100,7 @@ impl Debug for BasicIndex {
             \t\tpostings:{:.3}Mb\n\
             \t\tlinks:{:.3}Mb\n\
             \t\textent:{:.3}Mb\n\
+            \t\tmetadata:{:.3}Mb\n\
             \t}}\n\
             }}",
             self.dump_id,
@@ -104,8 +109,9 @@ impl Debug for BasicIndex {
             mem,
             ((mem / 1000.0) / (docs as f64)) * 1000000.0,
             posting_mem as f64 / 1000000.0,
-            links_mem as f64 / 1000000.0,
+            (links_mem + incoming_links_mem) as f64 / 1000000.0,
             extent_mem as f64 / 1000000.0,
+            last_updated_docs_mem as f64 / 1000000.0
         )
     }
 }
@@ -141,7 +147,7 @@ impl Index for BasicIndex {
     }
 
     fn get_number_of_documents(&self) -> u32 {
-        return 0; //self.id_title_map.len() as u32;
+        self.last_updated_docs.len() as u32
     }
 
     // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory

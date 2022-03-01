@@ -21,6 +21,7 @@ use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocu
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 
@@ -162,6 +163,7 @@ pub async fn search(
                     .try_get("abstracts")
                     .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
                 Ok::<Document, APIError>(Document {
+                    id: doc.doc_id,
                     title: title,
                     article_abstract: abstracts,
                     score: doc.score,
@@ -190,18 +192,28 @@ pub async fn relational(
         .map_err(|_e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
 
     // construct + execute query
+    let root_article = sqlx::query(
+        "SELECT a.articleid
+        From article as a
+        where a.title=`$1`",
+    ).bind(&q.root)
+    .fetch_one(&pool)
+    .await
+    .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+
+    let root_id : i64 = root_article.try_get("articleid")
+        .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+
     let idx = data.index_rest.read().map_err(|e| 
         APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
-    let (_, ref mut query) = parse_query(&format!(
-        "#LINKEDTO, {},{} {}",
-        q.root,
-        q.hops,
-        q.query
+    let (_, ref mut query) = parse_query(
+        &format!("#LINKEDTO, {},{} {}",root_id,q.hops,
+            q.query
             .clone()
             .map(|v| format!(",{}", v))
             .unwrap_or("".to_string())
-    )).map_err(|e| 
-        APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+        )).map_err(|e| 
+            APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
 
     debug!("Query: {:?}", query);
 
@@ -210,6 +222,8 @@ pub async fn relational(
     let mut postings = execute_query(query, &idx);
     let scored_documents = score_query(query, &idx, &mut postings); // page rank and stuff
 
+    // keep track of the translations between titles and ids 
+    // as well as the documents present in the query for later
     // get documents
     let documents = scored_documents
         .iter()
@@ -229,7 +243,9 @@ pub async fn relational(
                     .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
                 let abstracts: String = sql.try_get("abstracts")
                     .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                
                 Ok::<Document, APIError>(Document {
+                    id: doc.doc_id,
                     title: title,
                     article_abstract: abstracts,
                     score: doc.score,
@@ -241,6 +257,9 @@ pub async fn relational(
         .await
         .into_iter()
         .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
+    
+    let mut title_map : HashMap::<u32, &str> = HashMap::with_capacity(documents.len());
+    documents.iter().for_each(|d| {title_map.insert(d.id,&d.title);});
 
     // find links
     // TODO: this is extremely inefficient, we only need links between documents retrieved
@@ -248,25 +267,32 @@ pub async fn relational(
     let relations: Vec<Relation> = scored_documents
         .iter()
         .flat_map(|ScoredDocument { doc_id, score: _ }| {
-            debug!("{:?},{:?}", *doc_id, idx.get_links(*doc_id));
             idx.get_links(*doc_id)
                 .iter()
-                .map(|id| {
-                    debug!("{:?}", id);
-                    todo!()
-                    // Relation {
-                    //     source: idx.id_to_title(*doc_id).unwrap().to_string(),
-                    //     destination: idx.id_to_title(*id).unwrap().to_string(),
-                    // }
+                .filter_map(|target| {
+                    if !title_map.contains_key(target){
+                        None 
+                    } else {
+                        Some(Relation {
+                            source: title_map.get(&doc_id).unwrap().to_string(),
+                            destination: title_map.get(&target).unwrap().to_string(),
+                        })
+                    }
                 })
-                .chain(idx.get_incoming_links(*doc_id).iter().map(|_id| todo!()
-                //     Relation {
-                //     source: idx.id_to_title(*id).unwrap().to_string(),
-                //     destination: idx.id_to_title(*doc_id).unwrap().to_string(),
-                // }
-            ))
+                .chain(idx.get_incoming_links(*doc_id)
+                .iter()
+                .filter_map(|source| {
+                    if !title_map.contains_key(source){
+                        None
+                    } else {
+                        Some(Relation {
+                            source: title_map.get(&source).unwrap().to_string(),
+                            destination: title_map.get(&doc_id).unwrap().to_string(),
+                        })
+                    }
+                }))
                 .collect::<Vec<Relation>>()
-        })
+            })
         .collect();
 
     Ok(Json(RelationSearchOutput {

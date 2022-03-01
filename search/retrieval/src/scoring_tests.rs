@@ -1,7 +1,7 @@
 use crate::scoring::{idf, tfidf_query, tfidf_term};
+use index::PreIndex;
 use index::utils::get_document_with_text;
 use index::{
-    collections::SmallPostingMap,
     index::{BasicIndex, Index},
 };
 use parser::ast::{BinaryOp, Query, UnaryOp};
@@ -17,8 +17,9 @@ fn test_idf() {
 
 #[test]
 fn test_tfidf_term() {
-    let mut idx: Box<dyn Index> = Box::new(BasicIndex::<SmallPostingMap>::default());
-    idx.add_document(get_document_with_text(
+    let mut pre_idx = PreIndex::default();
+
+    pre_idx.add_document(get_document_with_text(
         1,
         "Strictly non-aquatic mammals",
         vec![("", "aaa bbb")],
@@ -28,7 +29,7 @@ fn test_tfidf_term() {
     ))
     .unwrap();
 
-    idx.add_document(get_document_with_text(
+    pre_idx.add_document(get_document_with_text(
         2,
         "All about big whales",
         vec![("", "aaa bbb")],
@@ -37,7 +38,7 @@ fn test_tfidf_term() {
         "ggg hhh",
     )).unwrap();
 
-    idx.finalize().unwrap();
+    let mut idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
     let df_whale = 2.0;
     let tf_whale_1 = 1.0;
@@ -56,8 +57,9 @@ fn test_tfidf_term() {
 
 #[test]
 fn test_tfidf_term_2() {
-    let mut idx: Box<dyn Index> = Box::new(BasicIndex::<SmallPostingMap>::default());
-    idx.add_document(get_document_with_text(
+    let mut pre_idx = PreIndex::default();
+
+    pre_idx.add_document(get_document_with_text(
         1,
         "Strictly non-aquatic mammals",
         vec![("", "aaa bbb")],
@@ -67,7 +69,7 @@ fn test_tfidf_term_2() {
     ))
     .unwrap();
 
-    idx.add_document(get_document_with_text(
+    pre_idx.add_document(get_document_with_text(
         2,
         "All about big whales",
         vec![("", "aaa bbb")],
@@ -76,7 +78,7 @@ fn test_tfidf_term_2() {
         "ggg hhh",
     )).unwrap();
 
-    idx.finalize().unwrap();
+    let mut idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
     let df_big = 1.0;
     let tf_big_2 = 2.0;
@@ -94,8 +96,8 @@ fn test_tfidf_term_2() {
 
 #[test]
 fn test_tfidf_simple_phrase_query() {
-    let mut idx: Box<dyn Index> = Box::new(BasicIndex::<SmallPostingMap>::default());
-    idx.add_document(get_document_with_text(
+    let mut pre_idx = PreIndex::default();
+    pre_idx.add_document(get_document_with_text(
         1,
         "Strictly non aquatic mammals",
         vec![("", "aaa bbb")],
@@ -105,7 +107,7 @@ fn test_tfidf_simple_phrase_query() {
     ))
     .unwrap();
 
-    idx.add_document(get_document_with_text(
+    pre_idx.add_document(get_document_with_text(
         2,
         "All about big whales",
         vec![("", "aaa bbb")],
@@ -114,7 +116,7 @@ fn test_tfidf_simple_phrase_query() {
         "ggg hhh",
     )).unwrap();
 
-    idx.finalize().unwrap();
+    let mut idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
     let query = Box::new(Query::FreetextQuery {
         tokens: vec!["big".to_string(), "whale".to_string()],
@@ -144,8 +146,8 @@ fn test_tfidf_simple_phrase_query() {
 
 #[test]
 fn test_simple_binary_query() {
-    let mut idx: Box<dyn Index> = Box::new(BasicIndex::<SmallPostingMap>::default());
-    idx.add_document(get_document_with_text(
+    let mut pre_idx = PreIndex::default();
+    pre_idx.add_document(get_document_with_text(
         1,
         "Strictly non aquatic mammals",
         vec![("", "aaa bbb")],
@@ -155,7 +157,7 @@ fn test_simple_binary_query() {
     ))
     .unwrap();
 
-    idx.add_document(get_document_with_text(
+    pre_idx.add_document(get_document_with_text(
         2,
         "All about big whales",
         vec![("", "aaa bbb")],
@@ -164,7 +166,7 @@ fn test_simple_binary_query() {
         "ggg hhh",
     )).unwrap();
 
-    idx.finalize().unwrap();
+    let mut idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
     let query = Box::new(Query::BinaryQuery {
         op: BinaryOp::And,
@@ -200,8 +202,8 @@ fn test_simple_binary_query() {
 
 #[test]
 fn test_nested_binary_query() {
-    let mut idx: Box<dyn Index> = Box::new(BasicIndex::<SmallPostingMap>::default());
-    idx.add_document(get_document_with_text(
+    let mut pre_idx = PreIndex::default();
+    pre_idx.add_document(get_document_with_text(
         1,
         "Strictly non aquatic mammals",
         vec![("", "aaa bbb")],
@@ -211,7 +213,7 @@ fn test_nested_binary_query() {
     ))
     .unwrap();
 
-    idx.add_document(get_document_with_text(
+    pre_idx.add_document(get_document_with_text(
         2,
         "All about big whales",
         vec![("", "aaa bbb")],
@@ -220,7 +222,7 @@ fn test_nested_binary_query() {
         "ggg hhh",
     )).unwrap();
 
-    idx.finalize().unwrap();
+    let mut idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
     let query = Box::new(Query::BinaryQuery {
         op: BinaryOp::And,
@@ -259,8 +261,8 @@ fn test_nested_binary_query() {
 
 #[test]
 fn test_simple_relation_query() {
-    let mut idx: Box<dyn Index> = Box::new(BasicIndex::<SmallPostingMap>::default());
-    idx.add_document(get_document_with_text(
+    let mut pre_idx = PreIndex::default();
+    pre_idx.add_document(get_document_with_text(
         1,
         "Strictly non aquatic mammals",
         vec![("", "aaa bbb")],
@@ -270,10 +272,10 @@ fn test_simple_relation_query() {
     ))
     .unwrap();
 
-    idx.finalize().unwrap();
+    let mut idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
     let query = Box::new(Query::RelationQuery {
-        root: "All about big whales".to_string(),
+        root: 1,
         hops: 3,
         sub: None,
     });
@@ -283,8 +285,10 @@ fn test_simple_relation_query() {
 
 #[test]
 fn test_nested_relation_query() {
-    let mut idx: Box<dyn Index> = Box::new(BasicIndex::<SmallPostingMap>::default());
-    idx.add_document(get_document_with_text(
+    let mut pre_idx = PreIndex::default();
+
+
+    pre_idx.add_document(get_document_with_text(
         1,
         "Strictly non aquatic mammals",
         vec![("", "aaa bbb")],
@@ -294,7 +298,7 @@ fn test_nested_relation_query() {
     ))
     .unwrap();
 
-    idx.add_document(get_document_with_text(
+    pre_idx.add_document(get_document_with_text(
         2,
         "All about big whales",
         vec![("", "aaa bbb")],
@@ -303,10 +307,10 @@ fn test_nested_relation_query() {
         "ggg hhh",
     )).unwrap();
 
-    idx.finalize().unwrap();
+    let mut idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
     let query = Box::new(Query::RelationQuery {
-        root: "All about big whales".to_string(),
+        root: 2,
         hops: 3,
         sub: Some(Box::new(Query::BinaryQuery {
             op: BinaryOp::And,
