@@ -19,7 +19,6 @@ pub struct IndexError {
     pub kind: IndexErrorKind,
 }
 
-
 impl fmt::Display for IndexError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -61,4 +60,3 @@ impl From<IndexError> for std::io::Error {
         std::io::Error::new(std::io::ErrorKind::Other, e)
     }
 }
-

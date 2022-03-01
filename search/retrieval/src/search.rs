@@ -1,17 +1,17 @@
+use crate::tfidf_query;
 use chrono::NaiveDateTime;
 use index::{
     index::Index,
     index_structs::{PosRange, Posting},
 };
 use itertools::Itertools;
+use log::debug;
 use parser::ast::{BinaryOp, Query, UnaryOp};
 use parser::errors::{QueryError, QueryErrorKind};
 use preprocessor::{Preprocessor, ProcessingOptions};
-use crate::{tfidf_query};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use utils::utils::merge;
-use log::debug;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct ScoredDocument {
