@@ -76,14 +76,14 @@ pub struct Document {
 /// Represents a relation between two articles
 /// where source is the origin of a link
 /// and destination is the destination of the link
-#[derive(Serialize)]
+#[derive(Serialize,Debug, Hash, PartialEq, Eq)]
 pub struct Relation {
     pub source: String,
     pub destination: String,
 }
 
 /// Represents a collection of documents and relations
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct RelationSearchOutput {
     pub documents: Vec<Document>,
     pub relations: Vec<Relation>,

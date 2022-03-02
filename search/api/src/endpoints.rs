@@ -4,6 +4,7 @@ use crate::structs::{
     SearchParameters, UserFeedback,
 };
 use actix_web::ResponseError;
+use actix_web::http::header::{HttpDate, ContentType};
 use actix_web::{
     get,
     http::StatusCode,
@@ -21,19 +22,25 @@ use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocu
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::fmt;
+use std::collections::{HashMap, HashSet};
+use std::fmt::{self, Display};
 use std::fmt::Debug;
 
-#[derive(Debug, Clone)]
 pub struct APIError {
     pub code: StatusCode,
     pub msg: String,
+    pub hidden_msg: String,
 }
 
 impl fmt::Display for APIError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.msg)
+    }
+}
+
+impl fmt::Debug for APIError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("APIError").field("code", &self.code).field("msg", &self.msg).field("hidden_msg", &self.hidden_msg).finish()
     }
 }
 
@@ -44,38 +51,29 @@ impl ResponseError for APIError {
 }
 
 impl APIError {
-    fn from_status_code(s: StatusCode) -> Self {
-        APIError {
-            code: s,
-            msg: "".to_string(),
-        }
+    fn error_response(&self) -> HttpResponse {
+        HttpResponse::build(self.status_code())
+        .insert_header(ContentType::html())
+        .body(self.to_string())
     }
 
-    fn from_printable<T: Debug>(p: T, s: StatusCode) -> Self {
-        APIError {
-            code: s,
-            msg: format!("{:?}", p),
-        }
-    }
-}
-
-impl From<QueryError> for APIError {
-    fn from(e: QueryError) -> Self {
-        APIError {
+    fn new_user_error<T : Display, O : Display>( user_msg : &T, hidden_msg : &O) -> Self {
+        APIError{
             code: StatusCode::UNPROCESSABLE_ENTITY,
-            msg: format!("{:?}", e),
+            hidden_msg: hidden_msg.to_string(),
+            msg: user_msg.to_string(),
+        }
+    }
+
+    fn new_internal_error<T : Display + ?Sized>( hidden_msg : &T) -> Self {
+        APIError{
+            code: StatusCode::INTERNAL_SERVER_ERROR,
+            hidden_msg: hidden_msg.to_string(),
+            msg: "Something went wrong, please try again later!".to_string(),
         }
     }
 }
 
-impl From<IndexError> for APIError {
-    fn from(e: IndexError) -> Self {
-        APIError {
-            code: StatusCode::INTERNAL_SERVER_ERROR,
-            msg: format!("{:?}", e),
-        }
-    }
-}
 
 impl std::error::Error for APIError {}
 
@@ -98,16 +96,17 @@ pub async fn search(
         .max_connections(1)
         .connect(&data.connection_string)
         .await
-        .map_err(|_e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map_err(|_e| APIError::new_internal_error("Failed to initialise connection with postgres"))?;
 
     // construct + execute query
     let idx = data
         .index_rest
         .read()
-        .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+        .map_err(|e| APIError::new_internal_error(&e))?;
     let (_, ref mut query) = parse_query(&q.query)
-        .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
-    preprocess_query(query)?;
+        .map_err(|e| APIError::new_user_error(&e,&e))?;
+    
+    preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
 
     let mut postings = execute_query(query, &idx);
 
@@ -156,14 +155,14 @@ pub async fn search(
                 .bind(doc.doc_id as i64)
                 .fetch_one(&pool_cpy)
                 .await
-                .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                .map_err(|e| APIError::new_internal_error(&e))?;
 
                 let title: String = sql
                     .try_get("title")
-                    .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                    .map_err(|e| APIError::new_internal_error(&e))?;
                 let abstracts: String = sql
                     .try_get("abstracts")
-                    .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                    .map_err(|e| APIError::new_internal_error(&e))?;
                 Ok::<Document, APIError>(Document {
                     id: doc.doc_id,
                     title: title,
@@ -177,7 +176,6 @@ pub async fn search(
         .await
         .into_iter()
         .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
-
     Ok(Json(future_documents))
 }
 
@@ -191,41 +189,45 @@ pub async fn relational(
         .max_connections(1)
         .connect(&data.connection_string)
         .await
-        .map_err(|_e| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map_err(|e| APIError::new_internal_error(&e))?;
 
     // construct + execute query
     let root_article = sqlx::query(
         "SELECT a.articleid
         From article as a
-        where a.title=`$1`",
+        where a.title=$1",
     )
-    .bind(&q.root)
+    .bind(q.root.clone())
     .fetch_one(&pool)
     .await
-    .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+    .map_err(|e| APIError::new_user_error(
+        &format!("The root article provided `{}` is not a valid root article title",q.root),&e))?;
+    
 
     let root_id: i64 = root_article
         .try_get("articleid")
-        .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map_err(|e| APIError::new_internal_error(&e))?;
 
     let idx = data
         .index_rest
         .read()
-        .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
-    let (_, ref mut query) = parse_query(&format!(
-        "#LINKEDTO, {},{} {}",
+        .map_err(|e| APIError::new_internal_error(&e))?;
+    
+    
+    let query_string = format!(
+        "#LINKSTO, {},{} {}",
         root_id,
         q.hops,
         q.query
             .clone()
             .map(|v| format!(",{}", v))
-            .unwrap_or("".to_string())
-    ))
-    .map_err(|e| APIError::from_printable(e, StatusCode::UNPROCESSABLE_ENTITY))?;
+            .unwrap_or("".to_string()));
+    debug!("{:?}", query_string);
+    let (_, ref mut query) = parse_query(&query_string)
+        .map_err(|e| APIError::new_user_error(&e,&e))?;
 
-    debug!("Query: {:?}", query);
 
-    preprocess_query(query)?;
+    preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
 
     let mut postings = execute_query(query, &idx);
     let scored_documents = score_query(query, &idx, &mut postings); // page rank and stuff
@@ -246,14 +248,14 @@ pub async fn relational(
                 .bind(doc.doc_id as i64)
                 .fetch_one(&pool_cpy)
                 .await
-                .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                .map_err(|e| APIError::new_internal_error(&e))?;
 
                 let title: String = sql
                     .try_get("title")
-                    .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                    .map_err(|e| APIError::new_internal_error(&e))?;
                 let abstracts: String = sql
                     .try_get("abstracts")
-                    .map_err(|_| APIError::from_status_code(StatusCode::INTERNAL_SERVER_ERROR))?;
+                    .map_err(|e| APIError::new_internal_error(&e))?;
 
                 Ok::<Document, APIError>(Document {
                     id: doc.doc_id,
@@ -277,9 +279,10 @@ pub async fn relational(
     // find links
     // TODO: this is extremely inefficient, we only need links between documents retrieved
     // also there may be duplicates, need to retrieve this while crawling the graph
-    let relations: Vec<Relation> = scored_documents
+    let relations: HashSet<Relation> = scored_documents
         .iter()
         .flat_map(|ScoredDocument { doc_id, score: _ }| {
+            debug!("DOC: {}",doc_id);
             idx.get_links(*doc_id)
                 .iter()
                 .filter_map(|target| {
@@ -305,10 +308,10 @@ pub async fn relational(
                 .collect::<Vec<Relation>>()
         })
         .collect();
-
+    
     Ok(Json(RelationSearchOutput {
         documents: documents,
-        relations: relations,
+        relations: relations.into_iter().collect(),
     }))
 }
 

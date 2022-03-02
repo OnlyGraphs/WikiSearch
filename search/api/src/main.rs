@@ -2,6 +2,7 @@ use actix_cors::Cors;
 use actix_files::{Files, NamedFile};
 use actix_web::dev::ServiceRequest;
 use actix_web::dev::ServiceResponse;
+use actix_web::middleware::Logger;
 use actix_web::{App, HttpServer};
 use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
@@ -165,14 +166,17 @@ async fn run_rest(
     let bind_address = format!("{}:{}", ip, port);
 
     info!("Binding to: {}", bind_address);
-
+    
     HttpServer::new(move || {
         let cors = Cors::permissive();
         let data = RESTSearchData {
             index_rest: index_rest.clone(),
             connection_string: connection_string.clone(),
         };
+        let logger = Logger::default();
+
         App::new()
+            .wrap(logger)
             .wrap(cors)
             .data(data)
             .service(endpoints::search)
@@ -193,7 +197,7 @@ async fn run_rest(
                                 Ok(v) => v,
                                 Err(_) => NamedFile::open_async(format!("{}/{}", root, "404.html"))
                                     .await
-                                    .expect("No file named 404.html in staticfiles!"),
+                                    .expect("No file named 404.html in static_dir"),
                             };
 
                             let res = file.into_response(&http_req);
