@@ -14,6 +14,7 @@ use pretty_env_logger;
 use search_lib::endpoints;
 use search_lib::grpc_server::CheckIndexService;
 use search_lib::structs::RESTSearchData;
+use core::time;
 use std::process;
 use std::{
     env,
@@ -51,8 +52,7 @@ fn main() -> std::io::Result<()> {
     let connection_string_grpc = connection_string.clone();
     let index_grpc = index.clone();
     thread::spawn(move || {
-        let mut retries = 3;
-        while retries > 0 {
+        loop {
             let status = run_grpc(
                 index_grpc.clone(),
                 grpc_address.clone(),
@@ -61,13 +61,10 @@ fn main() -> std::io::Result<()> {
 
             if status.is_err() {
                 error!("GRPC server error: {:?}", status.err().unwrap());
-                error!("GRPC server failed, restarting..");
-                retries -= 1;
-                if retries <= 0 {
-                    error!("Retried 3 times, GRPC offline.");
-                }
+                info!("GRPC server failed, restarting in 30s ..");
+                thread::sleep(time::Duration::from_secs(30));
             } else {
-                info!("Launched GRPC server successfully.");
+                info!("GRPC server successfully shutdown.");
                 break;
             }
         }
@@ -75,8 +72,7 @@ fn main() -> std::io::Result<()> {
     let connection_string_rest = connection_string.clone();
     let index_rest = index.clone();
     let handle = thread::spawn(move || {
-        let mut retries = 3;
-        while retries > 0 {
+        loop {
             let status = run_rest(
                 rest_ip.clone(),
                 rest_port.clone(),
@@ -86,13 +82,11 @@ fn main() -> std::io::Result<()> {
             );
             if status.is_err() {
                 error!("REST service error: {:?}", status.err().unwrap());
-                error!("REST service failed, restarting..");
-                retries -= 1;
-                if retries <= 0 {
-                    error!("Retried 3 times, REST service offline");
-                }
+                info!("REST service failed, restarting..");
+                info!("REST service failed, retrying in 30s ..");
+                thread::sleep(time::Duration::from_secs(30));
             } else {
-                info!("Launched REST service successfully.");
+                info!("REST service successfully shutdown.");
                 break;
             }
         }
