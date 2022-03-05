@@ -107,6 +107,6 @@ impl Default for DefaultPage {
 
 #[derive(Debug)]
 pub struct RESTSearchData {
-    pub index_rest: Arc<RwLock<Box<dyn Index>>>,
+    pub index_rest: Arc<RwLock<Index>>,
     pub connection_string: String, //Used to query Database for metadata results like Title or Abstracts
 }

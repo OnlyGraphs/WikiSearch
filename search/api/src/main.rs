@@ -8,19 +8,21 @@ use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
     CheckIndexRequest,
 };
-use index::index::{BasicIndex, Index};
+use index::index::{Index};
 use log::{error, info};
 use pretty_env_logger;
 use search_lib::endpoints;
 use search_lib::grpc_server::CheckIndexService;
 use search_lib::structs::RESTSearchData;
 use core::time;
+use std::path::Path;
 use std::process;
 use std::{
     env,
     io::{Error, ErrorKind},
     sync::{Arc, RwLock},
     thread,
+    fs::read_dir
 };
 use tonic::{transport::Server, Request};
 
@@ -43,9 +45,13 @@ fn main() -> std::io::Result<()> {
     let rest_ip: String = env::var("SEARCH_IP").unwrap_or(DEFAULT_REST_IP.to_string());
     let rest_port = env::var("SEARCH_PORT").unwrap_or(DEFAULT_REST_PORT.to_string());
     let static_serve_dir = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string());
+    
+    info!("Reading Directories at STATIC_DIR:");
+    read_dir(Path::new(&static_serve_dir)).unwrap().map(|v| v.unwrap().path())
+     .for_each(|v| info!("\t {}",v.display()) );
 
     // create shared memory for index
-    let index: Arc<RwLock<Box<dyn Index>>> = Arc::new(RwLock::new(Box::new(BasicIndex::default())));
+    let index: Arc<RwLock<Index>> = Arc::new(RwLock::new(Index::default()));
 
     // the rust docs seemed to perform multiple joins
     // with redeclarations of the handle, no idea if any version of that would work
@@ -101,7 +107,7 @@ fn main() -> std::io::Result<()> {
 
 #[actix_web::main]
 async fn run_grpc<'a>(
-    index_grpc: Arc<RwLock<Box<dyn Index>>>,
+    index_grpc: Arc<RwLock<Index>>,
     grpc_address: String,
     connection_string: String,
 ) -> std::io::Result<()> {
@@ -152,7 +158,7 @@ async fn run_rest(
     ip: String,
     port: String,
     static_dir: String,
-    index_rest: Arc<RwLock<Box<dyn Index>>>,
+    index_rest: Arc<RwLock<Index>>,
     connection_string: String,
 ) -> std::io::Result<()> {
     // launch REST api
@@ -187,11 +193,11 @@ async fn run_rest(
                                 .unwrap_or(DEFAULT_STATICFILES_DIR.to_string()); // stupid af, can't just use the static_dir variable cuz of moves and lifetimes
 
                             let with_extension = format!("{}{}{}", root, http_req.path(), ".html");
-                            let file = match NamedFile::open_async(with_extension).await {
+                            let file = match NamedFile::open_async(with_extension.clone()).await {
                                 Ok(v) => v,
-                                Err(_) => NamedFile::open_async(format!("{}/{}", root, "404.html"))
+                                Err(e) => NamedFile::open_async(format!("{}/404.html", root))
                                     .await
-                                    .expect("No file named 404.html in static_dir"),
+                                    .expect(&format!("No file named 404.html at {}",root)),
                             };
 
                             let res = file.into_response(&http_req);

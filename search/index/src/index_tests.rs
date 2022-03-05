@@ -2,11 +2,12 @@ use crate::{get_document_with_date_time, PreIndex, DATE_TIME_FORMAT};
 
 use crate::utils::{get_document_with_links, get_document_with_text};
 use crate::{
-    index::{BasicIndex, Index},
+    index::{Index},
     index_structs::Posting,
 };
 use std::array::IntoIter;
 use std::collections::HashMap;
+use streaming_iterator::StreamingIterator;
 use utils::utils::MemFootprintCalculator;
 
 use chrono::NaiveDateTime;
@@ -56,7 +57,7 @@ fn test_index_date_time_parsing_correct() {
         .unwrap();
     let datetime_correct2 = NaiveDateTime::parse_from_str(actual_str2, DATE_TIME_FORMAT).unwrap();
 
-    let idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(idx.get_last_updated_date(1), Some(datetime_correct1));
     assert_eq!(idx.get_last_updated_date(2), Some(datetime_correct2));
@@ -92,7 +93,7 @@ fn test_index_date_time_parsing_incorrect() {
         .add_document(get_document_with_date_time(6, "6", incorrect_str6))
         .unwrap();
 
-    let idx = BasicIndex::default();
+    let idx = Index::default();
 
     for i in 1..7 {
         assert_eq!(idx.get_last_updated_date(i), None);
@@ -141,10 +142,10 @@ fn test_basic_index_get_postings() {
         ))
         .unwrap();
 
-    let idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(
-        *idx.get_postings("aaa").unwrap(),
+        idx.get_postings("aaa").unwrap().cloned().collect::<Vec<Posting>>(),
         vec![Posting {
             document_id: 2,
             position: 0,
@@ -152,7 +153,7 @@ fn test_basic_index_get_postings() {
     );
 
     assert_eq!(
-        *idx.get_postings("ddd").unwrap(),
+        idx.get_postings("ddd").unwrap().cloned().collect::<Vec<Posting>>(),
         vec![Posting {
             document_id: 2,
             position: 3,
@@ -160,14 +161,14 @@ fn test_basic_index_get_postings() {
     );
 
     assert_eq!(
-        *idx.get_postings("ggg").unwrap(),
+        idx.get_postings("ggg").unwrap().cloned().collect::<Vec<Posting>>(),
         vec![Posting {
             document_id: 2,
             position: 6,
         }]
     );
 
-    assert_eq!(idx.get_postings("dick"), None);
+    assert_eq!(idx.get_postings("dick").map(|v| v.cloned().collect::<Vec<Posting>>()),None);
 }
 
 #[test]
@@ -196,10 +197,10 @@ fn test_sorted_postings() {
         ))
         .unwrap();
 
-    let idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(
-        *idx.get_postings("ggg").unwrap(),
+        idx.get_postings("ggg").unwrap().cloned().collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 2,
@@ -236,10 +237,10 @@ fn test_basic_index_get_all_postings_sorted() {
         ))
         .unwrap();
 
-    let idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(
-        *idx.get_all_postings(),
+        idx.get_all_postings().cloned().collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 2,
@@ -279,7 +280,7 @@ fn test_basic_index_get_all_postings_sorted() {
 
 // #[test] TEMP REMOVAL
 // fn test_basic_index_get_extent() {
-//     let mut idx = BasicIndex::default();
+//     let mut idx = Index::default();
 
 //     idx.add_document(get_document_with_text(
 //         2,
@@ -341,7 +342,7 @@ fn test_basic_index_tf() {
         ))
         .unwrap();
 
-    let idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(idx.tf("hello", 0), 3);
     assert_eq!(idx.tf("world", 0), 3);
@@ -377,7 +378,7 @@ fn test_basic_index_df() {
         ))
         .unwrap();
 
-    let idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(idx.df("hello"), 1);
     assert_eq!(idx.df("world"), 2);
@@ -401,7 +402,7 @@ fn test_basic_index_links() {
         .add_document(get_document_with_links(2, "target2", "source, target1"))
         .unwrap();
 
-    let idx = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(idx.get_links(0), vec![1, 2]);
     assert_eq!(idx.get_links(1), vec![1, 2]);

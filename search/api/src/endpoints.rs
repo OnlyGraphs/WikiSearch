@@ -15,16 +15,18 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use index::errors::IndexError;
 use index::index_structs::Posting;
-use log::debug;
+use log::{debug, info};
 use parser::errors::QueryError;
 use parser::parser::parse_query;
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
+use streaming_iterator::StreamingIterator;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display};
 use std::fmt::Debug;
+use std::time::Instant;
 
 pub struct APIError {
     pub code: StatusCode,
@@ -91,6 +93,9 @@ pub async fn search(
     data: Data<RESTSearchData>,
     q: Query<SearchParameters>,
 ) -> Result<impl Responder, APIError> {
+
+    let timer = Instant::now();
+
     //Initialise Database connection to retrieve article title and abstract for each document found for the query
     let pool = PgPoolOptions::new()
         .max_connections(1)
@@ -108,7 +113,7 @@ pub async fn search(
     
     preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
 
-    let mut postings = execute_query(query, &idx);
+    let mut postings = execute_query(query, &idx).cloned().collect::<Vec<Posting>>();
 
     // score documents if necessary and sort appropriately
     let ordered_docs: Vec<ScoredDocument> = match q.sort_by {
@@ -176,6 +181,9 @@ pub async fn search(
         .await
         .into_iter()
         .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
+
+    info!("Query: {} took: {}us",&q.query, timer.elapsed().as_micros());
+
     Ok(Json(future_documents))
 }
 
@@ -185,6 +193,8 @@ pub async fn relational(
     data: Data<RESTSearchData>,
     q: Query<RelationalSearchParameters>,
 ) -> Result<impl Responder, APIError> {
+    let timer = Instant::now();
+
     let pool = PgPoolOptions::new()
         .max_connections(1)
         .connect(&data.connection_string)
@@ -229,7 +239,7 @@ pub async fn relational(
 
     preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
 
-    let mut postings = execute_query(query, &idx);
+    let mut postings = execute_query(query, &idx).cloned().collect::<Vec<Posting>>();
     let scored_documents = score_query(query, &idx, &mut postings); // page rank and stuff
 
     // keep track of the translations between titles and ids
@@ -308,7 +318,9 @@ pub async fn relational(
                 .collect::<Vec<Relation>>()
         })
         .collect();
-    
+
+    info!("Relational Query: {:?} took: {}us",&q.query, timer.elapsed().as_micros());
+
     Ok(Json(RelationSearchOutput {
         documents: documents,
         relations: relations.into_iter().collect(),

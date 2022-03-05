@@ -1,6 +1,7 @@
 use bimap::BiMap;
 use chrono::NaiveDateTime;
 use either::Either;
+use indexmap::IndexMap;
 use std::collections::HashMap;
 
 use std::hash::Hash;
@@ -64,6 +65,18 @@ where
         self.iter()
             .fold(0, |a, (k, v)| v.real_mem() + k.real_mem() + a)
             + size_of::<HashMap<K, V>>() as u64 // need this as above doesnt count metadata
+    }
+}
+
+impl<K, V> MemFootprintCalculator for IndexMap<K, V>
+where
+    K: MemFootprintCalculator,
+    V: MemFootprintCalculator,
+{
+    fn real_mem(&self) -> u64 {
+        self.iter()
+            .fold(0, |a, (k, v)| v.real_mem() + k.real_mem() + a)
+            + size_of::<IndexMap<K, V>>() as u64 // need this as above doesnt count metadata
     }
 }
 

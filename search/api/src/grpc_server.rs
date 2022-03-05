@@ -10,7 +10,7 @@ use tonic::{Request, Response, Status};
 
 #[derive(Debug)]
 pub struct CheckIndexService {
-    pub index: Arc<RwLock<Box<dyn Index>>>,
+    pub index: Arc<RwLock<Index>>,
     pub connection_string: String,
 }
 

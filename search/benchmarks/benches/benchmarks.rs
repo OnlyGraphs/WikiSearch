@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use index::{
-    index::{BasicIndex, Index},
+    index::{Index},
     index_structs::{Citation, Document, Infobox},
     PreIndex,
 };
@@ -174,7 +174,7 @@ pub fn get_random_query(p: &IndexBenchParameters) -> Box<Query> {
     rel_q
 }
 
-pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Box<dyn Index> {
+pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Index {
     let mut pre_idx = PreIndex::default();
 
     docs.into_iter().for_each(|d| {
@@ -182,12 +182,11 @@ pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Box<dyn Index> {
             .add_document(d)
             .expect("Benchmarking failed, could not add document");
     });
-    let idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
 
-    idx
+    Index::from_pre_index(pre_idx)
 }
 
-pub fn execute_query_with_index(idx: Box<dyn Index>, mut q: Box<Query>) {
+pub fn execute_query_with_index(idx: &Index, mut q: Box<Query>) {
     preprocess_query(&mut *q).unwrap();
     let mut postings = execute_query(&q, &idx);
     score_query(&q, &idx, &mut postings);

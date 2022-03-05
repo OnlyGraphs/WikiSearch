@@ -6,7 +6,7 @@ pub fn idf(df: f64, num_documents: u32) -> f64 {
 }
 
 // Compute the tfidf for a single term
-pub fn tfidf_term(term: &str, doc_id: u32, index: &Box<dyn Index>) -> f64 {
+pub fn tfidf_term(term: &str, doc_id: u32, index: &Index) -> f64 {
     let num_documents = index.get_number_of_documents();
     let tf = index.tf(term, doc_id);
     let idf_term = idf(index.df(term) as f64, num_documents);
@@ -18,7 +18,7 @@ pub fn tfidf_term(term: &str, doc_id: u32, index: &Box<dyn Index>) -> f64 {
 }
 
 // compute the tfidf over a number of terms with regads to  certain document
-pub fn tfidf_doc(terms: &Vec<String>, doc_id: u32, index: &Box<dyn Index>) -> f64 {
+pub fn tfidf_doc(terms: &Vec<String>, doc_id: u32, index: &Index) -> f64 {
     let mut score = 0.0;
     for term in terms {
         score += tfidf_term(term, doc_id, index);
@@ -26,7 +26,7 @@ pub fn tfidf_doc(terms: &Vec<String>, doc_id: u32, index: &Box<dyn Index>) -> f6
     return score;
 }
 
-pub fn tfidf_query(document_id: u32, query: &Box<Query>, index: &Box<dyn Index>) -> f64 {
+pub fn tfidf_query(document_id: u32, query: &Box<Query>, index: &Index) -> f64 {
     match &**query {
         Query::FreetextQuery { tokens } => return tfidf_doc(&tokens, document_id, index),
         Query::BinaryQuery { op: _, lhs, rhs } => {

@@ -1,5 +1,5 @@
 use crate::scoring::{idf, tfidf_query, tfidf_term};
-use index::index::{BasicIndex, Index};
+use index::index::{Index};
 use index::utils::get_document_with_text;
 use index::PreIndex;
 use parser::ast::{BinaryOp, Query, UnaryOp};
@@ -37,7 +37,7 @@ fn test_tfidf_term() {
         "ggg hhh",
     )).unwrap();
 
-    let idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     let df_whale = 2.0;
     let tf_whale_1 = 1.0;
@@ -78,7 +78,7 @@ fn test_tfidf_term_2() {
         "ggg hhh",
     )).unwrap();
 
-    let idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     let df_big = 1.0;
     let tf_big_2 = 2.0;
@@ -117,7 +117,7 @@ fn test_tfidf_simple_phrase_query() {
         "ggg hhh",
     )).unwrap();
 
-    let idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     let query = Box::new(Query::FreetextQuery {
         tokens: vec!["big".to_string(), "whale".to_string()],
@@ -168,7 +168,7 @@ fn test_simple_binary_query() {
         "ggg hhh",
     )).unwrap();
 
-    let idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     let query = Box::new(Query::BinaryQuery {
         op: BinaryOp::And,
@@ -225,7 +225,7 @@ fn test_nested_binary_query() {
         "ggg hhh",
     )).unwrap();
 
-    let idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     let query = Box::new(Query::BinaryQuery {
         op: BinaryOp::And,
@@ -276,7 +276,7 @@ fn test_simple_relation_query() {
         ))
         .unwrap();
 
-    let idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     let query = Box::new(Query::RelationQuery {
         root: 1,
@@ -311,7 +311,7 @@ fn test_nested_relation_query() {
         "ggg hhh",
     )).unwrap();
 
-    let idx: Box<dyn Index> = BasicIndex::from_pre_index(pre_idx);
+    let idx = Index::from_pre_index(pre_idx);
 
     let query = Box::new(Query::RelationQuery {
         root: 2,

@@ -1,7 +1,7 @@
-use crate::PreIndex;
+use crate::{PreIndex};
 use crate::{
     errors::{IndexError, IndexErrorKind},
-    index::{BasicIndex, Index},
+    index::{Index},
     index_structs::{Citation, Document, Infobox},
 };
 use async_trait::async_trait;
@@ -9,8 +9,8 @@ use sqlx::{postgres::PgPoolOptions, query, query_scalar};
 use std::collections::HashMap;
 
 #[async_trait]
-pub trait IndexBuilder {
-    async fn build_index_if_needed(&self) -> Result<Option<Box<dyn Index>>, IndexError>;
+pub trait IndexBuilder  {
+    async fn build_index_if_needed(&self) -> Result<Option<Index>, IndexError>;
 }
 
 pub struct SqlIndexBuilder {
@@ -20,7 +20,7 @@ pub struct SqlIndexBuilder {
 
 #[async_trait]
 impl IndexBuilder for SqlIndexBuilder {
-    async fn build_index_if_needed(&self) -> Result<Option<Box<dyn Index>>, IndexError> {
+    async fn build_index_if_needed(&self) -> Result<Option<Index>, IndexError> {
         let pool = PgPoolOptions::new()
             .max_connections(1)
             .connect(&self.connection_string)
@@ -109,7 +109,7 @@ impl IndexBuilder for SqlIndexBuilder {
 
         pool.close().await;
 
-        let idx = BasicIndex::from_pre_index(pre_index);
+        let idx = Index::from_pre_index(pre_index);
 
         Ok(Some(idx))
     }

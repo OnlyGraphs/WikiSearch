@@ -14,3 +14,4 @@ index = { path = "../index" }
 parser = { path = "../parser" }
 retrieval = { path = "../retrieval" }
 utils = { path = "../utils" }
+streaming-iterator = "0.1.5"

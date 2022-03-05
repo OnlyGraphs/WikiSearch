@@ -8,7 +8,6 @@ export SEARCH_PORT=8000
 export RUST_LOG=debug,actix_web=debug
 export BACKEND=http://localhost:8000
 export RUST_BACKTRACE=1
-export STATIC_DIR=
 run_img: #build_img
 	docker run \
 		-e SEARCH_PORT \
