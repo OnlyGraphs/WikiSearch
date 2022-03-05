@@ -131,9 +131,11 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
         } =>  PostingIterator::new(
                 DistanceMergeStreamingIterator::new(
                     *dst,
-                    Box::new(index.get_postings(lhs).unwrap()),
-                    Box::new(index.get_postings(rhs).unwrap()),
-                )
+                    index.get_postings(lhs).map(|v| 
+                        {let a: Box<dyn StreamingIterator<Item = Posting>> = Box::new(v);a}).unwrap_or(Box::new(empty::<Posting>())),
+                    index.get_postings(rhs).map(|v| 
+                        {let a: Box<dyn StreamingIterator<Item = Posting>> = Box::new(v);a}).unwrap_or(Box::new(empty::<Posting>())),
+                ),
             ),
         Query::RelationQuery {
             root: id,

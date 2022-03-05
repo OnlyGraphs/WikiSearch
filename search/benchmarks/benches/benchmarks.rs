@@ -2,11 +2,12 @@ use criterion::{black_box, criterion_group, criterion_main, BatchSize, Benchmark
 use index::{
     index::{Index},
     index_structs::{Citation, Document, Infobox},
-    PreIndex,
+    PreIndex, Posting,
 };
 use parser::ast::{BinaryOp, Query, UnaryOp};
 
 use retrieval::search::{execute_query, preprocess_query, score_query};
+use streaming_iterator::StreamingIterator;
 
 use std::fmt::{Debug, Display};
 
@@ -188,7 +189,7 @@ pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Index {
 
 pub fn execute_query_with_index(idx: &Index, mut q: Box<Query>) {
     preprocess_query(&mut *q).unwrap();
-    let mut postings = execute_query(&q, &idx);
+    let mut postings = execute_query(&q, &idx).cloned().collect::<Vec<Posting>>();
     score_query(&q, &idx, &mut postings);
 }
 
@@ -222,7 +223,7 @@ impl Display for IndexBenchParameters {
 }
 
 pub fn index_build_time(c: &mut Criterion) {
-    let mut group = c.benchmark_group("index build time: article size");
+    let mut group = c.benchmark_group("index build time: article count");
     group.sample_size(20);
 
     for size in [200000].iter() {
@@ -242,10 +243,10 @@ pub fn index_build_time(c: &mut Criterion) {
 }
 
 pub fn query_execution_time(c: &mut Criterion) {
-    let mut group = c.benchmark_group("query execution time: article size");
+    let mut group = c.benchmark_group("query execution time: article count");
     group.sample_size(20);
 
-    for size in [100, 1000, 10000].iter() {
+    for size in [200000].iter() {
         let ref param = IndexBenchParameters::from_article_count(*size);
         group.bench_with_input(BenchmarkId::from_parameter(param), param, |b, i| {
             b.iter_batched(
@@ -256,7 +257,7 @@ pub fn query_execution_time(c: &mut Criterion) {
 
                     (idx, qs)
                 },
-                |(idx, qs)| execute_query_with_index(idx, qs),
+                |(idx, qs)| execute_query_with_index(&idx, qs),
                 BatchSize::PerIteration,
             )
         });
