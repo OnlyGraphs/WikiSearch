@@ -1,10 +1,12 @@
 use chrono::NaiveDateTime;
 use indexmap::IndexMap;
+use log::info;
 use streaming_iterator::{convert_ref, StreamingIterator,convert};
 use utils::MemFootprintCalculator;
 
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::time::Instant;
 use std::{
     collections::HashMap,
     fmt,
@@ -190,6 +192,9 @@ impl Index {
 
     pub fn from_pre_index(mut p: PreIndex) -> Self {
         // extract postings and sort
+        let mut timer = Instant::now();
+
+        info!("Sorting posting lists");
         let mut posting_nodes = IndexMap::with_capacity(p.posting_nodes.len());
         p.posting_nodes.iter_idx().for_each(|_| {
             // we do not use get_by_idx, since the indexes will change, we only care about what's next in order
@@ -197,9 +202,12 @@ impl Index {
             v.postings.sort();
             posting_nodes.insert(k, v);
         });
+        info!("Took {}s", timer.elapsed().as_secs());
 
         // convert strings in the links to u32's
         // sort all links
+        info!("Reconciling links with IDs");
+        timer = Instant::now();
         let mut links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(p.links.len());
         p.links.iter().for_each(|(from, to)| {
             let mut targets: Vec<u32> = Vec::with_capacity(links.len());
@@ -211,8 +219,11 @@ impl Index {
             targets.sort();
             let _ = links.insert(*from, targets);
         });
+        info!("Took {}s", timer.elapsed().as_secs());
 
         // back links
+        info!("Generating back links");
+        timer = Instant::now();
         let mut back_links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(p.links.len());
         links.iter().for_each(|(source, target)| {
             target.iter().for_each(|v| {
@@ -220,6 +231,7 @@ impl Index {
             })
         });
         back_links.values_mut().for_each(|v| v.sort());
+        info!("Took {}s", timer.elapsed().as_secs());
 
         Self {
             dump_id: p.dump_id,

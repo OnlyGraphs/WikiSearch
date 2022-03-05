@@ -113,8 +113,8 @@ impl IndexBuilder for SqlIndexBuilder {
             });
             pre_index.add_document(new_document)?;
             let perc = ((i as f32) / (len as f32)) * 100.0;
-            if i % 1000 == 0{
-                info!("Building pre-index: {}% ({}s / 1000 docs)",perc,timer.elapsed().as_secs());
+            if i % 10000 == 0{
+                info!("Building pre-index: {}% ({}s / 10000 docs)",perc,timer.elapsed().as_secs());
                 timer = Instant::now();
 
             }

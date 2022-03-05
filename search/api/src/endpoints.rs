@@ -22,7 +22,7 @@ use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocu
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
 use streaming_iterator::StreamingIterator;
-use std::cmp::Ordering;
+use std::cmp::{Ordering, max, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display};
 use std::fmt::Debug;
@@ -115,6 +115,7 @@ pub async fn search(
 
     let mut postings = execute_query(query, &idx).cloned().collect::<Vec<Posting>>();
 
+    let capped_max_results = min(q.results_per_page.0,150);
     // score documents if necessary and sort appropriately
     let ordered_docs: Vec<ScoredDocument> = match q.sort_by {
         SortType::Relevance => {
@@ -126,8 +127,8 @@ pub async fn search(
             });
             scored_documents
                 .into_iter() // consumes scored_documents
-                .skip((q.results_per_page.0 * (q.page.0 - 1)) as usize)
-                .take(q.results_per_page.0 as usize)
+                .skip((capped_max_results * (q.page.0 - 1)) as usize)
+                .take(capped_max_results as usize)
                 .collect()
         }
         SortType::LastEdited => {
@@ -137,8 +138,8 @@ pub async fn search(
             });
             postings
                 .into_iter() // consumes postings
-                .skip((q.results_per_page.0 * (q.page.0 - 1)) as usize)
-                .take(q.results_per_page.0 as usize)
+                .skip((capped_max_results * (q.page.0 - 1)) as usize)
+                .take(capped_max_results as usize)
                 .map(|p| ScoredDocument {
                     doc_id: p.document_id,
                     score: 1.0,
@@ -193,7 +194,9 @@ pub async fn relational(
     data: Data<RESTSearchData>,
     q: Query<RelationalSearchParameters>,
 ) -> Result<impl Responder, APIError> {
+
     let timer = Instant::now();
+
 
     let pool = PgPoolOptions::new()
         .max_connections(1)
@@ -239,8 +242,13 @@ pub async fn relational(
 
     preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
 
+    let capped_max_results = min(q.max_results.0,150) as usize;
+
     let mut postings = execute_query(query, &idx).cloned().collect::<Vec<Posting>>();
-    let scored_documents = score_query(query, &idx, &mut postings); // page rank and stuff
+    let scored_documents = score_query(query, &idx, &mut postings)
+        .into_iter()
+        .take(capped_max_results)
+        .collect::<Vec<ScoredDocument>>();
 
     // keep track of the translations between titles and ids
     // as well as the documents present in the query for later
