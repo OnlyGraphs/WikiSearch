@@ -393,13 +393,13 @@ fn test_basic_index_links() {
     let mut pre_idx = PreIndex::default();
 
     pre_idx
-        .add_document(get_document_with_links(0, "source", "target1, target2"))
+        .add_document(get_document_with_links(0, "source", "target1\ttarget2"))
         .unwrap();
     pre_idx
-        .add_document(get_document_with_links(1, "target1", "target2, target1"))
+        .add_document(get_document_with_links(1, "target1", "target2\ttarget1"))
         .unwrap();
     pre_idx
-        .add_document(get_document_with_links(2, "target2", "source, target1"))
+        .add_document(get_document_with_links(2, "target2", "source\ttarget1"))
         .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);

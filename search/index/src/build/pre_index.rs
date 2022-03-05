@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 #[derive(Default)]
 pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, PostingNode, 10000>,
+    pub posting_nodes: DiskHashMap<String, PostingNode, 1000000>,
     pub links: HashMap<u32, Vec<String>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub id_title_map: BiMap<u32, String>,
@@ -99,7 +99,7 @@ impl PreIndex {
     fn add_links(&mut self, doc_id: u32, article_links: &str) -> Result<(), IndexError> {
         // out links
         let link_titles: Vec<String> = article_links
-            .split(",")
+            .split("\t")
             .map(|c| c.trim().to_string())
             .collect();
 

@@ -5,8 +5,10 @@ use crate::{
     index_structs::{Citation, Document, Infobox},
 };
 use async_trait::async_trait;
+use log::info;
 use sqlx::{postgres::PgPoolOptions, query, query_scalar};
 use std::collections::HashMap;
+use std::time::Instant;
 
 #[async_trait]
 pub trait IndexBuilder  {
@@ -87,7 +89,12 @@ impl IndexBuilder for SqlIndexBuilder {
 
         pre_index.dump_id = highest_dump_id;
 
+        let mut i = 0;
+        let len = main_query.len();
+        let mut timer = Instant::now();
+        
         for row in main_query {
+
             let doc_id = row.articleid.ok_or(IndexError {
                 msg: "Missing articleid when querying articles".to_string(),
                 kind: IndexErrorKind::Database,
@@ -105,6 +112,13 @@ impl IndexBuilder for SqlIndexBuilder {
                 citations: article_citations.remove(&doc_id).unwrap_or_default(),
             });
             pre_index.add_document(new_document)?;
+            let perc = ((i as f32) / (len as f32)) * 100.0;
+            if i % 1000 == 0{
+                info!("Building pre-index: {}% ({}s / 1000 docs)",perc,timer.elapsed().as_secs());
+                timer = Instant::now();
+
+            }
+            i+=1;
         }
 
         pool.close().await;

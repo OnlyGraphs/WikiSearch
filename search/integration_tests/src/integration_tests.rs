@@ -307,8 +307,8 @@ fn test_docs_within_hops_complex() {
     //              E
 
     pre_idx.add_document(get_document_with_links(0, "A", "")) .unwrap();
-    pre_idx.add_document(get_document_with_links(1, "B", "A, E")).unwrap();
-    pre_idx.add_document(get_document_with_links(2, "C", "B, D")).unwrap();
+    pre_idx.add_document(get_document_with_links(1, "B", "A\tE")).unwrap();
+    pre_idx.add_document(get_document_with_links(2, "C", "B\tD")).unwrap();
     pre_idx.add_document(get_document_with_links(3, "D", "")).unwrap();
     pre_idx.add_document(get_document_with_links(4, "E", "")).unwrap();
 
@@ -936,7 +936,7 @@ fn test_relational_search() {
         "asd world",
         vec!["ddd ddd"],
         "ooo ppp",
-        "B, D"
+        "B\tD"
     ))
     .unwrap();
 
