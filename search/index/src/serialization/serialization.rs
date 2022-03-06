@@ -153,8 +153,30 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
         bytes
     }
 
-    fn decode<R: Read>(_: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
+    //TODO! Finish decoding
+    fn decode<R: Read>(_prev: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
+        todo!();
         let mut a = Posting::default();
+        let count = a.deserialize(&mut bytes);
+        (a, count)
+    }
+}
+
+#[derive(Default, Eq, PartialEq, Debug)]
+pub struct VbyteEncoder {}
+
+//TODO!!
+impl<T: Serializable> SequentialEncoder<T> for VbyteEncoder {
+    fn encode(_prev: &Option<T>, curr: &T) -> Vec<u8> {
+        todo!();
+        let mut bytes = Vec::default();
+        let _count = curr.serialize(&mut bytes);
+        bytes
+    }
+
+    fn decode<R: Read>(_: &Option<T>, mut bytes: R) -> (T, usize) {
+        todo!();
+        let mut a = T::default();
         let count = a.deserialize(&mut bytes);
         (a, count)
     }
