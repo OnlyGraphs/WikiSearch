@@ -78,8 +78,9 @@ fn test_deserialize_posting() {
     assert_eq!(clean, target)
 }
 
-/// --------------------- Encoding Tests -------------- ////
+/// --------------------- Compression Tests -------------- ////
 
+/// ----------- Identity --------------
 #[test]
 #[cfg(target_endian = "little")]
 fn test_serialize_encoded_object() {
@@ -174,6 +175,7 @@ fn test_identity_encoder_prev() {
     let target = b"E\0\0\0*\0\0\0".to_vec();
     assert_eq!(encoded, target);
 }
+/// ----------- Delta --------------
 
 #[test]
 fn test_delta_encoder_no_prev() {
@@ -223,6 +225,65 @@ fn test_delta_encoder_prev_different_document() {
     assert_eq!(encoded, target);
 }
 
+#[test]
+#[cfg(target_endian = "little")]
+fn test_delta_encoder_no_prev_decode() {
+    let source = b"E\0\0\0F\0\0\0".to_vec();
+    let (encoded, size): (Posting, usize) = DeltaEncoder::decode(
+        &None,
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+    let target = Posting {
+        document_id: 69,
+        position: 70,
+    };
+    assert_eq!(encoded, target);
+    assert_eq!(size, 8);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_delta_encoder_with_prev_same_document_decode() {
+    let prev = &Some(Posting {
+        document_id: 69,
+        position: 50,
+    });
+    let source = b"\0\0\0\02\0\0\0".to_vec(); //Delta of prev and next, where delta doc_id = 0, and delta position is 50
+
+    let (encoded, size): (Posting, usize) = DeltaEncoder::decode(
+        prev,
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+
+    let target = Posting {
+        document_id: 69,
+        position: 100,
+    };
+    assert_eq!(encoded, target);
+    assert_eq!(size, 8);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_delta_encoder_with_prev_different_document_decode() {
+    let prev = &Some(Posting {
+        document_id: 42,
+        position: 69,
+    });
+    let source = b"\0\0\0\0\0\0".to_vec(); //Delta of prev and next, where delta doc_id = 27 , and delta position is 1
+    let (encoded, size): (Posting, usize) = DeltaEncoder::decode(
+        prev,
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+
+    let target = Posting {
+        document_id: 69,
+        position: 70,
+    };
+    assert_eq!(encoded, target);
+    assert_eq!(size, 8);
+}
+/// ---------------- Compression Tests [END] ----------------
 #[test]
 fn test_from_and_to_iter() {
     let target_1 = Posting {

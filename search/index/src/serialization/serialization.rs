@@ -158,9 +158,14 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
 
     //TODO! Finish decoding
     fn decode<R: Read>(_prev: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
-        todo!();
         let mut a = Posting::default();
         let count = a.deserialize(&mut bytes);
+
+        if let Some(previous_posting) = *_prev {
+            a.document_id = a.document_id + previous_posting.document_id;
+            a.position = a.position + previous_posting.position;
+        }
+
         (a, count)
     }
 }
