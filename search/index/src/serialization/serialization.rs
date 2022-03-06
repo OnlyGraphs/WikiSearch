@@ -114,6 +114,9 @@ where
     }
 }
 
+/// ------------------ Encoding -------------------- ///
+//TODO! Elias gamma code, v-byte encoding, delta encoding
+
 /// An encoder which does the absolute minimum
 /// Stores as little as possible but without any encoding
 #[derive(Default, Eq, PartialEq, Debug)]
@@ -128,6 +131,30 @@ impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
 
     fn decode<R: Read>(_: &Option<T>, mut bytes: R) -> (T, usize) {
         let mut a = T::default();
+        let count = a.deserialize(&mut bytes);
+        (a, count)
+    }
+}
+#[derive(Default, Eq, PartialEq, Debug)]
+pub struct DeltaEncoder {}
+
+impl SequentialEncoder<Posting> for DeltaEncoder {
+    fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
+        let mut bytes = Vec::default();
+        let mut diff = Posting {
+            document_id: curr.document_id,
+            position: curr.position,
+        };
+        if let Some(previous_posting) = *_prev {
+            diff.document_id = curr.document_id - previous_posting.document_id;
+            diff.position = curr.position - previous_posting.position
+        }
+        let _count = diff.serialize(&mut bytes);
+        bytes
+    }
+
+    fn decode<R: Read>(_: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
+        let mut a = Posting::default();
         let count = a.deserialize(&mut bytes);
         (a, count)
     }

@@ -1,5 +1,6 @@
 use crate::{
-    DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting, SequentialEncoder, Serializable,
+    DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting,
+    SequentialEncoder, Serializable,
 };
 
 #[test]
@@ -169,6 +170,37 @@ fn test_identity_encoder_prev() {
     );
 
     let target = b"E\0\0\0*\0\0\0".to_vec();
+    assert_eq!(encoded, target);
+}
+
+#[test]
+fn test_delta_encoder_no_prev() {
+    let encoded = DeltaEncoder::encode(
+        &None,
+        &Posting {
+            document_id: 69,
+            position: 70,
+        },
+    );
+    let target = b"E\0\0\0F\0\0\0".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+fn test_delta_encoder_prev() {
+    let encoded = DeltaEncoder::encode(
+        &Some(Posting {
+            document_id: 42,
+            position: 69,
+        }),
+        &Posting {
+            document_id: 69,
+            position: 70,
+        },
+    );
+    let target = b"\0\0\0\0\0\0".to_vec(); // doc_id:27, pos:1
+
     assert_eq!(encoded, target);
 }
 
