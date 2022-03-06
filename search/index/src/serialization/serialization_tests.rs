@@ -78,6 +78,8 @@ fn test_deserialize_posting() {
     assert_eq!(clean, target)
 }
 
+/// --------------------- Encoding Tests -------------- ////
+
 #[test]
 #[cfg(target_endian = "little")]
 fn test_serialize_encoded_object() {
@@ -188,7 +190,24 @@ fn test_delta_encoder_no_prev() {
 }
 
 #[test]
-fn test_delta_encoder_prev() {
+fn test_delta_encoder_prev_same_document() {
+    let encoded = DeltaEncoder::encode(
+        &Some(Posting {
+            document_id: 42,
+            position: 69,
+        }),
+        &Posting {
+            document_id: 42,
+            position: 169,
+        },
+    );
+    let target = b"\0\0\0\0d\0\0\0".to_vec(); // doc_id:0, pos:100
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+fn test_delta_encoder_prev_different_document() {
     let encoded = DeltaEncoder::encode(
         &Some(Posting {
             document_id: 42,
@@ -199,7 +218,7 @@ fn test_delta_encoder_prev() {
             position: 70,
         },
     );
-    let target = b"\0\0\0\0\0\0".to_vec(); // doc_id:27, pos:1
+    let target = b"\0\0\0F\0\0\0".to_vec(); // doc_id:27 (difference), pos:70 (start of document)
 
     assert_eq!(encoded, target);
 }
