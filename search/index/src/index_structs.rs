@@ -51,7 +51,6 @@ pub struct Document {
     pub title: String,
     pub categories: String,
     pub last_updated_date: String,
-    pub namespace: i16,
     pub main_text: String,
     pub article_links: String,
     pub infoboxes: Vec<Infobox>,

@@ -73,7 +73,6 @@ pub fn get_document_with_text(
             .collect(),
         categories: categories.to_string(),
         last_updated_date: String::default(),
-        namespace: i16::default(),
         article_links: String::default(),
     })
 }
@@ -88,7 +87,6 @@ pub fn get_document_with_links(id: u32, title: &str, links: &str) -> Box<Documen
         citations: vec![],
         categories: String::default(),
         last_updated_date: String::default(),
-        namespace: i16::default(),
         article_links: links.to_string(),
     })
 }
@@ -102,7 +100,6 @@ pub fn get_document_with_date_time(id: u32, title: &str, last_updated_date: &str
         citations: vec![],
         categories: String::default(),
         last_updated_date: last_updated_date.to_string(),
-        namespace: i16::default(),
         article_links: String::default(),
     })
 }
