@@ -1,6 +1,7 @@
 use crate::{EncodedPostingNode, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use core::fmt::Debug;
+use std::io::Bytes;
 use std::{
     collections::HashMap,
     io::{Read, Write},
@@ -156,7 +157,6 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
         bytes
     }
 
-    //TODO! Finish decoding
     fn decode<R: Read>(_prev: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
         let mut a = Posting::default();
         let count = a.deserialize(&mut bytes);
@@ -173,18 +173,29 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
 #[derive(Default, Eq, PartialEq, Debug)]
 pub struct VbyteEncoder {}
 
-//TODO!!
-impl<T: Serializable> SequentialEncoder<T> for VbyteEncoder {
-    fn encode(_prev: &Option<T>, curr: &T) -> Vec<u8> {
-        todo!();
-        let mut bytes = Vec::default();
-        let _count = curr.serialize(&mut bytes);
-        bytes
+//TODO!! Remember to find the difference
+impl SequentialEncoder<Posting> for VbyteEncoder {
+    fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
+        let mut encoding_bytes = Vec::default();
+        let mut num = curr.document_id;
+        println!();
+        while num >= 128 {
+            encoding_bytes.insert(0, ((num & 127) + 128) as u8);
+            num = num >> 7;
+        }
+
+        encoding_bytes.insert(0, ((num & 127) | 128) as u8);
+
+        //unclear 8th bit in the last byte
+        let len = encoding_bytes.len() - 1;
+        println!("{:?}", encoding_bytes);
+        encoding_bytes[len] = encoding_bytes[len] & !(1 << 7);
+        encoding_bytes
     }
 
-    fn decode<R: Read>(_: &Option<T>, mut bytes: R) -> (T, usize) {
+    fn decode<R: Read>(_: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
         todo!();
-        let mut a = T::default();
+        let mut a = Posting::default();
         let count = a.deserialize(&mut bytes);
         (a, count)
     }
@@ -210,6 +221,18 @@ impl Serializable for u32 {
         4
     }
 }
+
+// impl Serializable for u16 {
+//     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+//         buf.write_u16::<NativeEndian>(*self).unwrap();
+//         2
+//     }
+
+//     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+//         *self = buf.read_u16::<NativeEndian>().unwrap();
+//         2
+//     }
+// }
 
 impl Serializable for String {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {

@@ -1,6 +1,6 @@
 use crate::{
     DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting,
-    SequentialEncoder, Serializable,
+    SequentialEncoder, Serializable, VbyteEncoder,
 };
 
 #[test]
@@ -282,6 +282,103 @@ fn test_delta_encoder_with_prev_different_document_decode() {
     };
     assert_eq!(encoded, target);
     assert_eq!(size, 8);
+}
+
+/// --------- V byte ----------
+
+#[test]
+fn test_v_byte_encoder_no_prev() {
+    let encoded = VbyteEncoder::encode(
+        &None,
+        &Posting {
+            document_id: 128,
+            position: 0,
+        },
+    );
+    let target = b"\x81\0".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+fn test_v_byte_encoder_no_prev_2() {
+    let encoded = VbyteEncoder::encode(
+        &None,
+        &Posting {
+            document_id: 8192,
+            position: 0,
+        },
+    );
+    let target = b"\xC0\0".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+fn test_v_byte_encoder_no_prev_3() {
+    let encoded = VbyteEncoder::encode(
+        &None,
+        &Posting {
+            document_id: 127,
+            position: 0,
+        },
+    );
+    let target = b"\x7F".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+fn test_v_byte_encoder_no_prev_4() {
+    let encoded = VbyteEncoder::encode(
+        &None,
+        &Posting {
+            document_id: 0,
+            position: 0,
+        },
+    );
+    let target = b"\0".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+fn test_v_byte_encoder_no_prev_5() {
+    let encoded = VbyteEncoder::encode(
+        &None,
+        &Posting {
+            document_id: 256,
+            position: 0,
+        },
+    );
+    let target = b"\x82\x00".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+fn test_v_byte_encoder_no_prev_6() {
+    let encoded = VbyteEncoder::encode(
+        &None,
+        &Posting {
+            document_id: 16383,
+            position: 0,
+        },
+    );
+    let target = b"\xFF\x7F".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+fn test_v_byte_encoder_no_prev_7() {
+    let encoded = VbyteEncoder::encode(
+        &None,
+        &Posting {
+            document_id: 16384,
+            position: 0,
+        },
+    );
+    let target = b"\x81\x80\x00".to_vec();
+
+    assert_eq!(encoded, target);
 }
 /// ---------------- Compression Tests [END] ----------------
 #[test]
