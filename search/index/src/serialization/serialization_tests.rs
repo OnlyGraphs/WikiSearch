@@ -380,6 +380,22 @@ fn test_v_byte_encoder_no_prev_7() {
 
     assert_eq!(encoded, target);
 }
+
+fn test_v_byte_encoder_with_prev() {
+    let encoded = VbyteEncoder::encode(
+        &Some(Posting {
+            document_id: 0,
+            position: 1,
+        }),
+        &Posting {
+            document_id: 128,
+            position: 9,
+        },
+    );
+    let target = b"\x81\0\x09".to_vec();
+
+    assert_eq!(encoded, target);
+}
 /// ---------------- Compression Tests [END] ----------------
 #[test]
 fn test_from_and_to_iter() {

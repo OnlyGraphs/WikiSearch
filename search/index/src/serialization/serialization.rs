@@ -196,13 +196,12 @@ impl VbyteEncoder {
     }
 }
 
-//TODO!! Remember to find the difference
 impl SequentialEncoder<Posting> for VbyteEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut encoding_bytes = Vec::default();
         let mut vdiff = DeltaEncoder::compute_delta(_prev, curr);
-        encoding_bytes.extend(VbyteEncoder::into_vbyte(curr.document_id));
-        encoding_bytes.extend(VbyteEncoder::into_vbyte(curr.position));
+        encoding_bytes.extend(VbyteEncoder::into_vbyte(vdiff.document_id));
+        encoding_bytes.extend(VbyteEncoder::into_vbyte(vdiff.position));
         encoding_bytes
     }
 
