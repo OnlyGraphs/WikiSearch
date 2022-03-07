@@ -292,10 +292,10 @@ fn test_v_byte_encoder_no_prev() {
         &None,
         &Posting {
             document_id: 128,
-            position: 0,
+            position: 9,
         },
     );
-    let target = b"\x81\0".to_vec();
+    let target = b"\x81\0\x09".to_vec();
 
     assert_eq!(encoded, target);
 }
@@ -309,7 +309,7 @@ fn test_v_byte_encoder_no_prev_2() {
             position: 0,
         },
     );
-    let target = b"\xC0\0".to_vec();
+    let target = b"\xC0\0\0".to_vec();
 
     assert_eq!(encoded, target);
 }
@@ -323,7 +323,7 @@ fn test_v_byte_encoder_no_prev_3() {
             position: 0,
         },
     );
-    let target = b"\x7F".to_vec();
+    let target = b"\x7F\0".to_vec();
 
     assert_eq!(encoded, target);
 }
@@ -334,10 +334,10 @@ fn test_v_byte_encoder_no_prev_4() {
         &None,
         &Posting {
             document_id: 0,
-            position: 0,
+            position: 128,
         },
     );
-    let target = b"\0".to_vec();
+    let target = b"\0\x81\0".to_vec();
 
     assert_eq!(encoded, target);
 }
@@ -350,7 +350,7 @@ fn test_v_byte_encoder_no_prev_5() {
             position: 0,
         },
     );
-    let target = b"\x82\x00".to_vec();
+    let target = b"\x82\x00\0".to_vec();
 
     assert_eq!(encoded, target);
 }
@@ -363,7 +363,7 @@ fn test_v_byte_encoder_no_prev_6() {
             position: 0,
         },
     );
-    let target = b"\xFF\x7F".to_vec();
+    let target = b"\xFF\x7F\0".to_vec();
 
     assert_eq!(encoded, target);
 }
@@ -376,7 +376,7 @@ fn test_v_byte_encoder_no_prev_7() {
             position: 0,
         },
     );
-    let target = b"\x81\x80\x00".to_vec();
+    let target = b"\x81\x80\x00\0".to_vec();
 
     assert_eq!(encoded, target);
 }

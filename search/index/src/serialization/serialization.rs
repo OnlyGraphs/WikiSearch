@@ -173,23 +173,29 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
 #[derive(Default, Eq, PartialEq, Debug)]
 pub struct VbyteEncoder {}
 
+impl VbyteEncoder {
+    fn into_vbyte(mut num: u32) -> Vec<u8> {
+        let mut bytes = Vec::default();
+
+        while num >= 128 {
+            bytes.insert(0, ((num & 127) + 128) as u8);
+            num = num >> 7;
+        }
+
+        bytes.insert(0, ((num & 127) | 128) as u8);
+        //unclear 8th bit in the last byte
+        let len = bytes.len() - 1;
+        bytes[len] = bytes[len] & !(1 << 7);
+        return bytes;
+    }
+}
+
 //TODO!! Remember to find the difference
 impl SequentialEncoder<Posting> for VbyteEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut encoding_bytes = Vec::default();
-        let mut num = curr.document_id;
-        println!();
-        while num >= 128 {
-            encoding_bytes.insert(0, ((num & 127) + 128) as u8);
-            num = num >> 7;
-        }
-
-        encoding_bytes.insert(0, ((num & 127) | 128) as u8);
-
-        //unclear 8th bit in the last byte
-        let len = encoding_bytes.len() - 1;
-        println!("{:?}", encoding_bytes);
-        encoding_bytes[len] = encoding_bytes[len] & !(1 << 7);
+        encoding_bytes.extend(VbyteEncoder::into_vbyte(curr.document_id));
+        encoding_bytes.extend(VbyteEncoder::into_vbyte(curr.position));
         encoding_bytes
     }
 
