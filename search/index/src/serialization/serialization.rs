@@ -139,10 +139,8 @@ impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
 #[derive(Default, Eq, PartialEq, Debug)]
 pub struct DeltaEncoder {}
 
-//NOTE: The postings need to be sorted!
-impl SequentialEncoder<Posting> for DeltaEncoder {
-    fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
-        let mut bytes = Vec::default();
+impl DeltaEncoder {
+    fn compute_delta(_prev: &Option<Posting>, curr: &Posting) -> Posting {
         let mut diff = Posting {
             document_id: curr.document_id,
             position: curr.position,
@@ -153,6 +151,14 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
                 diff.position = curr.position - previous_posting.position;
             }
         }
+        return diff;
+    }
+}
+//NOTE: The postings need to be sorted!
+impl SequentialEncoder<Posting> for DeltaEncoder {
+    fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
+        let mut bytes = Vec::default();
+        let mut diff = DeltaEncoder::compute_delta(_prev, curr);
         let _count = diff.serialize(&mut bytes);
         bytes
     }
@@ -194,6 +200,7 @@ impl VbyteEncoder {
 impl SequentialEncoder<Posting> for VbyteEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut encoding_bytes = Vec::default();
+        let mut vdiff = DeltaEncoder::compute_delta(_prev, curr);
         encoding_bytes.extend(VbyteEncoder::into_vbyte(curr.document_id));
         encoding_bytes.extend(VbyteEncoder::into_vbyte(curr.position));
         encoding_bytes
