@@ -1,10 +1,11 @@
 use crate::{EncodedPostingNode, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
+use utils::MemFootprintCalculator;
 use core::fmt::Debug;
 use std::{
     collections::HashMap,
     io::{Read, Write},
-    marker::PhantomData,
+    marker::PhantomData, rc::Rc,
 };
 
 /// Implementations encapsulate any sort of encoding mechanism
@@ -18,7 +19,7 @@ pub trait SequentialEncoder<T: Serializable>: Default {
 /// An compact representation of an encodable object, requires a [SequentialEncoder] object
 /// which determines the way objects are decoded and encoded
 /// Operates over [Serializable] types only so that they can be kept in memory with a minimal footprint
-#[derive(Default, Eq, PartialEq, Debug)]
+#[derive(Default, Eq, PartialEq, Debug, Clone)]
 pub struct EncodedSequentialObject<T, E>
 where
     E: SequentialEncoder<T>,
@@ -44,6 +45,20 @@ where
     /// points to first unread byte  
     pos: usize,
 }
+
+impl <T : SequentialEncoder<Posting>>MemFootprintCalculator for EncodedPostingNode<T>{
+    fn real_mem(&self) -> u64 {
+        self.postings.real_mem() + 
+        self.real_mem() + 4
+    }
+}
+
+impl <T : SequentialEncoder<Posting>>MemFootprintCalculator for EncodedPostingList<T>{
+    fn real_mem(&self) -> u64 {
+        self.bytes.len() as u64
+    }
+}
+
 
 impl<E, T> Iterator for DecoderIterator<'_, T, E>
 where
@@ -79,6 +94,10 @@ impl<E: SequentialEncoder<T>, T: Serializable> EncodedSequentialObject<T, E> {
             bytes: b,
             _ph: PhantomData::default(),
         }
+    }
+
+    pub fn byte_len(&self) -> usize {
+        self.bytes.len()
     }
 }
 
@@ -116,7 +135,7 @@ where
 
 /// An encoder which does the absolute minimum
 /// Stores as little as possible but without any encoding
-#[derive(Default, Eq, PartialEq, Debug)]
+#[derive(Default, Eq, PartialEq, Debug, Clone)]
 pub struct IdentityEncoder {}
 
 impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
@@ -168,6 +187,16 @@ impl Serializable for String {
             self.push(buf.read_u8().unwrap() as char);
         }
         len as usize
+    }
+}
+
+impl <T : Serializable> Serializable for Rc<T> {
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        self.serialize(buf)
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        self.deserialize(buf)
     }
 }
 
