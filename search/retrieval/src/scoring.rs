@@ -32,7 +32,7 @@ pub fn tfidf_query(document_id: u32, query: &Box<Query>, index: &Index) -> f64 {
         Query::BinaryQuery { op: _, lhs, rhs } => {
             return tfidf_query(document_id, &lhs, index) + tfidf_query(document_id, &rhs, index)
         }
-        Query::UnaryQuery { op: _, sub } => return -tfidf_query(document_id, &sub, index),
+        Query::UnaryQuery { op: _, sub } => return -1000*tfidf_query(document_id, &sub, index),
         Query::PhraseQuery { tks } => return tfidf_doc(&tks, document_id, index),
         Query::StructureQuery { elem: _, sub } => return tfidf_query(document_id, &sub, index),
         Query::RelationQuery {
