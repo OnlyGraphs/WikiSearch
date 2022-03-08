@@ -140,7 +140,7 @@ impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
 pub struct DeltaEncoder {}
 
 impl DeltaEncoder {
-    fn delta_compress(_prev: &Option<Posting>, curr: &Posting) -> Posting {
+    fn compress(_prev: &Option<Posting>, curr: &Posting) -> Posting {
         let mut diff = Posting {
             document_id: curr.document_id,
             position: curr.position,
@@ -154,7 +154,7 @@ impl DeltaEncoder {
         return diff;
     }
 
-    fn delta_decompress(_prev: &Option<Posting>, diff: &mut Posting) -> Posting {
+    fn decompress(_prev: &Option<Posting>, diff: &mut Posting) -> Posting {
         if let Some(previous_posting) = *_prev {
             diff.document_id = diff.document_id + previous_posting.document_id;
             if diff.document_id == previous_posting.document_id {
@@ -168,7 +168,7 @@ impl DeltaEncoder {
 impl SequentialEncoder<Posting> for DeltaEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut bytes = Vec::default();
-        let mut diff = DeltaEncoder::delta_compress(_prev, curr);
+        let mut diff = DeltaEncoder::compress(_prev, curr);
         let _count = diff.serialize(&mut bytes);
         bytes
     }
@@ -177,7 +177,7 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
         let mut a = Posting::default();
         let count = a.deserialize(&mut bytes);
 
-        a = DeltaEncoder::delta_decompress(_prev, &mut a);
+        a = DeltaEncoder::decompress(_prev, &mut a);
 
         (a, count)
     }
@@ -189,8 +189,9 @@ pub struct VbyteEncoder {}
 impl VbyteEncoder {
     fn into_vbyte_serialise(mut num: u32) -> Vec<u8> {
         let mut bytes = Vec::default();
-
+        //Set everything to have a continuation bit
         while num >= 128 {
+            //Little endian order
             bytes.insert(0, ((num & 127) | 128) as u8);
             num = num >> 7;
         }
@@ -202,17 +203,21 @@ impl VbyteEncoder {
         return bytes;
     }
     fn from_vbyte_deserialise<R: Read>(mut bytes: R) -> (Posting, usize) {
-        let mut doc_id: u32 = 0;
-        let mut position: u32 = 0;
+        let mut doc_id: u32 = 0; //To compute document_id for Posting
+        let mut position: u32 = 0; //To compute position for Posting
         let mut reading_doc_id_flag = true; //set true to assign the following bytes until end of byte (continuation bit cleared) to doc id first
-        let mut result = 0;
+        let mut result = 0; //To be used for calculating doc_id and position
         let mut byte_total_count: usize = 0;
-        let mut shift: u8 = 0;
+        let mut shift: u8 = 0; //shift amount to store computation in result depending on the number of bytes (mainly by looking at continuation bit)
         for b in bytes.bytes() {
             let num_byte = b.unwrap();
+            //Increase byte count
             byte_total_count += 1;
+            //Get the first 7 bits of the byte
             let byte_subset = (num_byte & 127) as u32;
+            //Place the computation in the right byte placement (using shift)
             result = (result << shift) | byte_subset;
+            //If continuation bit is clear (== 0), save computed (deserialised) results
             if num_byte & 128 == 0 {
                 if reading_doc_id_flag == true {
                     doc_id = result;
@@ -220,12 +225,15 @@ impl VbyteEncoder {
                 } else {
                     position = result;
                 }
+                //Reset now for position posting
                 result = 0;
                 shift = 0;
             } else {
+                //After first iteration, where continuation bit happened to be 1, increase shift amount to 7
                 shift = 7;
             }
         }
+        //Create posting based on above computation
         let mut vdiff = Posting {
             document_id: doc_id,
             position: position,
@@ -241,7 +249,7 @@ impl VbyteEncoder {
 impl SequentialEncoder<Posting> for VbyteEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut encoding_bytes = Vec::default();
-        let mut vdiff = DeltaEncoder::delta_compress(_prev, curr);
+        let mut vdiff = DeltaEncoder::compress(_prev, curr);
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.document_id));
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.position));
         encoding_bytes
@@ -250,7 +258,7 @@ impl SequentialEncoder<Posting> for VbyteEncoder {
     fn decode<R: Read>(_prev: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
         let (mut vdiff, byte_total_count): (Posting, usize) =
             VbyteEncoder::from_vbyte_deserialise(bytes);
-        let a: Posting = DeltaEncoder::delta_decompress(_prev, &mut vdiff);
+        let a: Posting = DeltaEncoder::decompress(_prev, &mut vdiff);
         (a, byte_total_count)
     }
 }
