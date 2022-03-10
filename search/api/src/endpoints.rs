@@ -18,6 +18,7 @@ use index::index_structs::Posting;
 use log::{debug, info};
 use parser::errors::QueryError;
 use parser::parser::parse_query;
+use retrieval::execute_relational_query;
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
@@ -254,8 +255,9 @@ pub async fn relational(
 
     let capped_max_results = min(q.max_results.0,150) as usize;
 
-    let mut postings = execute_query(query, &idx).collect::<Vec<Posting>>();
-    let scored_documents = score_query(query, &idx, &mut postings)
+    let mut scored_documents = execute_relational_query(query, &idx);
+    scored_documents.sort_by(|a,b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)); // TODO; hmm
+    scored_documents = scored_documents
         .into_iter()
         .take(capped_max_results)
         .collect::<Vec<ScoredDocument>>();

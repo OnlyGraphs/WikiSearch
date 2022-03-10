@@ -403,9 +403,9 @@ fn test_parse_simple_relation_query2() {
 
 #[test]
 fn test_parse_simple_relation_query3() {
-    let query = "#LINKSTO, 142, 354545";
+    let query = "#LINKSTO, 142, 255";
     let expected_root = 142;
-    let expected_hops = 354545;
+    let expected_hops = 255;
     let expected_sub = None;
     let expected = Box::new(Query::RelationQuery {
         root: expected_root,
@@ -418,9 +418,9 @@ fn test_parse_simple_relation_query3() {
 
 #[test]
 fn test_parse_nested_relation_query() {
-    let query = "#LINKSTO , 2222 , 354545 , Donald OR Trump";
+    let query = "#LINKSTO , 2222 , 0 , Donald OR Trump";
     let expected_root = 2222;
-    let expected_hops = 354545;
+    let expected_hops = 0;
     let expected_sub = Box::new(Query::BinaryQuery {
         op: BinaryOp::Or,
         lhs: Box::new(Query::FreetextQuery {

@@ -115,7 +115,6 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
             Entry::Memory(v) => {
                 let prev = std::mem::take(v);
                 Self::evict(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)),prev)?;
-                info!("Evicting {:?} from cache",&self);
             },
             Entry::Disk(_) => return Ok(()),
         };
@@ -132,7 +131,6 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
                 *self = Entry::Memory(
                     Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))? // TODO: env variable
                 );
-                info!("Fetching {:?} from cache",&self);
                 Ok(())
             },
         }
@@ -148,7 +146,6 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
                 *self = Entry::Memory(
                     Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))? // TODO: env variable
                 );
-                info!("Fetching {:?} from cache",&self);
 
                 match self {
                     Entry::Memory(ref mut v) => Ok(v),

@@ -1,7 +1,7 @@
 use index::{get_document_with_links, Index, PreIndex, get_document_with_text, Posting, get_document_with_text_and_links};
 use parser::ast::{BinaryOp, Query, StructureElem, UnaryOp};
 use retrieval::{search::preprocess_query, get_docs_within_hops, execute_query};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use streaming_iterator::StreamingIterator;
 
 #[test]
@@ -216,12 +216,12 @@ fn test_wildcard_query() {
 
 
 
-macro_rules! set {
-    ( $( $x:expr ),* ) => {  // Match zero or more comma delimited items
+macro_rules! map {
+    ( $( ($x:expr,$y:expr) ),* ) => {  // Match zero or more comma delimited items
         {
-            let mut temp_set = HashSet::new();  // Create a mutable HashSet
+            let mut temp_set = HashMap::new();  // Create a mutable HashSet
             $(
-                temp_set.insert($x); // Insert each item matched into the HashSet
+                temp_set.insert($x,$y); // Insert each item matched into the HashSet
             )*
             temp_set // Return the populated HashSet
         }
@@ -240,25 +240,25 @@ fn test_docs_within_hops_line() {
 
     let idx = Index::from_pre_index(pre_idx);
 
-    let mut out = HashSet::default();
+    let mut out = HashMap::default();
     get_docs_within_hops(0,1, &mut out, &idx);
-    assert_eq!(out,set![0,1]);
+    assert_eq!(out,map![(0,0),(1,1)]);
     out.clear();
 
     get_docs_within_hops(0,2, &mut out, &idx);
-    assert_eq!(out,set![0,1,2]);
+    assert_eq!(out,map![(0,0),(1,1),(2,2)]);
     out.clear();
 
     get_docs_within_hops(0,3, &mut out, &idx);
-    assert_eq!(out,set![0,1,2,3]);
+    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3)]);
     out.clear();
 
     get_docs_within_hops(0,4, &mut out, &idx);
-    assert_eq!(out,set![0,1,2,3,4]);
+    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3),(4,4)]);
     out.clear();
 
     get_docs_within_hops(0,5, &mut out, &idx);
-    assert_eq!(out,set![0,1,2,3,4]);
+    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3),(4,4)]);
     out.clear();
 }
 
@@ -274,25 +274,25 @@ fn test_docs_within_hops_inverse_line() {
 
     let idx = Index::from_pre_index(pre_idx);
 
-    let mut out = HashSet::default();
+    let mut out = HashMap::default();
     get_docs_within_hops(0,1, &mut out, &idx);
-    assert_eq!(out,set![0,1]);
+    assert_eq!(out,map![(0,0),(1,1)]);
     out.clear();
 
     get_docs_within_hops(0,2, &mut out, &idx);
-    assert_eq!(out,set![0,1,2]);
+    assert_eq!(out,map![(0,0),(1,1),(2,2)]);
     out.clear();
 
     get_docs_within_hops(0,3, &mut out, &idx);
-    assert_eq!(out,set![0,1,2,3]);
+    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3)]);
     out.clear();
 
     get_docs_within_hops(0,4, &mut out, &idx);
-    assert_eq!(out,set![0,1,2,3,4]);
+    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3),(4,4)]);
     out.clear();
 
     get_docs_within_hops(0,5, &mut out, &idx);
-    assert_eq!(out,set![0,1,2,3,4]);
+    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3),(4,4)]);
     out.clear();
 }
 
@@ -314,21 +314,21 @@ fn test_docs_within_hops_complex() {
 
     let idx = Index::from_pre_index(pre_idx);
 
-    let mut out = HashSet::default();
+    let mut out = HashMap::default();
     get_docs_within_hops(1,0, &mut out, &idx);
-    assert_eq!(out,set![1]);
+    assert_eq!(out,map![(1,0)]);
     out.clear();
 
     get_docs_within_hops(1,1, &mut out, &idx);
-    assert_eq!(out,set![0,1,2,4]);
+    assert_eq!(out,map![(1,0),(0,1),(2,1),(4,1)]);
     out.clear();
 
     get_docs_within_hops(1,2, &mut out, &idx);
-    assert_eq!(out,set![0,1,2,3,4]);
+    assert_eq!(out,map![(1,0),(0,1),(2,1),(4,1),(3,2)]);
     out.clear();
 
     get_docs_within_hops(3,2, &mut out, &idx);
-    assert_eq!(out,set![1,2,3]);
+    assert_eq!(out,map![(1,2),(2,1),(3,0)]);
     out.clear();
 
 }
@@ -1040,15 +1040,15 @@ fn test_relational_search() {
             },
             Posting {
                 document_id: 1,
-                position: 0
+                position: 1
             },
             Posting {
                 document_id: 2,
-                position: 0
+                position: 2
             },
             Posting {
                 document_id: 3,
-                position: 0
+                position: 3
             }
         ]
     );

@@ -10,7 +10,7 @@ use parser::{ast::{Query}, UnaryOp, BinaryOp};
 use parser::errors::{QueryError, QueryErrorKind};
 use preprocessor::{Preprocessor, ProcessingOptions};
 
-use std::{collections::HashSet, iter::empty};
+use std::{collections::{HashSet, HashMap}, iter::empty};
 use utils::utils::merge;
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -145,29 +145,28 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
             ref hops,
             ref sub,
         } => {
-            let mut subset = HashSet::default();
+            let mut subset = HashMap::default();
             get_docs_within_hops(id, *hops, &mut subset, index);
 
             match sub {
-                Some(v) => {
-                    return PostingIterator::new(
-                                execute_query(v, index)
-                                    .filter(move |c| subset.contains(&c.document_id))
-                            )
-                }
+                Some(q) => {
+                    PostingIterator::new(execute_query(q, index).into_iter().filter(move |v| {
+                        subset.contains_key(&v.document_id)
+                    }))
+                },
                 None => {
-                    let mut o: Vec<Posting> = subset
-                        .into_iter()
-                        .map(|c| Posting {
-                            document_id: c,
-                            position: 0,
-                        })
-                        .collect();
-                    o.sort(); // TODO; hmm
-                    return PostingIterator::new(o.into_iter());
-                }
-            };
-        }
+                    let mut o = subset.into_iter().map(|(k,v)|{
+                        Posting{
+                            document_id: k,
+                            position: v as u32,
+                        }
+                    }).collect::<Vec<Posting>>();
+                    o.sort();
+
+                    PostingIterator::new(o.into_iter())
+                },
+            }
+        },
         Query::WildcardQuery {
             prefix: _,
             postfix: _,
@@ -257,13 +256,52 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
     }
 }
 
+/// own endpoint for relational query, scoring for it should happen here (i.e. Page Rank)
+pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> Vec<ScoredDocument> {
 
+        if let Query::RelationQuery{root, hops, sub} = &**query{
+            let mut subset = HashMap::default();
+            get_docs_within_hops(*root, *hops, &mut subset, index);
 
+            match sub {
+                Some(v) => {
+                    execute_query(&v, index)
+                            .filter_map(move |c| {
+                                if subset.contains_key(&c.document_id){
+                                    Some(ScoredDocument{
+                                        score: (*hops as f64 - *subset.get(&c.document_id).unwrap() as f64) * 100.0, // magic number, choose whatever you want
+                                        doc_id: c.document_id,
+                                    })
+                                } else {
+                                    None
+                                }
+                            }).collect()
+                }
+                None => {
+                    subset
+                        .into_iter()
+                        .map(move |(id,score)| ScoredDocument {
+                            doc_id: id,
+                            score: (*hops as f64 - score as f64) * 100.0, // magic number, choose whatever you want
+                        })
+                        .collect()
+                }
+            }
+        } else {
+            Vec::default()
+        }
+}
 
-pub fn get_docs_within_hops(docid: u32, hops: u32, out: &mut HashSet<u32>, index: &Index) {
-    out.insert(docid);
+/// finds documents within given hops off the root, also stores the number of hops from the root
+pub fn get_docs_within_hops(docid: u32, hops: u8, out: &mut HashMap<u32,u8>, index: &Index) {
+    get_docs_within_hops_sub(docid,hops,0, out, index)
+}
 
-    if hops == 0 {
+#[inline(always)]
+fn get_docs_within_hops_sub(docid: u32,hops_max: u8 ,hops: u8, out: &mut HashMap<u32,u8>, index: &Index) {
+    out.insert(docid, hops);
+
+    if hops == hops_max {
         return;
     }
 
@@ -272,13 +310,15 @@ pub fn get_docs_within_hops(docid: u32, hops: u32, out: &mut HashSet<u32>, index
     let all_l = merge(in_l, out_l);
 
     all_l.iter().for_each(|v| {
-        if !out.contains(v) {
-            out.insert(*v);
-            get_docs_within_hops(*v, hops - 1, out, index);
+        if !out.contains_key(v) {
+            out.insert(*v, hops + 1);
+            get_docs_within_hops_sub(*v,hops_max, hops + 1, out, index);
         }
     })
 }
 
+
+/// scores all queries apart from the relational query which passes through its own endpoint
 pub fn score_query(
     query: &Box<Query>,
     index: &Index,

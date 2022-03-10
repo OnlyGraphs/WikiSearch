@@ -1,13 +1,13 @@
 IMAGE_NAME=wiki_search_api
 IMAGE_VERSION=1.1.0
- #warning,search_api=debug,index=debug,search=debug,parser=debug,actix_web=info
 GRPC_PORT=50051
 export SQLX_OFFLINE=true
 export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
 export SEARCH_PORT=8000
-export RUST_LOG=debug,actix_web=debug
+export RUST_LOG=warning,search_api=debug,index=debug,retrieval=debug,parser=debug,search_lib=debug,search_api=debug,actix_web=info
 export BACKEND=http://localhost:8000
 export RUST_BACKTRACE=1
+export CACHE_SIZE=10000000
 run_img: #build_img
 	docker run \
 		-e SEARCH_PORT \

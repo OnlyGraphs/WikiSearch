@@ -56,7 +56,7 @@ pub enum Query {
     },
     RelationQuery {
         root: u32,
-        hops: u32,
+        hops: u8,
         sub: Option<Box<Query>>,
     },
     WildcardQuery {
