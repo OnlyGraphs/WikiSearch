@@ -2,6 +2,7 @@ use crate::{EncodedPostingNode, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use utils::MemFootprintCalculator;
 use core::fmt::Debug;
+use std::io::Bytes;
 use std::{
     collections::HashMap,
     io::{Read, Write},
@@ -128,6 +129,9 @@ where
     }
 }
 
+/// ------------------ Compression -------------------- ///
+//TODO! Elias gamma code, or potentially Google's Group varint encoding
+
 /// An encoder which does the absolute minimum
 /// Stores as little as possible but without any encoding
 #[derive(Default, Eq, PartialEq, Debug, Clone)]
@@ -146,6 +150,134 @@ impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
         (a, count)
     }
 }
+#[derive(Default, Eq, PartialEq, Debug)]
+pub struct DeltaEncoder {}
+
+impl DeltaEncoder {
+    fn compress(_prev: &Option<Posting>, curr: &Posting) -> Posting {
+        let mut diff = Posting {
+            document_id: curr.document_id,
+            position: curr.position,
+        };
+        if let Some(previous_posting) = *_prev {
+            diff.document_id = curr.document_id - previous_posting.document_id;
+            if curr.document_id == previous_posting.document_id {
+                diff.position = curr.position - previous_posting.position;
+            }
+        }
+        return diff;
+    }
+
+    fn decompress(_prev: &Option<Posting>, diff: &mut Posting) -> Posting {
+        if let Some(previous_posting) = *_prev {
+            diff.document_id = diff.document_id + previous_posting.document_id;
+            if diff.document_id == previous_posting.document_id {
+                diff.position = diff.position + previous_posting.position;
+            }
+        }
+        return *diff;
+    }
+}
+//NOTE: The postings need to be sorted!
+impl SequentialEncoder<Posting> for DeltaEncoder {
+    fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
+        let mut bytes = Vec::default();
+        let mut diff = DeltaEncoder::compress(_prev, curr);
+        let _count = diff.serialize(&mut bytes);
+        bytes
+    }
+
+    fn decode<R: Read>(_prev: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
+        let mut a = Posting::default();
+        let count = a.deserialize(&mut bytes);
+
+        a = DeltaEncoder::decompress(_prev, &mut a);
+
+        (a, count)
+    }
+}
+
+#[derive(Default, Eq, PartialEq, Debug)]
+pub struct VbyteEncoder {}
+
+impl VbyteEncoder {
+    fn into_vbyte_serialise(mut num: u32) -> Vec<u8> {
+        let mut bytes = Vec::default();
+        //Set everything to have a continuation bit
+        while num >= 128 {
+            //Little endian order
+            bytes.insert(0, ((num & 127) | 128) as u8);
+            num = num >> 7;
+        }
+
+        bytes.insert(0, ((num & 127) | 128) as u8);
+        //unclear 8th bit in the last byte
+        let len = bytes.len() - 1;
+        bytes[len] = bytes[len] & !(1 << 7);
+        return bytes;
+    }
+    fn from_vbyte_deserialise<R: Read>(mut bytes: R) -> (Posting, usize) {
+        let mut doc_id: u32 = 0; //To compute document_id for Posting
+        let mut position: u32 = 0; //To compute position for Posting
+        let mut reading_doc_id_flag = true; //set true to assign the following bytes until end of byte (continuation bit cleared) to doc id first
+        let mut result = 0; //To be used for calculating doc_id and position
+        let mut byte_total_count: usize = 0;
+        let mut shift: u8 = 0; //shift amount to store computation in result depending on the number of bytes (mainly by looking at continuation bit)
+        for b in bytes.bytes() {
+            let num_byte = b.unwrap();
+            //Increase byte count
+            byte_total_count += 1;
+            //Get the first 7 bits of the byte
+            let byte_subset = (num_byte & 127) as u32;
+            //Place the computation in the right byte placement (using shift)
+            result = (result << shift) | byte_subset;
+            //If continuation bit is clear (== 0), save computed (deserialised) results
+            if num_byte & 128 == 0 {
+                if reading_doc_id_flag == true {
+                    doc_id = result;
+                    reading_doc_id_flag = false;
+                } else {
+                    position = result;
+                }
+                //Reset now for position posting
+                result = 0;
+                shift = 0;
+            } else {
+                //After first iteration, where continuation bit happened to be 1, increase shift amount to 7
+                shift = 7;
+            }
+        }
+        //Create posting based on above computation
+        let mut vdiff = Posting {
+            document_id: doc_id,
+            position: position,
+        };
+        (vdiff, byte_total_count)
+    }
+}
+
+/// Note: The order of reading goes by compressing document id first, then going to position.
+///Hence when decoding, the first bytes with continuation bit (in 8th bit) set  until the last byte with the bit unset/cleared (i.e it is set to 0), is the document
+/// The rest would indicate the position
+/// There will be at least 2 bytes
+impl SequentialEncoder<Posting> for VbyteEncoder {
+    fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
+        let mut encoding_bytes = Vec::default();
+        let mut vdiff = DeltaEncoder::compress(_prev, curr);
+        encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.document_id));
+        encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.position));
+        encoding_bytes
+    }
+
+    fn decode<R: Read>(_prev: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
+        let (mut vdiff, byte_total_count): (Posting, usize) =
+            VbyteEncoder::from_vbyte_deserialise(bytes);
+        let a: Posting = DeltaEncoder::decompress(_prev, &mut vdiff);
+        (a, byte_total_count)
+    }
+}
+
+/// ------------------ Compression [END] -------------------- ///
 
 /// objects which can be turned into a stream of bytes and back
 /// Return a compact encoding, and deserialize from it
