@@ -1,13 +1,16 @@
 use crate::{EncodedPostingNode, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use utils::MemFootprintCalculator;
 use core::fmt::Debug;
 use std::io::Bytes;
 use std::{
+    cell::RefCell,
     collections::HashMap,
     io::{Read, Write},
-    marker::PhantomData, rc::Rc, cell::RefCell, ops::{Deref, DerefMut},
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    rc::Rc,
 };
+use utils::MemFootprintCalculator;
 
 /// Implementations encapsulate any sort of encoding mechanism
 /// an encoder is the bridge between a list of bytes [u8] and the in-memory object representation
@@ -47,18 +50,17 @@ where
     pos: usize,
 }
 
-impl <T : SequentialEncoder<Posting>>MemFootprintCalculator for EncodedPostingNode<T>{
+impl<T: SequentialEncoder<Posting>> MemFootprintCalculator for EncodedPostingNode<T> {
     fn real_mem(&self) -> u64 {
         self.postings.real_mem() + self.tf.real_mem() + self.df.real_mem()
     }
 }
 
-impl <T : SequentialEncoder<Posting>>MemFootprintCalculator for EncodedPostingList<T>{
+impl<T: SequentialEncoder<Posting>> MemFootprintCalculator for EncodedPostingList<T> {
     fn real_mem(&self) -> u64 {
         self.bytes.len() as u64
     }
 }
-
 
 impl<E, T> Iterator for DecoderIterator<'_, T, E>
 where
@@ -187,7 +189,7 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
         bytes
     }
 
-    fn decode<R: Read>(_prev: &Option<Posting>,  bytes: &mut R) -> (Posting, usize) {
+    fn decode<R: Read>(_prev: &Option<Posting>, bytes: &mut R) -> (Posting, usize) {
         let mut a = Posting::default();
         let count = a.deserialize(bytes);
 
@@ -288,8 +290,7 @@ pub trait Serializable: Default {
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize;
 }
 
-
-impl <T: Serializable> Serializable for RefCell<T>{
+impl<T: Serializable> Serializable for RefCell<T> {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         self.borrow().serialize(buf)
     }
@@ -327,7 +328,6 @@ impl Serializable for String {
         len as usize
     }
 }
-
 
 impl<T, E> Serializable for EncodedSequentialObject<T, E>
 where
