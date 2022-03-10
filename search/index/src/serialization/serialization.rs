@@ -13,7 +13,7 @@ use std::{
 /// an example would be a V-byte encoder, which saves space using the fact that intermediate values are close to each other
 pub trait SequentialEncoder<T: Serializable>: Default {
     fn encode(prev: &Option<T>, curr: &T) -> Vec<u8>;
-    fn decode<R: Read>(prev: &Option<T>, bytes: R) -> (T, usize);
+    fn decode<R: Read>(prev: &Option<T>, bytes: &mut R) -> (T, usize);
 }
 
 /// An compact representation of an encodable object, requires a [SequentialEncoder] object
@@ -38,7 +38,7 @@ where
 {
     /// the underlying encoded object
     o: &'a EncodedSequentialObject<T, E>,
-
+    buffer: &'a [u8],
     /// the previous decoded object
     prev: Option<T>,
 
@@ -70,14 +70,9 @@ where
         if self.pos < self.o.bytes.len() {
             let (out, count) = E::decode(
                 &self.prev,
-                &mut self
-                    .o
-                    .bytes
-                    .iter()
-                    .skip(self.pos)
-                    .cloned()
-                    .collect::<Vec<u8>>()
-                    .as_slice(),
+                &mut &self.buffer[self.pos..]
+                    // .buffer[..]
+                    // .as_slice(),
             );
             self.pos += count;
             Some(out)
@@ -128,6 +123,7 @@ where
             o: self,
             pos: 0,
             prev: None,
+            buffer: &self.bytes[..],
         }
     }
 }
@@ -144,9 +140,9 @@ impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
         bytes
     }
 
-    fn decode<R: Read>(_: &Option<T>, mut bytes: R) -> (T, usize) {
+    fn decode<R: Read>(_: &Option<T>, bytes: &mut R) -> (T, usize) {
         let mut a = T::default();
-        let count = a.deserialize(&mut bytes);
+        let count = a.deserialize(bytes);
         (a, count)
     }
 }

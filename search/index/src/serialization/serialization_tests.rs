@@ -216,7 +216,7 @@ fn test_from_and_to_iter() {
 
 #[test]
 fn test_disk_hash_map_above_capacity(){
-    let mut d = DiskHashMap::<String,u32,2,0>::new(2);
+    let mut d = DiskHashMap::<String,u32,0>::new(2);
 
     d.insert("0123".to_string(),32);
     d.insert("3210".to_string(),16);
@@ -231,7 +231,7 @@ fn test_disk_hash_map_above_capacity(){
 
 #[test]
 fn test_disk_hash_map_zero_capacity(){
-    let mut d = DiskHashMap::<String,u32,0,1>::new(2);
+    let mut d = DiskHashMap::<String,u32,1>::new(0);
 
     d.insert("0123".to_string(),32);
     d.insert("3210".to_string(),16);
@@ -245,7 +245,7 @@ fn test_disk_hash_map_zero_capacity(){
 
 #[test]
 fn test_disk_hash_map_insert_existing(){
-    let mut d = DiskHashMap::<String,u32,1,2>::new(2);
+    let mut d = DiskHashMap::<String,u32,2>::new(1);
 
     d.insert("0123".to_string(),32);
     let o = d.insert("0123".to_string(),16);
@@ -259,8 +259,8 @@ fn test_disk_hash_map_insert_existing(){
 
 #[test]
 fn test_disk_hash_map_clean_up() {
-    let mut d = DiskHashMap::<String, u32, 0,3>::new(2);
-    let path = DiskHashMap::<String, u32, 0,3>::path();
+    let mut d = DiskHashMap::<String, u32,3>::new(0);
+    let path = DiskHashMap::<String, u32,3>::path();
 
     d.insert("0123".to_string(), 3);
     d.insert("0124".to_string(), 4);
@@ -275,38 +275,51 @@ fn test_disk_hash_map_clean_up() {
 
 #[test]
 fn test_disk_hash_map_path() {
-    assert_eq!(DiskHashMap::<String, u32, 0,4>::path(),PathBuf::from("/tmp/diskhashmap-4"));
-    assert_eq!(DiskHashMap::<String, u32, 0,5>::path(),PathBuf::from("/tmp/diskhashmap-5"));
-    assert_eq!(DiskHashMap::<String, u32, 0,6>::path(),PathBuf::from("/tmp/diskhashmap-6"));
+    assert_eq!(DiskHashMap::<String, u32,4>::path(),PathBuf::from("/tmp/diskhashmap-4"));
+    assert_eq!(DiskHashMap::<String, u32,5>::path(),PathBuf::from("/tmp/diskhashmap-5"));
+    assert_eq!(DiskHashMap::<String, u32,6>::path(),PathBuf::from("/tmp/diskhashmap-6"));
 
 }
 
 
 #[test]
 fn test_disk_hash_map_real_mem() {
-    let mut d = DiskHashMap::<u32, u32, 0,7>::new(2);
-    let path = DiskHashMap::<u32, u32, 0,7>::path();
+    let mut d = DiskHashMap::<u32, u32,7>::new(0);
+    let path = DiskHashMap::<u32, u32,7>::path();
 
     d.insert(0, 3);
     d.insert(1, 4);
     d.insert(2, 4);
     d.insert(3, 4);
     assert_eq!(d.clean_cache(),0);
-
     assert_eq!(d.real_mem(),104);
 
 }
 
+#[test]
+fn test_disk_hash_map_clean_cache_cache_pop() {
+    let mut d = DiskHashMap::<u32, u32,7>::new(0);
+
+
+    d.insert(0, 3);
+    d.insert(1, 4);
+    d.insert(2, 4);
+    d.insert(3, 4);
+    assert_eq!(d.cache_population(),4);
+    assert_eq!(d.clean_cache(),0);
+    assert_eq!(d.cache_population(),0);
+
+}
 
 #[test]
 fn test_disk_hash_map_multiple_uses() {
-    drop(DiskHashMap::<u32, u32, 0,8>::new(2));
-    drop(DiskHashMap::<u32, u32, 0,8>::new(2));
-    drop(DiskHashMap::<u32, u32, 0,8>::new(2)); 
+    drop(DiskHashMap::<u32, u32,8>::new(0));
+    drop(DiskHashMap::<u32, u32,8>::new(0));
+    drop(DiskHashMap::<u32, u32,8>::new(0)); 
 }
 
 #[test]
 fn test_disk_hash_map_multiple_uses_consecutive() {
-    let a = DiskHashMap::<u32, u32, 0,9>::new(2);
-    let b =  DiskHashMap::<u32, u32, 0,9>::new(2);
+    let a = DiskHashMap::<u32, u32,9>::new(0);
+    let b =  DiskHashMap::<u32, u32,9>::new(0);
 }

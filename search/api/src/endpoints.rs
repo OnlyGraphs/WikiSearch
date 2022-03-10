@@ -94,6 +94,8 @@ pub async fn search(
     q: Query<SearchParameters>,
 ) -> Result<impl Responder, APIError> {
 
+    info!("received query: {}", q.query);
+
     let timer = Instant::now();
 
     //Initialise Database connection to retrieve article title and abstract for each document found for the query
@@ -111,9 +113,16 @@ pub async fn search(
     let (_, ref mut query) = parse_query(&q.query)
         .map_err(|e| APIError::new_user_error(&e,&e))?;
     
+    info!("preprocessing query: {}", q.query);
     preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
 
-    let mut postings = execute_query(query, &idx).collect::<Vec<Posting>>();
+    info!("executing query: {}", q.query);
+
+    let postings_query = execute_query(query, &idx);
+    info!("collecting query: {}", q.query);
+    let mut postings = postings_query.collect::<Vec<Posting>>();
+
+    info!("sorting query: {}", q.query);
 
     let capped_max_results = min(q.results_per_page.0,150);
     // score documents if necessary and sort appropriately
@@ -235,7 +244,7 @@ pub async fn relational(
             .clone()
             .map(|v| format!(",{}", v))
             .unwrap_or("".to_string()));
-    debug!("{:?}", query_string);
+
     let (_, ref mut query) = parse_query(&query_string)
         .map_err(|e| APIError::new_user_error(&e,&e))?;
 

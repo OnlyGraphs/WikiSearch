@@ -27,9 +27,9 @@ use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
 
 
 #[derive(Default)]
-pub struct Index {
+pub struct Index{
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1000000,1>, // index map because we want to keep this sorted
+    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1>, // index map because we want to keep this sorted
     pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
@@ -48,6 +48,7 @@ impl MemFootprintCalculator for Index {
 impl Debug for Index {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // split calculation to avoid recalculating
+
         let posting_mem = self.posting_nodes.real_mem();
         let links_mem = self.links.real_mem();
         let incoming_links_mem = self.incoming_links.real_mem();
@@ -63,17 +64,18 @@ impl Debug for Index {
 
         let mem = real_mem as f64 / 1000000.0;
         let docs = self.links.len();
-
         write!(
             f,
             "BasicIndex{{\n\
             \tDump ID={:?}\n\
-            \tPostings={:?}\n\
+            \tPostingLists={:?}\n\
+            \tPostingInRAM={:?}\n\
+            \tPostingRamCapacity={:?}\n\
             \tDocs={:.3}\n\
             \tRAM={:.3}MB\n\
             \tRAM/Docs={:.3}GB/1Million\n\
             \t{{\n\
-            \t\tpostings:{:.3}Mb\n\
+            \t\tpostings(in cache):{:.3}Mb\n\
             \t\tlinks:{:.3}Mb\n\
             \t\textent:{:.3}Mb\n\
             \t\tmetadata:{:.3}Mb\n\
@@ -81,6 +83,8 @@ impl Debug for Index {
             }}",
             self.dump_id,
             self.posting_nodes.len(),
+            self.posting_nodes.cache_population(),
+            self.posting_nodes.capacity(),
             docs,
             mem,
             ((mem / 1000.0) / (docs as f64)) * 1000000.0,
@@ -147,17 +151,16 @@ impl Index {
     }
 
     pub fn with_capacity(
-        articles: usize,
-        avg_tokens_per_article: usize,
-        struct_elem_type_count: usize,
+        posting_list_mem_limit: u32,
+        articles: u32
     ) -> Self {
         Self {
             dump_id: 0,
-            posting_nodes: DiskHashMap::new(articles * avg_tokens_per_article),
-            links: HashMap::with_capacity(articles),
-            incoming_links: HashMap::with_capacity(articles),
-            extent: HashMap::with_capacity(struct_elem_type_count),
-            last_updated_docs: HashMap::with_capacity(articles),
+            posting_nodes: DiskHashMap::new(posting_list_mem_limit),
+            links: HashMap::with_capacity(articles as usize),
+            incoming_links: HashMap::with_capacity(articles as usize),
+            extent: HashMap::with_capacity(256),
+            last_updated_docs: HashMap::with_capacity(articles as usize),
         }
     }
 
@@ -165,13 +168,13 @@ impl Index {
         // extract postings and sort
         let mut timer = Instant::now();
 
-        info!("Sorting posting lists");
-        let mut posting_nodes : DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1000000,1> = DiskHashMap::new(p.posting_nodes.len());
+        let total_posting_lists = p.posting_nodes.len();
+        info!("Sorting {} posting lists", total_posting_lists);
+        let mut posting_nodes : DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1> = DiskHashMap::new(p.posting_nodes.capacity());
+
         (0..p.posting_nodes.len()).for_each(|idx| {
-            // we do not use get_by_idx, since the indexes will change, we only care about what's next in order
-            // let (k, mut v) = p.posting_nodes.remove_first().unwrap();
-            // v.postings.sort();
-            // posting_nodes.insert(k, v);
+
+            { 
             let (k, v) = p.posting_nodes.pop().unwrap();
             v.lock().get_mut().unwrap().postings.sort();
 
@@ -184,9 +187,18 @@ impl Index {
 
             let encoded_node = EncodedPostingNode::from(unwrapped);
             posting_nodes.insert(k,encoded_node);
+            } // for dropping lock on v in case we want to evict it
+
+            // every R records, clean cache, and report progress
+            if idx % posting_nodes.capacity() as usize == 0 {
+                info!("Sorted {}%, cache pop: {} ({}s)", (idx as f32 / total_posting_lists as f32) * 100.0,posting_nodes.clean_cache(),timer.elapsed().as_secs());
+                timer = Instant::now();
+                
+            }
         });
+
+        posting_nodes.clean_cache();
         
-        info!("Took {}s", timer.elapsed().as_secs());
 
         // convert strings in the links to u32's
         // sort all links

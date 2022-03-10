@@ -2,16 +2,17 @@ use std::{
     borrow::Borrow,
     env,
     fmt::Debug,
-    fs::{create_dir, remove_dir_all, File, remove_file},
+    fs::{create_dir, remove_dir_all, File, remove_file, create_dir_all},
     hash::Hash,
-    path::{PathBuf}, rc::Rc, error::Error, io::Read, sync::{Arc},
+    path::{PathBuf, Path}, rc::Rc, error::Error, io::Read, sync::{Arc},
 };
 
 use crate::{Serializable, EncodedPostingNode, SequentialEncoder, IdentityEncoder};
 use indexmap::{IndexMap};
+use log::info;
 use utils::MemFootprintCalculator;
-use uuid::Uuid;
 use parking_lot::{Mutex};
+use default_env::default_env;
 
 pub struct Iter {
     max_len: usize,
@@ -33,19 +34,13 @@ impl Iterator for Iter {
     }
 }
 
+#[derive(Debug)]
 pub enum Entry<V : Serializable, const ID : u32> {
     Memory(V),
     Disk(u32),
 }
 
-impl <V: Serializable + Debug, const ID : u32>Debug for Entry<V, ID>{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Memory(arg0) => f.debug_tuple("Memory").field(arg0).finish(),
-            Self::Disk(arg0) => f.debug_tuple("Disk").field(arg0).finish(),
-        }
-    }
-}
+
 
 impl <V : Serializable, const ID : u32> Default for Entry<V, ID> {
     fn default() -> Self {
@@ -73,12 +68,12 @@ impl <V : Serializable + MemFootprintCalculator, const ID : u32>MemFootprintCalc
     fn real_mem(&self) -> u64 {
         match self {
             Entry::Memory(v) => v.real_mem() + 4,
-            Entry::Disk(v) => 4,
+            Entry::Disk(_) => 4,
         }
     }
 }
 
-impl<V : Serializable, const ID : u32> Entry<V, ID>{
+impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
 
     pub fn into_inner(self) -> Result<V, Box<dyn Error>>{
         match self {
@@ -102,7 +97,7 @@ impl<V : Serializable, const ID : u32> Entry<V, ID>{
         match self {
             Entry::Memory(ref mut v) => Ok(v),
             Entry::Disk(id) => {
-                let new = Self::fetch(PathBuf::from(format!("/tmp/diskhashmap-{}/{}",ID,id)))?; // TODO: env variable
+                let new = Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))?; // TODO: env variable
                 *self = Entry::Memory(new);
                 
                 match self {
@@ -119,7 +114,8 @@ impl<V : Serializable, const ID : u32> Entry<V, ID>{
         match self {
             Entry::Memory(v) => {
                 let prev = std::mem::take(v);
-                Self::evict(PathBuf::from(format!("/tmp/diskhashmap-{}/{}",ID,id)),prev)?;
+                Self::evict(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)),prev)?;
+                info!("Evicting {:?} from cache",&self);
             },
             Entry::Disk(_) => return Ok(()),
         };
@@ -134,8 +130,9 @@ impl<V : Serializable, const ID : u32> Entry<V, ID>{
             Entry::Memory(v) => Ok(()),
             Entry::Disk(id) => {
                 *self = Entry::Memory(
-                    Self::fetch(PathBuf::from(format!("/tmp/diskhashmap-{}/{}",ID,id)))? // TODO: env variable
+                    Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))? // TODO: env variable
                 );
+                info!("Fetching {:?} from cache",&self);
                 Ok(())
             },
         }
@@ -149,9 +146,10 @@ impl<V : Serializable, const ID : u32> Entry<V, ID>{
             Entry::Memory(ref mut v) => Ok(v),
             Entry::Disk(id) => {
                 *self = Entry::Memory(
-                    Self::fetch(PathBuf::from(format!("/tmp/diskhashmap-{}/{}",ID,id)))? // TODO: env variable
+                    Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))? // TODO: env variable
                 );
-                
+                info!("Fetching {:?} from cache",&self);
+
                 match self {
                     Entry::Memory(ref mut v) => Ok(v),
                     _ => panic!()
@@ -197,22 +195,27 @@ impl<V : Serializable, const ID : u32> Entry<V, ID>{
 /// A hashmap which holds a limited number of records in main memory with the rest
 /// of the records held on disk
 /// records are swapped as necessary
-pub struct DiskHashMap<K, V, const R: u32, const ID : u32>
+pub struct DiskHashMap<K, V, const ID : u32>
 where
     K: Serializable + Hash + Eq + Clone,
-    V: Serializable,
+    V: Serializable + Debug,
 {
     map: IndexMap<K, Arc<Mutex<Entry<V,ID>>>>,
+    capacity: u32,
 }
 
-impl<K, V, const R: u32, const ID : u32> DiskHashMap<K, V, R, ID>
+impl<K, V, const ID : u32> DiskHashMap<K, V, ID>
 where
     K: Serializable + Hash + Eq + Clone,
-    V: Serializable,
+    V: Serializable + Debug,
 {
 
     pub fn len(&self) -> usize {
         return self.map.len()
+    }
+
+    pub fn capacity(&self) -> u32 {
+        return self.capacity;
     }
 
 
@@ -227,24 +230,22 @@ where
     }
 
     /// evicts unused records untill all records are checked or record limit is satisfied
-    pub fn clean_cache(&mut self) -> u32 {
+    pub fn clean_cache(&self) -> u32 {
 
         // figure out how many records are in memory
         let mut records = self.cache_population();
 
 
         // reduce this number if needed
-        if records > R {
+        if records > self.capacity {
             self.map.values().enumerate().take_while(|(i,v)| {
-                let count = Arc::strong_count(v);
-
-                if count <= 1 && !v.is_locked(){
+                if !v.is_locked() && v.lock().is_loaded(){
                     // we are only ones using it 
                     // evict candidate
                     v.lock().unload(*i as u32).unwrap();
                     records -= 1;
                 };
-                records > R
+                records > self.capacity
             }).for_each(drop);
         }
 
@@ -277,7 +278,7 @@ where
     }
 
     pub fn path() -> PathBuf{
-        PathBuf::from(format!("/tmp/diskhashmap-{}",ID))
+        PathBuf::from(format!("{}/{}-{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID))
     }
 
     pub fn insert(&mut self, k:K, v: V) -> Option<Arc<Mutex<Entry<V,ID>>>>
@@ -290,42 +291,49 @@ where
         self.map.pop()
     }
 
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(capacity: u32) -> Self {
         let path = Self::path();
+        
+        if path == Path::new("/") ||
+            path.as_os_str().len() == 0 {
+            panic!();
+        };
+
         remove_dir_all(&path);
-        create_dir(&path);
+        create_dir_all(&path);
 
         Self {
             map: IndexMap::new(),
+            capacity: capacity
         }
     }
 }
 
 
-impl <K, V, const R: u32, const ID : u32> MemFootprintCalculator for DiskHashMap<K, V, R, ID>
+impl <K, V, const ID : u32> MemFootprintCalculator for DiskHashMap<K, V, ID>
 where 
     K: Serializable + Hash + Eq + Clone + MemFootprintCalculator,
-    V: Serializable + MemFootprintCalculator
+    V: Serializable + MemFootprintCalculator + Debug
 {
     fn real_mem(&self) -> u64 {
         self.map.real_mem()
     }
 }
 
-impl<K, V, const R: u32, const ID : u32> Drop for DiskHashMap<K, V, R, ID>
+impl<K, V, const ID : u32> Drop for DiskHashMap<K, V, ID>
 where
     K: Serializable + Hash + Eq + Clone,
-    V: Serializable,
+    V: Serializable + Debug,
 {
     fn drop(&mut self) {
         remove_dir_all(Self::path()).unwrap_or(());
     }
 }
 
-impl<K, V, const R: u32, const ID : u32> Default for DiskHashMap<K, V, R, ID>
+impl<K, V, const ID : u32> Default for DiskHashMap<K, V, ID>
 where
     K: Serializable + Hash + Eq + Clone,
-    V: Serializable ,
+    V: Serializable + Debug,
 {
     fn default() -> Self {
         Self::new(0)

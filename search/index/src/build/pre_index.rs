@@ -8,10 +8,9 @@ use parser::StructureElem;
 use std::collections::{HashMap, HashSet};
 
 /// a common backbone from which any index can be intialized
-#[derive(Default)]
-pub struct PreIndex {
+pub struct PreIndex{
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, PostingNode, 1000000, 0>,
+    pub posting_nodes: DiskHashMap<String, PostingNode, 0>,
     pub links: HashMap<u32, Vec<String>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub id_title_map: BiMap<u32, String>,
@@ -20,8 +19,34 @@ pub struct PreIndex {
     curr_doc_appearances: HashSet<String>,
 }
 
+impl Default for PreIndex {
+    fn default() -> Self {
+        Self { 
+            dump_id: Default::default(),
+            posting_nodes: DiskHashMap::new(1000000),
+            links: Default::default(), extent: Default::default(), 
+            id_title_map: Default::default(), 
+            last_updated_docs: Default::default(), 
+            curr_doc_appearances: Default::default() }
+    }
+}
+
 impl PreIndex {
-    pub fn finalize() {}
+
+    pub fn with_capacity(cap : u32) -> Self {
+        Self { 
+            dump_id: Default::default(),
+            posting_nodes: DiskHashMap::new(cap),
+            links: Default::default(), extent: Default::default(), 
+            id_title_map: Default::default(), 
+            last_updated_docs: Default::default(), 
+            curr_doc_appearances: Default::default() }
+    }
+
+    pub fn clean_cache(&self){
+        self.posting_nodes.clean_cache();
+    }
+
 
     pub fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError> {
         let mut word_pos = 0;

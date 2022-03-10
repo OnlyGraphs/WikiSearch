@@ -1,6 +1,6 @@
 IMAGE_NAME=wiki_search_api
 IMAGE_VERSION=1.1.0
-
+ #warning,search_api=debug,index=debug,search=debug,parser=debug,actix_web=info
 GRPC_PORT=50051
 export SQLX_OFFLINE=true
 export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
@@ -31,6 +31,8 @@ update-schema:
 
 run:
 	cd search && cargo run
+flame-run:
+	cd search && cargo flamegraph 
 
 build:
 	cd search && cargo build --release 

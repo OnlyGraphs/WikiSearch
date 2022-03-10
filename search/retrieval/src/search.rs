@@ -188,8 +188,14 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
             let  init  = PostingIterator::new(empty::<Posting>());
 
             tks.iter().tuple_windows().map(|(a,b)| {
-                (index.get_postings(a).map(|v| v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>()),
-                index.get_postings(b).map(|v| v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>()))
+                let l = index.get_postings(a).map(|v| {
+                    v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>()
+                
+                });
+                let r = index.get_postings(b).map(|v| {
+                    v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>()
+                });
+                (l,r)
             }).enumerate()
                 .fold(init,
                     |a, (i,(l,r))| {
@@ -235,7 +241,10 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
         Query::FreetextQuery { ref tokens } => {
             let init  = PostingIterator::new(empty::<Posting>());
 
-            tokens.iter().filter_map(|v| index.get_postings(v)).fold(init,|a,iter| {
+
+            tokens.iter()
+                .filter_map(|v| index.get_postings(v))
+                .fold(init,|a,iter| {
                 PostingIterator::new(
                     UnionMergeIterator::new(
                         Box::new(a),
@@ -328,7 +337,7 @@ impl <'a>UnionMergeIterator<'a> {
 impl <'a>Iterator for UnionMergeIterator<'a>{
     type Item = Posting;
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Self::Item> {        
         self.last = match self.state {
             UnionMergeState::Left => { // last time left side was 'get', advance it
                 self.state = UnionMergeState::Left;

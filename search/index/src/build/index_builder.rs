@@ -14,6 +14,8 @@ use std::future::Future;
 use std::ops::Range;
 use std::time::Instant;
 use num_integer::Integer;
+use default_env::default_env;
+use std::env;
 
 #[async_trait]
 pub trait IndexBuilder  {
@@ -47,7 +49,12 @@ impl IndexBuilder for SqlIndexBuilder {
         }
 
 
-        let mut pre_index = PreIndex::default();
+
+        let cap_str = env::var("CACHE_SIZE").unwrap_or("1000000".to_string());
+        let cap = cap_str.parse::<u32>().unwrap();
+        info!("Cap size found: {}", cap_str);
+        
+        let mut pre_index = PreIndex::with_capacity(cap);
         pre_index.dump_id = highest_dump_id;
 
         // do this in batches 
@@ -114,9 +121,15 @@ impl IndexBuilder for SqlIndexBuilder {
                     error!("Error in adding document with {{id: {}, title: {}}}:{}",doc_id,title,e);
                 }
 
+                if processed_docs % cap == 0 {
+                    pre_index.clean_cache();
+                }
+
+
             });
 
             info!("Building pre-index: {}% ({}s)",(processed_docs as f32 / num_docs as f32) * 100.0,timer.elapsed().as_secs());
+            pre_index.clean_cache();
         }
 
         pool.close().await;
