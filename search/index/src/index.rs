@@ -1,5 +1,6 @@
 use chrono::NaiveDateTime;
 use log::info;
+use sqlx::database::HasArguments;
 use streaming_iterator::{convert_ref, StreamingIterator,convert};
 use utils::MemFootprintCalculator;
 
@@ -24,7 +25,7 @@ use crate::index_structs::{PosRange, Posting};
 use crate::PostingNode;
 use crate::PreIndex;
 use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
-use crate::page_rank::{init_page_rank};
+// use crate::init_page_rank;
 
 
 #[derive(Default)]
@@ -239,7 +240,7 @@ impl Index {
             incoming_links: back_links,
             extent: p.extent,
             last_updated_docs: p.last_updated_docs,
-            page_rank: init_page_rank(back_links, 1.0),
+            page_rank: HashMap::default(), //init_page_rank(back_links, 1.0),
         }
     }
 }
