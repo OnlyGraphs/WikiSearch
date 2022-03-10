@@ -24,6 +24,7 @@ use crate::index_structs::{PosRange, Posting};
 use crate::PostingNode;
 use crate::PreIndex;
 use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
+use crate::page_rank::{init_page_rank};
 
 
 #[derive(Default)]
@@ -34,6 +35,7 @@ pub struct Index{
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub last_updated_docs: HashMap<u32, NaiveDateTime>,
+    pub page_rank: HashMap<u32, f64>,
 }
 
 impl MemFootprintCalculator for Index {
@@ -161,6 +163,7 @@ impl Index {
             incoming_links: HashMap::with_capacity(articles as usize),
             extent: HashMap::with_capacity(256),
             last_updated_docs: HashMap::with_capacity(articles as usize),
+            page_rank: HashMap::with_capacity(articles as usize),
         }
     }
 
@@ -236,6 +239,7 @@ impl Index {
             incoming_links: back_links,
             extent: p.extent,
             last_updated_docs: p.last_updated_docs,
+            page_rank: init_page_rank(back_links, 1.0),
         }
     }
 }
