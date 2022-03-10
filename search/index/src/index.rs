@@ -15,6 +15,7 @@ use std::{
 };
 
 use crate::DecoderIterator;
+use crate::DeltaEncoder;
 use crate::DiskHashMap;
 use crate::EncodedPostingList;
 use crate::EncodedPostingNode;

@@ -187,9 +187,9 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
         bytes
     }
 
-    fn decode<R: Read>(_prev: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
+    fn decode<R: Read>(_prev: &Option<Posting>,  bytes: &mut R) -> (Posting, usize) {
         let mut a = Posting::default();
-        let count = a.deserialize(&mut bytes);
+        let count = a.deserialize(bytes);
 
         a = DeltaEncoder::decompress(_prev, &mut a);
 
@@ -269,7 +269,7 @@ impl SequentialEncoder<Posting> for VbyteEncoder {
         encoding_bytes
     }
 
-    fn decode<R: Read>(_prev: &Option<Posting>, mut bytes: R) -> (Posting, usize) {
+    fn decode<R: Read>(_prev: &Option<Posting>, bytes: &mut R) -> (Posting, usize) {
         let (mut vdiff, byte_total_count): (Posting, usize) =
             VbyteEncoder::from_vbyte_deserialise(bytes);
         let a: Posting = DeltaEncoder::decompress(_prev, &mut vdiff);
