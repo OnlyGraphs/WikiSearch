@@ -35,6 +35,7 @@ where
 
 /// An convenience iterator for decoding [EncodedSequentialObject]'s can be created with
 /// [EncodedSequentialObject]::into_iter()
+#[derive(Clone)]
 pub struct DecoderIterator<'a, T, E>
 where
     E: SequentialEncoder<T>,
@@ -62,7 +63,7 @@ impl<T: SequentialEncoder<Posting>> MemFootprintCalculator for EncodedPostingLis
     }
 }
 
-impl<E, T> Iterator for DecoderIterator<'_, T, E>
+impl<E, T: Clone> Iterator for DecoderIterator<'_, T, E>
 where
     E: SequentialEncoder<T>,
     T: Serializable + Debug,
@@ -78,6 +79,7 @@ where
                     // .as_slice(),
             );
             self.pos += count;
+            self.prev = Some(out.clone());
             Some(out)
         } else {
             None
@@ -115,7 +117,7 @@ impl<E: SequentialEncoder<T>, T: Serializable> FromIterator<T> for EncodedSequen
 impl<'a, E, T> IntoIterator for &'a EncodedSequentialObject<T, E>
 where
     E: SequentialEncoder<T>,
-    T: Serializable + Debug,
+    T: Serializable + Debug + Clone,
 {
     type Item = T;
 
@@ -240,6 +242,7 @@ impl VbyteEncoder {
                     reading_doc_id_flag = false;
                 } else {
                     position = result;
+                    break;
                 }
                 //Reset now for position posting
                 result = 0;

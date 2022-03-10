@@ -617,6 +617,8 @@ fn test_delta_and_vbyte_encoder_vs_identity() {
         document_id: 99,
         position: 42,
     };
+    let target_vec = vec![target_1, target_2];
+
     //Serialise identity
     let obj_identity = EncodedSequentialObject::<Posting, IdentityEncoder>::from_iter(
         vec![target_1, target_2].into_iter(),
@@ -634,9 +636,8 @@ fn test_delta_and_vbyte_encoder_vs_identity() {
     obj_delta.serialize(&mut out);
 
     //Test deserialisation now
-    obj_delta.deserialize(&mut out.as_slice());
-
-    assert_eq!(out_identity, out);
+    let out_delta_decoded = obj_delta.into_iter().collect::<Vec<Posting>>();
+    assert_eq!(target_vec, out_delta_decoded);
 
     // ------------ serialise vbyte --------------
     let mut obj_vbyte = EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(
@@ -646,9 +647,9 @@ fn test_delta_and_vbyte_encoder_vs_identity() {
     obj_vbyte.serialize(&mut out);
 
     //Test deserialisation now
-    obj_vbyte.deserialize(&mut out.as_slice());
+    let out_vbyte_decoded = obj_vbyte.into_iter().collect::<Vec<Posting>>();
 
-    assert_eq!(out_identity, out);
+    assert_eq!(target_vec, out_vbyte_decoded);
 }
 
 /// ---------------- Compression Tests [END] ----------------
