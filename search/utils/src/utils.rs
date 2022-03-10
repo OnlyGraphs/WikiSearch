@@ -2,11 +2,16 @@ use bimap::BiMap;
 use chrono::NaiveDateTime;
 use either::Either;
 use indexmap::IndexMap;
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use std::hash::Hash;
 use std::mem::size_of;
-
+use std::ops::Deref;
+use std::rc::Rc;
+use std::sync::{Arc};
+use parking_lot::{Mutex, MutexGuard, RawMutex};
+use std::fmt::Debug;
 pub trait MemFootprintCalculator {
     fn real_mem(&self) -> u64;
 }
@@ -16,6 +21,23 @@ impl MemFootprintCalculator for &str {
         (self.len() * size_of::<u8>()) as u64 + size_of::<&str>() as u64
     }
 }
+
+impl <T : MemFootprintCalculator> MemFootprintCalculator for Arc<Mutex<T>> {
+    fn real_mem(&self) -> u64 {
+        <T as MemFootprintCalculator>::real_mem(self.lock().deref())
+    }
+}
+
+
+// impl <T : MemFootprintCalculator >MemFootprintCalculator for Mutex<T> 
+// {
+//     fn real_mem(&self) -> u64 {
+//         <T as MemFootprintCalculator>::real_mem(self.lock().deref())
+//     }
+// }
+
+
+
 impl MemFootprintCalculator for String {
     fn real_mem(&self) -> u64 {
         (self.len() * size_of::<u8>()) as u64 + size_of::<String>() as u64

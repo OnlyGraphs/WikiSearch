@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use std::{
     collections::HashMap,
     io::{Read, Write},
-    marker::PhantomData, rc::Rc,
+    marker::PhantomData, rc::Rc, cell::RefCell, ops::{Deref, DerefMut},
 };
 
 /// Implementations encapsulate any sort of encoding mechanism
@@ -48,8 +48,7 @@ where
 
 impl <T : SequentialEncoder<Posting>>MemFootprintCalculator for EncodedPostingNode<T>{
     fn real_mem(&self) -> u64 {
-        self.postings.real_mem() + 
-        self.real_mem() + 4
+        self.postings.real_mem() + self.tf.real_mem() + self.df.real_mem()
     }
 }
 
@@ -161,6 +160,17 @@ pub trait Serializable: Default {
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize;
 }
 
+
+impl <T: Serializable> Serializable for RefCell<T>{
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        self.borrow().serialize(buf)
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        self.borrow_mut().deserialize(buf)
+    }
+}
+
 impl Serializable for u32 {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         buf.write_u32::<NativeEndian>(*self).unwrap();
@@ -190,15 +200,6 @@ impl Serializable for String {
     }
 }
 
-impl <T : Serializable> Serializable for Rc<T> {
-    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
-        self.serialize(buf)
-    }
-
-    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
-        self.deserialize(buf)
-    }
-}
 
 impl<T, E> Serializable for EncodedSequentialObject<T, E>
 where

@@ -27,7 +27,8 @@ pub struct SqlIndexBuilder {
 
 #[async_trait]
 impl IndexBuilder for SqlIndexBuilder {
-    async fn build_index_if_needed(&self) -> Result<Option<Index>, IndexError> {
+    async fn build_index_if_needed(&self) -> Result<Option<Index>, IndexError> 
+    {
         let pool = PgPoolOptions::new()
             .max_connections(1)
             .connect(&self.connection_string)

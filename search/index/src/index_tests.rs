@@ -145,7 +145,7 @@ fn test_basic_index_get_postings() {
     let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(
-        idx.get_postings("aaa").unwrap().cloned().collect::<Vec<Posting>>(),
+        idx.get_postings("aaa").unwrap().lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>(),
         vec![Posting {
             document_id: 2,
             position: 0,
@@ -153,7 +153,7 @@ fn test_basic_index_get_postings() {
     );
 
     assert_eq!(
-        idx.get_postings("ddd").unwrap().cloned().collect::<Vec<Posting>>(),
+        idx.get_postings("ddd").unwrap().lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>(),
         vec![Posting {
             document_id: 2,
             position: 3,
@@ -161,14 +161,14 @@ fn test_basic_index_get_postings() {
     );
 
     assert_eq!(
-        idx.get_postings("ggg").unwrap().cloned().collect::<Vec<Posting>>(),
+        idx.get_postings("ggg").unwrap().lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>(),
         vec![Posting {
             document_id: 2,
             position: 6,
         }]
     );
 
-    assert_eq!(idx.get_postings("dick").map(|v| v.cloned().collect::<Vec<Posting>>()),None);
+    assert_eq!(idx.get_postings("dick").map(|v| v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>()),None);
 }
 
 #[test]
@@ -200,7 +200,7 @@ fn test_sorted_postings() {
     let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(
-        idx.get_postings("ggg").unwrap().cloned().collect::<Vec<Posting>>(),
+        idx.get_postings("ggg").unwrap().lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 2,
@@ -222,61 +222,6 @@ fn test_sorted_postings() {
     );
 }
 
-#[test]
-fn test_basic_index_get_all_postings_sorted() {
-    let mut pre_idx = PreIndex::default();
-
-    pre_idx
-        .add_document(get_document_with_text(
-            2,
-            "d0",
-            vec![("", "aaa eee")],
-            "ccc ddd",
-            vec!["eee fff"],
-            "fff fff",
-        ))
-        .unwrap();
-
-    let idx = Index::from_pre_index(pre_idx);
-
-    assert_eq!(
-        idx.get_all_postings().cloned().collect::<Vec<Posting>>(),
-        vec![
-            Posting {
-                document_id: 2,
-                position: 0,
-            },
-            Posting {
-                document_id: 2,
-                position: 1,
-            },
-            Posting {
-                document_id: 2,
-                position: 2,
-            },
-            Posting {
-                document_id: 2,
-                position: 3,
-            },
-            Posting {
-                document_id: 2,
-                position: 4,
-            },
-            Posting {
-                document_id: 2,
-                position: 5,
-            },
-            Posting {
-                document_id: 2,
-                position: 6,
-            },
-            Posting {
-                document_id: 2,
-                position: 7,
-            }
-        ]
-    );
-}
 
 // #[test] TEMP REMOVAL
 // fn test_basic_index_get_extent() {

@@ -113,7 +113,7 @@ pub async fn search(
     
     preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
 
-    let mut postings = execute_query(query, &idx).cloned().collect::<Vec<Posting>>();
+    let mut postings = execute_query(query, &idx).collect::<Vec<Posting>>();
 
     let capped_max_results = min(q.results_per_page.0,150);
     // score documents if necessary and sort appropriately
@@ -244,7 +244,7 @@ pub async fn relational(
 
     let capped_max_results = min(q.max_results.0,150) as usize;
 
-    let mut postings = execute_query(query, &idx).cloned().collect::<Vec<Posting>>();
+    let mut postings = execute_query(query, &idx).collect::<Vec<Posting>>();
     let scored_documents = score_query(query, &idx, &mut postings)
         .into_iter()
         .take(capped_max_results)

@@ -1,49 +1,35 @@
 use chrono::NaiveDateTime;
-use indexmap::IndexMap;
 use log::info;
 use streaming_iterator::{convert_ref, StreamingIterator,convert};
 use utils::MemFootprintCalculator;
 
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::ops::Deref;
+use std::sync::Arc;
 use std::time::Instant;
 use std::{
     collections::HashMap,
     fmt,
 };
 
+use crate::DecoderIterator;
+use crate::DiskHashMap;
+use crate::EncodedPostingList;
+use crate::EncodedPostingNode;
+use crate::EncodedSequentialObject;
+use crate::Entry;
+use crate::IdentityEncoder;
 use crate::index_structs::{PosRange, Posting};
 use crate::PostingNode;
 use crate::PreIndex;
+use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
 
-
-
-// Generic
-// pub trait Index: Send + Sync + Debug + MemFootprintCalculator {
-
-//     fn get_dump_id(&self) -> u32;
-//     fn get_postings(&self, token: &str) -> Option<PostingIterator<>>;
-//     fn get_all_postings(& self) -> Box<dyn StreamingIterator<Item = Posting> + '_>;
-
-//     fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange>;
-//     fn df(&self, token: &str) -> u32;
-//     fn tf(&self, token: &str, docid: u32) -> u32;
-//     fn get_number_of_documents(&self) -> u32;
-
-//     fn get_links(&self, source: u32) -> &[u32];
-//     fn get_incoming_links(&self, source: u32) -> &[u32];
-//     fn get_last_updated_date(&self, source: u32) -> Option<NaiveDateTime>;
-// }
-
-
-
-//TODO:
-//Make sure you check for integer overflows. Or, implementing Delta encoding would mitigate any such problems.
 
 #[derive(Default)]
 pub struct Index {
     pub dump_id: u32,
-    pub posting_nodes: IndexMap<String, PostingNode>, // index map because we want to keep this sorted
+    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1000000,1>, // index map because we want to keep this sorted
     pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
@@ -123,15 +109,16 @@ impl Index {
     }
 
     pub fn df(&self, token: &str) -> u32 {
-        match self.posting_nodes.get(token) {
-            Some(v) => v.df,
+        match self.posting_nodes.entry(token) {
+            Some(v) => v.deref().lock().get().unwrap().df,
             None => return 0,
         }
     }
 
     pub fn tf(&self, token: &str, docid: u32) -> u32 {
-        match self.posting_nodes.get(token) {
-            Some(v) => v.tf.get(&docid).cloned().unwrap_or(0),
+        match self.posting_nodes.entry(token) {
+            Some(v) => v.deref().lock().get().unwrap().tf
+                                                                    .get(&docid).cloned().unwrap_or(0),
             None => 0,
         }
     }
@@ -139,29 +126,13 @@ impl Index {
     pub fn get_number_of_documents(&self) -> u32 {
         self.last_updated_docs.len() as u32
     }
-    // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
-    pub fn get_postings(&self, token: &str) -> Option<impl StreamingIterator<Item = Posting> + '_>{
-        self.posting_nodes
-            .get(token)
-            .and_then(|c| {
-                let postings = &c.postings;
-                let iter  = convert_ref(postings.iter());
-                Some(iter)
-            })
-    
+
+
+    pub fn get_postings(&self, token: &str) -> Option<Arc<Mutex<Entry<EncodedPostingNode<IdentityEncoder>,1>>>>
+    {
+        self.posting_nodes.entry(token)
     }
 
-    // TODO: some sort of batching wrapper over postings lists, to later support lists of postings bigger than memory
-    pub fn get_all_postings(& self) -> impl StreamingIterator<Item = Posting>{
-        let mut out = self
-            .posting_nodes
-            .iter()
-            .flat_map(|(_, v)| v.postings.clone())
-            .collect::<Vec<Posting>>();
-        out.sort(); // TODO: merge while retrieving instead with iterator
-        let iter = convert(out.into_iter());
-        iter
-    }
 
     pub fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange> {
         self.extent.get(itype).and_then(|r| r.get(doc_id))
@@ -182,7 +153,7 @@ impl Index {
     ) -> Self {
         Self {
             dump_id: 0,
-            posting_nodes: IndexMap::with_capacity(articles * avg_tokens_per_article),
+            posting_nodes: DiskHashMap::new(articles * avg_tokens_per_article),
             links: HashMap::with_capacity(articles),
             incoming_links: HashMap::with_capacity(articles),
             extent: HashMap::with_capacity(struct_elem_type_count),
@@ -195,13 +166,26 @@ impl Index {
         let mut timer = Instant::now();
 
         info!("Sorting posting lists");
-        let mut posting_nodes = IndexMap::with_capacity(p.posting_nodes.len());
-        p.posting_nodes.iter_idx().for_each(|_| {
+        let mut posting_nodes : DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1000000,1> = DiskHashMap::new(p.posting_nodes.len());
+        (0..p.posting_nodes.len()).for_each(|idx| {
             // we do not use get_by_idx, since the indexes will change, we only care about what's next in order
-            let (k, mut v) = p.posting_nodes.remove_first().unwrap();
-            v.postings.sort();
-            posting_nodes.insert(k, v);
+            // let (k, mut v) = p.posting_nodes.remove_first().unwrap();
+            // v.postings.sort();
+            // posting_nodes.insert(k, v);
+            let (k, v) = p.posting_nodes.pop().unwrap();
+            v.lock().get_mut().unwrap().postings.sort();
+
+            let unwrapped = match Arc::try_unwrap(v) {
+                Ok(v) => v,
+                Err(_) => panic!(),
+            }  .into_inner()
+                .into_inner()
+                .unwrap();
+
+            let encoded_node = EncodedPostingNode::from(unwrapped);
+            posting_nodes.insert(k,encoded_node);
         });
+        
         info!("Took {}s", timer.elapsed().as_secs());
 
         // convert strings in the links to u32's

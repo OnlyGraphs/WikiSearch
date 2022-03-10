@@ -1,6 +1,13 @@
+use std::{sync::Arc, path::PathBuf};
+
+use utils::MemFootprintCalculator;
+
 use crate::{
     DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting, SequentialEncoder, Serializable,
 };
+
+
+
 
 #[test]
 #[cfg(target_endian = "little")]
@@ -193,163 +200,113 @@ fn test_from_and_to_iter() {
     assert_eq!(iter.next().unwrap(), target_2);
 }
 
-// #[test]
-// fn test_disk_hash_map_above_capacity(){
-//     let mut d = DiskHashMap::<String,u32,2>::new(2);
-
-//     d.insert("0123".to_string(),32).unwrap();
-//     d.insert("3210".to_string(),16).unwrap();
-//     d.insert("1023".to_string(),8).unwrap();
-
-//     assert_eq!(*d.get("0123").unwrap().unwrap(),32 as u32);
-//     assert_eq!(*d.get("1023").unwrap().unwrap(),8 as u32);
-//     assert_eq!(d.disk_len(),1);
-//     assert_eq!(d.len(),3);
-
-// }
-
-// #[test]
-// fn test_disk_hash_map_zero_capacity(){
-//     let mut d = DiskHashMap::<String,u32,0>::new(2);
-
-//     d.insert("0123".to_string(),32).unwrap();
-//     d.insert("3210".to_string(),16).unwrap();
-//     d.insert("1023".to_string(),8).unwrap();
-
-//     assert_eq!(*d.get("1023").unwrap().unwrap(),8 as u32);
-//     assert_eq!(d.disk_len(),2);
-//     assert_eq!(d.len(),3);
-// }
-
-// #[test]
-// fn test_disk_hash_map_insert_existing(){
-//     let mut d = DiskHashMap::<String,u32,1>::new(2);
-
-//     d.insert("0123".to_string(),32).unwrap();
-//     let o = d.insert("0123".to_string(),16);
-
-//     assert_eq!(*d.get("0123").unwrap().unwrap(),16  as u32);
-//     assert_eq!(o.unwrap(),Some(32));
-//     assert_eq!(d.len(),1);
-//     assert_eq!(d.disk_len(),0);
-// }
+//// IMPORTANT!!!
+/// Tests are run in parallel by default 
+/// to make sure they work nicely, each disk hash map MUST use a different id unique between tests!
+///
+/// 
+/// 
+/// 
+/// 
+/// 
+/// 
+/// 
+/// 
+/// IMPORTANT!!!
 
 #[test]
-fn test_disk_hash_map_remove() {
-    let mut d = DiskHashMap::<String, u32, 1>::new(2);
+fn test_disk_hash_map_above_capacity(){
+    let mut d = DiskHashMap::<String,u32,2,0>::new(2);
 
-    d.insert("0123".to_string(), 32).unwrap();
+    d.insert("0123".to_string(),32);
+    d.insert("3210".to_string(),16);
+    d.insert("1023".to_string(),8);
+    assert_eq!(*d.entry("0123").unwrap().lock().get().unwrap(),32 as u32);
+    assert_eq!(*d.entry("1023").unwrap().lock().get().unwrap(),8 as u32);
+    assert_eq!(d.cache_population(),3);
+    assert_eq!(d.clean_cache(),2);
+    assert_eq!(d.len(),3);
 
-    assert_eq!(d.remove("0123").unwrap(), Some(32 as u32));
-    assert_eq!(d.len(), 0);
-    assert_eq!(d.disk_len(), 0);
 }
 
 #[test]
-fn test_disk_hash_map_remove_on_disk() {
-    let mut d = DiskHashMap::<String, u32, 1>::new(2);
+fn test_disk_hash_map_zero_capacity(){
+    let mut d = DiskHashMap::<String,u32,0,1>::new(2);
 
-    d.insert("0123".to_string(), 4).unwrap();
-    d.insert("0124".to_string(), 8).unwrap();
-    assert_eq!(d.disk_len(), 1);
+    d.insert("0123".to_string(),32);
+    d.insert("3210".to_string(),16);
+    d.insert("1023".to_string(),8);
 
-    assert_eq!(d.remove("0123").unwrap(), Some(4 as u32));
-    assert_eq!(d.len(), 1);
-    assert_eq!(d.disk_len(), 0);
+    assert_eq!(*d.entry("1023").unwrap().lock().get().unwrap(),8 as u32);
+    assert_eq!(d.cache_population(),3);
+    assert_eq!(d.clean_cache(),0);
+    assert_eq!(d.len(),3);
 }
 
 #[test]
-fn test_disk_hash_map_remove_on_disk_multiple() {
-    let mut d = DiskHashMap::<String, u32, 1>::new(2);
+fn test_disk_hash_map_insert_existing(){
+    let mut d = DiskHashMap::<String,u32,1,2>::new(2);
 
-    d.insert("0123".to_string(), 3).unwrap();
-    d.insert("0124".to_string(), 4).unwrap();
-    d.insert("0125".to_string(), 5).unwrap();
+    d.insert("0123".to_string(),32);
+    let o = d.insert("0123".to_string(),16);
 
-    assert_eq!(d.disk_len(), 2);
-
-    assert_eq!(d.remove("0123").unwrap(), Some(3 as u32));
-    assert_eq!(d.remove("0124").unwrap(), Some(4 as u32));
-    assert_eq!(d.len(), 1);
-    assert_eq!(d.disk_len(), 0);
+    assert_eq!(*d.entry("0123").unwrap().lock().get().unwrap(),16  as u32);
+    assert_eq!(*o.unwrap().lock().get().unwrap(),32);
+    assert_eq!(d.len(),1);
+    assert_eq!(d.cache_population(),1);
 }
 
-#[test]
-fn test_disk_hash_map_insert_remove_mem() {
-    let mut d = DiskHashMap::<String, u32, 1>::new(2);
-
-    d.insert("0125".to_string(), 5).unwrap();
-    d.insert("0124".to_string(), 4).unwrap();
-    d.insert("0123".to_string(), 3).unwrap();
-
-    assert_eq!(d.remove("0123").unwrap(), Some(3 as u32));
-    assert_eq!(d.remove("0124").unwrap(), Some(4 as u32));
-    assert_eq!(d.remove("0125").unwrap(), Some(5 as u32));
-    assert_eq!(d.disk_len(), 0);
-    assert_eq!(d.len(), 0);
-}
-
-#[test]
-fn test_disk_hash_map_insert_remove_twice() {
-    let mut d = DiskHashMap::<String, u32, 1>::new(2);
-
-    d.insert("0125".to_string(), 5).unwrap();
-    d.insert("0124".to_string(), 4).unwrap();
-    d.insert("0123".to_string(), 3).unwrap();
-
-    assert_eq!(d.remove("0123").unwrap(), Some(3 as u32));
-    assert_eq!(d.remove("0124").unwrap(), Some(4 as u32));
-    assert_eq!(d.remove("0125").unwrap(), Some(5 as u32));
-    assert_eq!(d.disk_len(), 0);
-    assert_eq!(d.len(), 0);
-
-    d.insert("0123".to_string(), 5).unwrap();
-    d.insert("0125".to_string(), 3).unwrap();
-    d.insert("0124".to_string(), 4).unwrap();
-
-    assert_eq!(d.remove("0125").unwrap(), Some(3 as u32));
-    assert_eq!(d.remove("0123").unwrap(), Some(5 as u32));
-    assert_eq!(d.remove("0124").unwrap(), Some(4 as u32));
-    assert_eq!(d.disk_len(), 0);
-    assert_eq!(d.len(), 0);
-}
 
 #[test]
 fn test_disk_hash_map_clean_up() {
-    let mut d = DiskHashMap::<String, u32, 0>::new(2);
-    let path = d.path();
+    let mut d = DiskHashMap::<String, u32, 0,3>::new(2);
+    let path = DiskHashMap::<String, u32, 0,3>::path();
 
-    d.insert("0123".to_string(), 3).unwrap();
-    d.insert("0124".to_string(), 4).unwrap();
-    assert_eq!(d.disk_len(), 1);
+    d.insert("0123".to_string(), 3);
+    d.insert("0124".to_string(), 4);
+    assert_eq!(d.len(),2);
+    assert_eq!(d.cache_population(),2);
+    assert_eq!(d.clean_cache(), 0);
     drop(d);
 
     assert!(!path.is_dir());
 }
 
+
 #[test]
-fn test_disk_hash_map_iter_idx() {
-    let mut d = DiskHashMap::<String, u32, 0>::new(0);
+fn test_disk_hash_map_path() {
+    assert_eq!(DiskHashMap::<String, u32, 0,4>::path(),PathBuf::from("/tmp/diskhashmap-4"));
+    assert_eq!(DiskHashMap::<String, u32, 0,5>::path(),PathBuf::from("/tmp/diskhashmap-5"));
+    assert_eq!(DiskHashMap::<String, u32, 0,6>::path(),PathBuf::from("/tmp/diskhashmap-6"));
 
-    d.insert("0123".to_string(), 16).unwrap();
-    d.insert("0124".to_string(), 32).unwrap();
+}
 
-    let ref mut iter = d.iter_idx();
-    assert_eq!(iter.next(), Some(0));
-    assert_eq!(iter.next(), Some(1));
+
+#[test]
+fn test_disk_hash_map_real_mem() {
+    let mut d = DiskHashMap::<u32, u32, 0,7>::new(2);
+    let path = DiskHashMap::<u32, u32, 0,7>::path();
+
+    d.insert(0, 3);
+    d.insert(1, 4);
+    d.insert(2, 4);
+    d.insert(3, 4);
+    assert_eq!(d.clean_cache(),0);
+
+    assert_eq!(d.real_mem(),104);
+
+}
+
+
+#[test]
+fn test_disk_hash_map_multiple_uses() {
+    drop(DiskHashMap::<u32, u32, 0,8>::new(2));
+    drop(DiskHashMap::<u32, u32, 0,8>::new(2));
+    drop(DiskHashMap::<u32, u32, 0,8>::new(2)); 
 }
 
 #[test]
-fn test_disk_hash_map_iter_idx_retrieve_vals_and_keys() {
-    let mut d = DiskHashMap::<String, String, 0>::new(0);
-
-    d.insert("0123".to_string(), "a".to_string()).unwrap();
-    d.insert("0124".to_string(), "b".to_string()).unwrap();
-
-    let collect: Vec<String> = d
-        .iter_idx()
-        .map(|s| d.get_by_index(s).unwrap().1.clone())
-        .collect();
-
-    assert_eq!(collect, vec!["b".to_string(), "a".to_string()])
+fn test_disk_hash_map_multiple_uses_consecutive() {
+    let a = DiskHashMap::<u32, u32, 0,9>::new(2);
+    let b =  DiskHashMap::<u32, u32, 0,9>::new(2);
 }

@@ -1,17 +1,17 @@
 use std::{
     borrow::Borrow,
     env,
-    error::Error,
     fmt::Debug,
-    fs::{create_dir, remove_dir_all, remove_file, rename, File},
+    fs::{create_dir, remove_dir_all, File, remove_file},
     hash::Hash,
-    io::Read,
-    path::PathBuf,
+    path::{PathBuf}, rc::Rc, error::Error, io::Read, sync::{Arc},
 };
 
-use crate::{IndexError, IndexErrorKind, Serializable};
-use indexmap::{Equivalent, IndexMap, IndexSet};
+use crate::{Serializable, EncodedPostingNode, SequentialEncoder, IdentityEncoder};
+use indexmap::{IndexMap};
+use utils::MemFootprintCalculator;
 use uuid::Uuid;
+use parking_lot::{Mutex};
 
 pub struct Iter {
     max_len: usize,
@@ -33,267 +33,147 @@ impl Iterator for Iter {
     }
 }
 
-/// A hashmap which holds a limited number of records in main memory with the rest
-/// of the records held on disk
-/// records are swapped as necessary
-pub struct DiskHashMap<K, V, const R: u32>
-where
-    K: Serializable + Debug + Hash + Eq + Clone,
-    V: Serializable + Debug,
-{
-    /// in memory available records
-    /// together with insertion order information
-    online_map: IndexMap<K, V>,
-
-    /// offline, records stored on disk, for O(1) contains checks
-    offline_set: IndexSet<K>,
-
-    /// the root of the offline collection on disk
-    root: PathBuf,
+pub enum Entry<V : Serializable, const ID : u32> {
+    Memory(V),
+    Disk(u32),
 }
 
-impl<K, V, const R: u32> DiskHashMap<K, V, R>
-where
-    K: Serializable + Debug + Hash + Eq + Clone,
-    V: Serializable + Debug,
-{
-    pub fn iter_idx(&mut self) -> Iter
-    where
-        K: Default,
-    {
-        Iter {
-            curr_idx: 0,
-            max_len: self.len(),
+impl <V: Serializable + Debug, const ID : u32>Debug for Entry<V, ID>{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Memory(arg0) => f.debug_tuple("Memory").field(arg0).finish(),
+            Self::Disk(arg0) => f.debug_tuple("Disk").field(arg0).finish(),
+        }
+    }
+}
+
+impl <V : Serializable, const ID : u32> Default for Entry<V, ID> {
+    fn default() -> Self {
+        Self::Memory(V::default())
+    }
+}
+
+impl <V : Serializable, const ID : u32> Serializable for Entry<V, ID>{
+    fn serialize<W: std::io::Write>(&self, buf: &mut W) -> usize {
+        match self {
+            Entry::Memory(v) => v.serialize(buf),
+            _ => panic!(),
         }
     }
 
-    pub fn path(&self) -> PathBuf {
-        self.root.to_owned()
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        match self {
+            Entry::Memory(v) => v.deserialize(buf),
+            _ => panic!(),
+        }    
     }
+}
 
-    pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
-    where
-        Q: Hash + Eq + Equivalent<K>,
-    {
-        self.online_map.contains_key(key) || self.offline_set.contains(key)
-    }
-
-    pub fn contains_key_disk<Q: ?Sized>(&self, key: &Q) -> bool
-    where
-        Q: Hash + Eq + Equivalent<K>,
-    {
-        self.offline_set.contains(key)
-    }
-
-    fn contains_key_mem<Q: ?Sized>(&self, key: &Q) -> bool
-    where
-        Q: Hash + Eq + Equivalent<K>,
-    {
-        self.online_map.contains_key(key)
-    }
-
-    pub fn len(&self) -> usize {
-        return self.online_map.len() + self.offline_set.len();
-    }
-
-    pub fn mem_len(&self) -> usize {
-        return self.online_map.len();
-    }
-
-    pub fn disk_len(&self) -> usize {
-        return self.offline_set.len();
-    }
-
-    /// removes the record with the given key and returns it's value
-    /// if it exists or None otherwise
-    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Result<Option<V>, Box<dyn Error>>
-    where
-        Q: Hash + Eq + Debug + Equivalent<K> + ToOwned<Owned = K>,
-    {
-        if self.contains_key_mem(key) {
-            return Ok(self.online_map.remove(key));
-        } else if self.contains_key_disk(key) {
-            return self.fetch_no_insert(key).map(|v| Some(v));
-        } else {
-            return Ok(None);
+impl <V : Serializable + MemFootprintCalculator, const ID : u32>MemFootprintCalculator for Entry<V,ID>{
+    fn real_mem(&self) -> u64 {
+        match self {
+            Entry::Memory(v) => v.real_mem() + 4,
+            Entry::Disk(v) => 4,
         }
     }
-    /// inserts value into the disk backed hashmap
-    /// if there is no space, will evict another key
-    /// if no other key exists will still insert the given value
-    pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, Box<dyn Error>> {
-        let old_val = self.remove(&key)?;
+}
 
-        self.evict_victim_if_insert_overflows()?;
+impl<V : Serializable, const ID : u32> Entry<V, ID>{
 
-        self.online_map.insert(key, value);
-
-        Ok(old_val)
-    }
-
-    /// makes sure given index is in memory
-    pub fn load_into_mem(&mut self, idx: usize) -> Result<K, Box<dyn Error>> {
-        // RAM
-        if idx < self.mem_len() {
-            let (k, _v) = self.online_map.get_index(idx).ok_or(Box::new(IndexError {
-                msg: format!("Expected key val at {}", idx),
-                kind: IndexErrorKind::LogicError,
-            }))?;
-
-            return Ok(k.clone());
-        } else {
-            let disk_idx = idx - self.mem_len();
-            if disk_idx < self.disk_len() {
-                let k = self.offline_set[disk_idx].clone();
-                self.fetch(&k)?;
-                return Ok(k);
-            } else {
-                return Err(Box::new(IndexError {
-                    msg: format!("Expected key val at {}", disk_idx),
-                    kind: IndexErrorKind::LogicError,
-                }));
-            }
+    pub fn into_inner(self) -> Result<V, Box<dyn Error>>{
+        match self {
+            Entry::Memory(v) => Ok(v),
+            Entry::Disk(_) => Err(Box::new(
+                std::io::Error::new(std::io::ErrorKind::Other, format!("Data was not in memory.")
+            ))),
         }
     }
 
-    /// finds record by index, faster for sequential use, however if addressed in random order
-    /// each retrieval can change the index of some items, so only use if you know what you're doing
-    /// fast tracks
-    pub fn get_by_index(&mut self, idx: usize) -> Result<(K, &V), Box<dyn Error>> {
-        let k = self.load_into_mem(idx)?;
-        let (_, v) = self.get_from_mem(&k).ok_or(Box::new(IndexError {
-            msg: format!(""),
-            kind: IndexErrorKind::LogicError,
-        }))?;
-
-        Ok((k, v))
-    }
-
-    /// removes the most recently inserted element
-    /// if not in cache brings it in automatically
-    pub fn remove_first(&mut self) -> Result<(K, V), Box<dyn Error>> {
-        // RAM first
-        if self.online_map.len() > 0 {
-            self.online_map.pop().ok_or(Box::new(IndexError {
-                msg: format!(""),
-                kind: IndexErrorKind::LogicError,
-            }))
-        } else if self.offline_set.len() > 0 {
-            let k = self.offline_set.last().unwrap().clone();
-            return Ok((k.clone(), self.fetch_no_insert(&k)?));
-        } else {
-            Err(Box::new(IndexError {
-                msg: format!(""),
-                kind: IndexErrorKind::LogicError,
-            }))
-        }
-
-        // let (_, v) = self.get_from_mem(&k).ok_or(Box::new(IndexError {
-        //     msg: format!(""),
-        //     kind: IndexErrorKind::LogicError,
-        // }))?;
-
-        // self.remove(&k).map(|o| (k,o.unwrap()))
-    }
-
-    pub fn get<Q: ?Sized>(&mut self, k: &Q) -> Result<Option<&V>, Box<dyn Error>>
-    where
-        K: Borrow<Q> + Eq + Hash,
-        Q: Hash + Eq + ToOwned<Owned = K>,
-    {
-        return self.get_mut(k).map(|k| k.map(|v| &*v));
-    }
-
-    pub fn get_mut<Q: ?Sized>(&mut self, k: &Q) -> Result<Option<&mut V>, Box<dyn Error>>
-    where
-        K: Borrow<Q> + Eq + Hash,
-        Q: Hash + Eq + ToOwned<Owned = K>,
-    {
-        // if available in RAM return it
-        if self.online_map.contains_key(k) {
-            return Ok(self.online_map.get_mut(k));
-        }
-
-        // if not available in offline store, then none
-        if !self.offline_set.contains(k) {
-            return Ok(None);
-        }
-
-        // otherwise we fetch into memory and return from there
-        // evicting another record if needed
-        return self.fetch(k).map(|v| Some(v));
-    }
-
-    pub fn get_or_insert_default_mut(&mut self, k: K) -> Result<&mut V, Box<dyn Error>>
-where {
-        if self.contains_key_mem(&k) {
-            return Ok(self.online_map.get_mut(&k).unwrap());
-        } else {
-            self.insert(k, V::default())?;
-            // get ref from top of online map
-            return Ok(self.online_map.last_mut().unwrap().1);
+    pub fn is_loaded(&self) -> bool {
+        match self {
+            Entry::Memory(_) => true,
+            Entry::Disk(_) => false,
         }
     }
 
-    pub fn get_from_mem<Q: ?Sized>(&self, k: &Q) -> Option<(&K, &V)>
-    where
-        K: Borrow<Q> + Eq + Hash,
-        Q: Hash + Eq + ToOwned<Owned = K>,
-    {
-        // if available in RAM return it
-        return self.online_map.get_full(k).map(|(_a, b, c)| (b, c));
+    // ensures the entry is in memory
+    // then returns reference to it
+    pub fn get(&mut self) -> Result<&V, Box<dyn Error>>{
+        match self {
+            Entry::Memory(ref mut v) => Ok(v),
+            Entry::Disk(id) => {
+                let new = Self::fetch(PathBuf::from(format!("/tmp/diskhashmap-{}/{}",ID,id)))?; // TODO: env variable
+                *self = Entry::Memory(new);
+                
+                match self {
+                    Entry::Memory(ref mut v) => Ok(v),
+                    _ => panic!()
+                }
+            },
+        }
     }
 
-    /// evicts a record determined by the eviction policy
-    /// if no records exist does nothing
-    fn evict_victim(&mut self) -> Result<(), Box<dyn Error>> {
-        if self.online_map.len() > 0 {
-            let (k, v) = self.online_map.pop().ok_or(Box::new(IndexError {
-                msg: format!("online_map key missing"),
-                kind: IndexErrorKind::LogicError,
-            }))?;
 
-            self.offline_set.insert(k);
-
-            let fn_evict = self.offline_file_name_idx(self.offline_set.len() - 1);
-
-            let mut f = File::create(fn_evict)?;
-            v.serialize(&mut f);
-        } else {
-            return Ok(());
+    // ensures the entry is not in memory
+    pub fn unload(&mut self,id : u32) -> Result<(), Box<dyn Error>>{
+        match self {
+            Entry::Memory(v) => {
+                let prev = std::mem::take(v);
+                Self::evict(PathBuf::from(format!("/tmp/diskhashmap-{}/{}",ID,id)),prev)?;
+            },
+            Entry::Disk(_) => return Ok(()),
         };
+        *self = Entry::Disk(id);
 
         Ok(())
     }
 
-    /// evicts a record only if an insert would cause more records than R to be present in the memory
-    /// If nothing is present in memory and an eviction is still required (R == 0), nothing will be evicted
-    fn evict_victim_if_insert_overflows(&mut self) -> Result<(), Box<dyn Error>> {
-        if self.len() + 1 > R as usize {
-            self.evict_victim()?;
+    // ensures the entry is in memory
+    pub fn load(&mut self) -> Result<(), Box<dyn Error>>{
+        match self {
+            Entry::Memory(v) => Ok(()),
+            Entry::Disk(id) => {
+                *self = Entry::Memory(
+                    Self::fetch(PathBuf::from(format!("/tmp/diskhashmap-{}/{}",ID,id)))? // TODO: env variable
+                );
+                Ok(())
+            },
         }
-        Ok(())
     }
 
-    /// fetches record and returns it without inserting into online map
-    /// deletes the value on disk and from offline store
-    /// If not on disk, raises error
-    fn fetch_no_insert<Q: ?Sized>(&mut self, k: &Q) -> Result<V, Box<dyn Error>>
-    where
-        Q: Debug + Equivalent<K> + Hash + Eq,
-    {
-        // figure out identifiers
-        let (removed_filename, _remove_idx) =
-            self.offline_file_name(k).ok_or(Box::new(IndexError {
-                msg: format!(
-                    "Tried to remove from offline map, but {:?} was not in the offline_map",
-                    k
-                ),
-                kind: IndexErrorKind::LogicError,
-            }))?;
 
+    // ensures the entry is in memory
+    // then returns mutable reference to it
+    pub fn get_mut(&mut self) -> Result<&mut V, Box<dyn Error>>{
+        match self {
+            Entry::Memory(ref mut v) => Ok(v),
+            Entry::Disk(id) => {
+                *self = Entry::Memory(
+                    Self::fetch(PathBuf::from(format!("/tmp/diskhashmap-{}/{}",ID,id)))? // TODO: env variable
+                );
+                
+                match self {
+                    Entry::Memory(ref mut v) => Ok(v),
+                    _ => panic!()
+                }
+            },
+        }
+    }
+
+    // tries to retrieve entry from memory, throws error if not present there
+    pub fn get_mem(&self) -> Result<&V, Box<dyn Error>>{
+        match self {
+            Entry::Memory(ref v) => Ok(v),
+            Entry::Disk(_) => Err(Box::new(
+                std::io::Error::new(std::io::ErrorKind::Other, format!("Data was not in memory.")
+            ))),
+        }
+    }
+
+
+    fn fetch(p : PathBuf) -> Result<V, Box<dyn Error>>{
         // open file and fill buffer
-        let mut f = File::open(&removed_filename).expect("no file found");
+        let mut f = File::open(&p).expect("no file found");
         let mut buffer = vec![0; f.metadata()?.len() as usize];
         f.read(&mut buffer)?;
 
@@ -301,94 +181,151 @@ where {
         let mut v = V::default();
         v.deserialize(&mut buffer.as_slice());
 
-        // clean up
-        remove_file(&removed_filename)?;
+        // clean up 
+        remove_file(&p)?;
+        Ok(v)
+    }
 
-        // figure out last key (the one being swapped)
-        let last_fn = self.offline_file_name_idx(self.offline_set.len() - 1);
+    fn evict(p : PathBuf, v: V) -> Result<(), Box<dyn Error>>{
+        let mut f = File::create(p)?;
+        v.serialize(&mut f);
+        Ok(())
+    }
+}
 
-        if !self.offline_set.swap_remove(k) {
-            // note this swaps id's of last and this element
-            Err(Box::new(IndexError {
-                msg: format!(
-                    "Tried to remove from offline map, but {:?} was not in the offline_map",
-                    k
-                ),
-                kind: IndexErrorKind::LogicError,
-            }))
-        } else {
-            // swap on disk as well if need be
-            // due to how offline set works
-            if self.offline_set.len() > 0 && last_fn != removed_filename {
-                rename(&last_fn, &removed_filename)?;
+
+/// A hashmap which holds a limited number of records in main memory with the rest
+/// of the records held on disk
+/// records are swapped as necessary
+pub struct DiskHashMap<K, V, const R: u32, const ID : u32>
+where
+    K: Serializable + Hash + Eq + Clone,
+    V: Serializable,
+{
+    map: IndexMap<K, Arc<Mutex<Entry<V,ID>>>>,
+}
+
+impl<K, V, const R: u32, const ID : u32> DiskHashMap<K, V, R, ID>
+where
+    K: Serializable + Hash + Eq + Clone,
+    V: Serializable,
+{
+
+    pub fn len(&self) -> usize {
+        return self.map.len()
+    }
+
+
+    pub fn cache_population(&self) -> u32 {
+        self.map.values().fold(0 as u32,|a,v| {
+            if v.lock().is_loaded(){
+                a + 1
+            } else {
+                a
             }
+        })
+    }
 
-            Ok(v)
+    /// evicts unused records untill all records are checked or record limit is satisfied
+    pub fn clean_cache(&mut self) -> u32 {
+
+        // figure out how many records are in memory
+        let mut records = self.cache_population();
+
+
+        // reduce this number if needed
+        if records > R {
+            self.map.values().enumerate().take_while(|(i,v)| {
+                let count = Arc::strong_count(v);
+
+                if count <= 1 && !v.is_locked(){
+                    // we are only ones using it 
+                    // evict candidate
+                    v.lock().unload(*i as u32).unwrap();
+                    records -= 1;
+                };
+                records > R
+            }).for_each(drop);
+        }
+
+        records
+    }
+
+    pub fn entry<Q : ?Sized>(&self, k:&Q) -> Option<Arc<Mutex<Entry<V,ID>>>>
+    where 
+        K: Borrow<Q>,
+        Q: Hash + Eq
+    {
+        self.map.get(k).map(|v|{
+            Arc::clone(v)
+        })
+    }
+
+    pub fn entry_or_default<Q : ?Sized>(&mut self, k:&Q) -> Arc<Mutex<Entry<V,ID>>>
+    where 
+        K: Borrow<Q>,
+        Q: Hash + Eq + ToOwned<Owned = K>
+    {
+        let v = self.map.get(k);
+        match v {
+            Some(s) => Arc::clone(s),
+            None => {
+                self.insert(k.to_owned(),V::default());
+                self.entry(k).expect("This shouldn't happen")
+            },
         }
     }
 
-    /// pulls in record from offline storage and inserts it into online map
-    /// then returns reference to it
-    /// deletes the value on disk and from offline store
-    /// If not on disk raises error
-    fn fetch<Q: ?Sized>(&mut self, k: &Q) -> Result<&mut V, Box<dyn std::error::Error>>
-    where
-        Q: Hash + Eq + ToOwned<Owned = K>,
-    {
-        // TODO: bring in adjacent records into RAM as well
-
-        self.evict_victim_if_insert_overflows()?;
-
-        // deserialize
-        let key = k.to_owned();
-
-        let v = self.fetch_no_insert(&key)?;
-        Ok(self.online_map.entry(key).or_insert(v))
+    pub fn path() -> PathBuf{
+        PathBuf::from(format!("/tmp/diskhashmap-{}",ID))
     }
 
-    fn offline_file_name<Q: ?Sized>(&self, key: &Q) -> Option<(PathBuf, usize)>
-    where
-        Q: Hash + Eq + Equivalent<K> + Debug,
+    pub fn insert(&mut self, k:K, v: V) -> Option<Arc<Mutex<Entry<V,ID>>>>
+    where 
     {
-        self.offline_set
-            .get_full(key)
-            .map(|(idx, _)| (self.offline_file_name_idx(idx), idx))
+       self.map.insert(k,Arc::new(Mutex::new(Entry::Memory(v))))
     }
 
-    fn offline_file_name_idx(&self, idx: usize) -> PathBuf where {
-        self.root.join(idx.to_string())
+    pub fn pop(&mut self) -> Option<(K,Arc<Mutex<Entry<V,ID>>>)>{
+        self.map.pop()
     }
 
     pub fn new(capacity: usize) -> Self {
-        let mut path = env::temp_dir();
-        path.push(Uuid::new_v4().to_string());
-        create_dir(&path).unwrap();
+        let path = Self::path();
+        remove_dir_all(&path);
+        create_dir(&path);
+
         Self {
-            online_map: IndexMap::with_capacity(capacity),
-            offline_set: IndexSet::default(),
-            root: path,
+            map: IndexMap::new(),
         }
     }
 }
 
-impl<K, V, const R: u32> Drop for DiskHashMap<K, V, R>
+
+impl <K, V, const R: u32, const ID : u32> MemFootprintCalculator for DiskHashMap<K, V, R, ID>
+where 
+    K: Serializable + Hash + Eq + Clone + MemFootprintCalculator,
+    V: Serializable + MemFootprintCalculator
+{
+    fn real_mem(&self) -> u64 {
+        self.map.real_mem()
+    }
+}
+
+impl<K, V, const R: u32, const ID : u32> Drop for DiskHashMap<K, V, R, ID>
 where
-    K: Serializable + Debug + Hash + Eq + Clone,
-    V: Serializable + Debug,
+    K: Serializable + Hash + Eq + Clone,
+    V: Serializable,
 {
     fn drop(&mut self) {
-        // prevent sad times
-        if self.root.to_str() != Some("/") && self.root.is_dir() {
-            // we don't care if it didn't delete, we tried
-            remove_dir_all(&self.root).unwrap_or(());
-        }
+        remove_dir_all(Self::path()).unwrap_or(());
     }
 }
 
-impl<K, V, const R: u32> Default for DiskHashMap<K, V, R>
+impl<K, V, const R: u32, const ID : u32> Default for DiskHashMap<K, V, R, ID>
 where
-    K: Serializable + Debug + Hash + Eq + Clone,
-    V: Serializable + Debug,
+    K: Serializable + Hash + Eq + Clone,
+    V: Serializable ,
 {
     fn default() -> Self {
         Self::new(0)

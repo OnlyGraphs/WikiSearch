@@ -9,9 +9,8 @@ use itertools::Itertools;
 use parser::{ast::{Query}, UnaryOp, BinaryOp};
 use parser::errors::{QueryError, QueryErrorKind};
 use preprocessor::{Preprocessor, ProcessingOptions};
-use streaming_iterator::{StreamingIterator, convert, empty};
 
-use std::{collections::HashSet};
+use std::{collections::HashSet, iter::empty};
 use utils::utils::merge;
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -89,34 +88,29 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
 }
 
 pub struct PostingIterator<'a> {
-    wrapped : Box<dyn StreamingIterator<Item = Posting> + 'a>
+    wrapped : Box<dyn Iterator<Item = Posting> + 'a>
 }
 
 impl <'a>PostingIterator<'a>{
-    pub fn new<T : StreamingIterator<Item= Posting> + 'a>(o: T) -> Self {
+    pub fn new<T : Iterator<Item= Posting> + 'a>(o: T) -> Self {
         Self {
             wrapped: Box::new(o) 
         }
     }
 
-    pub fn rewrap<T : StreamingIterator<Item = Posting> + 'a>(mut me : Self ,o : T) -> Self{
+    pub fn rewrap<T : Iterator<Item = Posting> + 'a>(mut me : Self ,o : T) -> Self{
         me.wrapped = Box::new(o);
         me
     }
 }
 
-impl StreamingIterator for PostingIterator<'_> {
+impl Iterator for PostingIterator<'_> {
     type Item = Posting;
 
-    #[inline(always)]
-    fn advance(&mut self) {
-        self.wrapped.advance()
+    fn next(&mut self) -> Option<Self::Item> {
+        self.wrapped.next()
     }
-
-    #[inline(always)]
-    fn get(&self) -> Option<&Self::Item> {
-        self.wrapped.get()
-    }
+        
 }
 
 
@@ -128,15 +122,24 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
             ref dst,
             ref lhs,
             ref rhs,
-        } =>  PostingIterator::new(
-                DistanceMergeStreamingIterator::new(
+        } =>  {
+            let lhs = index.get_postings(lhs).map(|v| v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>());
+            let rhs = index.get_postings(rhs).map(|v| v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>());
+
+            if lhs.is_none() || rhs.is_none(){
+                return PostingIterator{
+                    wrapped: Box::new(empty::<Posting>()),
+                }
+            }
+        
+            PostingIterator::new(
+                DistanceMergeIterator::new(
                     *dst,
-                    index.get_postings(lhs).map(|v| 
-                        {let a: Box<dyn StreamingIterator<Item = Posting>> = Box::new(v);a}).unwrap_or(Box::new(empty::<Posting>())),
-                    index.get_postings(rhs).map(|v| 
-                        {let a: Box<dyn StreamingIterator<Item = Posting>> = Box::new(v);a}).unwrap_or(Box::new(empty::<Posting>())),
+                    Box::new(lhs.unwrap().into_iter()),
+                    Box::new(rhs.unwrap().into_iter())
                 ),
-            ),
+            )
+        },
         Query::RelationQuery {
             root: id,
             ref hops,
@@ -161,7 +164,7 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
                         })
                         .collect();
                     o.sort(); // TODO; hmm
-                    return PostingIterator::new(convert(o));
+                    return PostingIterator::new(o.into_iter());
                 }
             };
         }
@@ -185,16 +188,19 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
             let  init  = PostingIterator::new(empty::<Posting>());
 
             tks.iter().tuple_windows().map(|(a,b)| {
-                (index.get_postings(a).map(|v| {let a: Box<dyn StreamingIterator<Item = Posting>> = Box::new(v); a}).unwrap_or(Box::new(empty::<Posting>())),
-                index.get_postings(b).map(|v| {let a: Box<dyn StreamingIterator<Item = Posting>> = Box::new(v); a}).unwrap_or(Box::new(empty::<Posting>())))
+                (index.get_postings(a).map(|v| v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>()),
+                index.get_postings(b).map(|v| v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>()))
             }).enumerate()
                 .fold(init,
                     |a, (i,(l,r))| {
-                        let curr = DistanceMergeStreamingIterator::new(1, l, r);
+                        let lhs: Box<dyn Iterator<Item = Posting>> = Box::new(l.unwrap_or_default().into_iter());
+                        let rhs: Box<dyn Iterator<Item = Posting>> = Box::new(r.unwrap_or_default().into_iter());
+
+                        let curr = DistanceMergeIterator::new(1, lhs, rhs);
 
                         if i != 0 {
                             PostingIterator::new(
-                                DistanceMergeStreamingIterator::new(i as u32, Box::new(a), Box::new(curr))
+                                DistanceMergeIterator::new(i as u32, Box::new(a), Box::new(curr))
                             )
                         } else {
                             PostingIterator::rewrap(a,curr)
@@ -204,13 +210,7 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
         },
 
         Query::UnaryQuery { ref op, ref sub } => match op {
-            UnaryOp::Not => 
-                PostingIterator::new(
-                    DifferenceMergeStreamingIterator::new(
-                        Box::new(index.get_all_postings()),
-                        Box::new(execute_query(sub, index))
-                    )
-                ),
+            UnaryOp::Not => execute_query(sub, index) // soft not 
         },
         Query::BinaryQuery {
             ref op,
@@ -221,12 +221,12 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
             let sub_r = execute_query(rhs, index); 
             match op {
                 BinaryOp::And => 
-                    PostingIterator::new(IntersectionMergeStreamingIterator::new(
+                    PostingIterator::new(IntersectionMergeIterator::new(
                         Box::new(sub_l),
                         Box::new(sub_r)
                     )),
                 BinaryOp::Or =>
-                    PostingIterator::new(UnionMergeStreamingIterator::new(
+                    PostingIterator::new(UnionMergeIterator::new(
                         Box::new(sub_l),
                         Box::new(sub_r)
                     ))
@@ -237,9 +237,9 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
 
             tokens.iter().filter_map(|v| index.get_postings(v)).fold(init,|a,iter| {
                 PostingIterator::new(
-                    UnionMergeStreamingIterator::new(
+                    UnionMergeIterator::new(
                         Box::new(a),
-                        Box::new(iter)
+                        Box::new(iter.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>().into_iter())
                     )
                 )
             })
@@ -305,197 +305,59 @@ enum UnionMergeState {
     Left
 }
 
-pub struct UnionMergeStreamingIterator<'a> {
-    left_iter:  Box<dyn StreamingIterator<Item = Posting> + 'a>,
-    right_iter: Box<dyn StreamingIterator<Item = Posting> + 'a>,
+pub struct UnionMergeIterator<'a> {
+    left_iter:  Box<dyn Iterator<Item = Posting> + 'a>,
+    right_iter: Box<dyn Iterator<Item = Posting> + 'a>,
     state: UnionMergeState,
+    last : (Option<Posting>, Option<Posting>)
 
 } 
-impl <'a>UnionMergeStreamingIterator<'a> {
-    pub fn new(l: Box<dyn StreamingIterator<Item = Posting> + 'a>,
-       r: Box<dyn StreamingIterator<Item = Posting> + 'a>) -> Self{
+impl <'a>UnionMergeIterator<'a> {
+    pub fn new(l: Box<dyn Iterator<Item = Posting> + 'a>,
+       r: Box<dyn Iterator<Item = Posting> + 'a>) -> Self{
         Self {
             left_iter: l,
             right_iter: r,
             state: UnionMergeState::None,
+            last: (None,None),
+            
         }
     }
 }
 
-impl <'a>StreamingIterator for UnionMergeStreamingIterator<'a>{
+impl <'a>Iterator for UnionMergeIterator<'a>{
     type Item = Posting;
 
-    fn advance(&mut self) {
-        let items = match self.state {
+    fn next(&mut self) -> Option<Self::Item> {
+        self.last = match self.state {
             UnionMergeState::Left => { // last time left side was 'get', advance it
                 self.state = UnionMergeState::Left;
-                (self.left_iter.next(), self.right_iter.get())
+                (self.left_iter.next(), self.last.1)
             },
             UnionMergeState::Right=> { // last time right side was 'get', advance it 
                 self.state = UnionMergeState::Right;    
-                (self.left_iter.get(), self.right_iter.next()) 
+                (self.last.0, self.right_iter.next()) 
             },
             UnionMergeState::None => {
                 (self.left_iter.next(),self.right_iter.next())
             },
         };
 
-        match items{
+        match self.last{
             (None, None)    => self.state = UnionMergeState::None, // loop around
             (None, Some(_)) => self.state = UnionMergeState::Right,// pick right
             (Some(_), None) => self.state = UnionMergeState::Left, // pick left
             (Some(l), Some(r)) if l <= r  => self.state = UnionMergeState::Left,
             _ => self.state = UnionMergeState::Right, 
         }
-    }
-
-    fn get(&self) -> Option<&Self::Item> {
+        
         match self.state {
-                    UnionMergeState::Left => self.left_iter.get(),
-                    UnionMergeState::Right=> self.right_iter.get(),
+                    UnionMergeState::Left => self.last.0,
+                    UnionMergeState::Right=> self.last.1,
                     UnionMergeState::None => None,  
         }
     }
 }
-
-
-// fn choose_from_iters_merge<'a,'b>(state : &MergeState, 
-//         self.left_iter : &'a Box<dyn StreamingIterator<Item = Posting> + 'b>,
-//         self.right_iter : &'a Box<dyn StreamingIterator<Item = Posting> + 'b>) -> Option<&'a Posting>{
-//         match state {
-//                     MergeState::Left  | 
-//                     MergeState::BothLeftThenRight(false) | 
-//                     MergeState::BothRightThenLeft(true) |
-//                     MergeState::OneLeftThenSkipRight(false) => self.left_iter.get(),
-        
-//                     MergeState::Right | 
-//                     MergeState::BothRightThenLeft(false) | 
-//                     MergeState::BothLeftThenRight(true)  => self.right_iter.get(),
-        
-//                     MergeState::None => None,  
-//                     _ => panic!() // should not receive any skips here          
-//                 }
-//     }
-
-// pub trait LinearMergeIterator{
-
-    // #[inline(always)]
-    // fn get_logic<'a,'b>(state : &MergeState, 
-    //     self.left_iter : &'a Box<dyn StreamingIterator<Item = Posting> + 'b>,
-    //     self.right_iter : &'a Box<dyn StreamingIterator<Item = Posting> + 'b>) -> Option<&'a Posting>{
-        // match state {
-        //     MergeState::Left  | 
-        //     MergeState::BothLeftThenRight(false) | 
-        //     MergeState::BothRightThenLeft(true) |
-        //     MergeState::OneLeftThenSkipRight(false) => self.left_iter.get(),
-
-        //     MergeState::Right | 
-        //     MergeState::BothRightThenLeft(false) | 
-        //     MergeState::BothLeftThenRight(true)  => self.right_iter.get(),
-
-        //     MergeState::None => None,  
-        //     _ => panic!() // should not receive any skips here          
-        // }
-    // }
-
-
-
-    // fn next_state(items : (Option<&Posting>, Option<&Posting>), state : &mut MergeState) -> bool;
-
-    // #[inline(always)]
-    // fn advance_state<'a,'b>(
-    //     self.left_iter : &'a mut Box<dyn StreamingIterator<Item = Posting> + 'b>,
-    //     self.right_iter : &'a mut Box<dyn StreamingIterator<Item = Posting> + 'b>,
-    //     state : &'a mut MergeState) -> () 
-    //     {
-        // let items = match state {
-        //     MergeState::Left | MergeState::SkipLeft | MergeState::BothRightThenLeft(true) => { // last time left side was 'get', advance it
-        //         self.state = MergeState::Left;
-        //         (self.left_iter.next(), self.right_iter.get())
-        //     },
-        //     MergeState::Right | MergeState::SkipRight | MergeState::OneLeftThenSkipRight(true) | MergeState::BothLeftThenRight(true) => { // last time right side was 'get', advance it 
-        //         self.state = MergeState::Right;    
-        //         (self.left_iter.get(), self.right_iter.next()) 
-        //     },
-        //     MergeState::None => {
-        //         (self.left_iter.next(),self.right_iter.next())
-        //     },
-        //     MergeState::BothLeftThenRight(false) => { // completed left, need right
-        //         self.state = MergeState::BothLeftThenRight(true);
-        //         self.left_iter.next();
-        //         return;
-        //     }, 
-        //     MergeState::BothRightThenLeft(false) => { // completed right, need left
-        //         self.state = MergeState::BothRightThenLeft(true);
-        //         self.right_iter.next();
-        //         return;
-        //     },
-        //     MergeState::OneLeftThenSkipRight(false) => {
-        //         self.state = MergeState::OneLeftThenSkipRight(true);
-        //         (self.left_iter.next(),self.right_iter.next())
-        //     },      
-        // };
-
-        // let mut quit = false;
-        // while !quit {
-        //     quit = Self::next_state(items,state);
-
-        //     if let MergeState::SkipLeft | MergeState::SkipRight = state{
-        //         return Self::advance_state(self.left_iter,self.right_iter, state)
-        //     } 
-        // }
-
-    // }
-
-
-    
-// }
-
-///fn distance_merge(a: Vec<Posting>, b: Vec<Posting>, dst: u32) -> Vec<Posting> {
-// let mut iter_left = a.iter();
-// let mut iter_right = b.iter();
-// let mut curr_items = (iter_left.next(), iter_right.next());
-// let mut out = Vec::new();
-
-// loop {
-//     let (l, r) = match curr_items {
-//         (Some(_), None) => return out,
-//         (None, Some(_)) => return out,
-//         (Some(l), Some(r)) => (l, r),
-//         (None, None) => break,
-//     };
-
-//     if l.document_id == r.document_id {
-//         if r.position.overflowing_sub(l.position).0 <= dst {
-//             out.push(*l); // only added at beginning
-//             out.push(*r);
-
-//             // consume all matches under distance, but not the first non match
-//             out.extend(iter_right.peeking_take_while(|c| {
-//                 c.document_id == l.document_id
-//                     && c.position.overflowing_sub(l.position).0 <= dst
-//             }));
-
-//             // move to next possible match or away to next doc
-//             curr_items.1 = iter_right.next();
-//             // curr_items.0 = iter_left.next();
-//         } else if l.position < r.position {
-//             curr_items.0 = iter_left.next();
-//         } else {
-//             curr_items.1 = iter_right.next();
-//         }
-//     } else {
-//         if l.document_id < r.document_id {
-//             curr_items.0 = iter_left.next();
-//         } else {
-//             curr_items.1 = iter_right.next();
-//         }
-//     }
-// }
-
-// return out;
-// }
-
 
 // ------------
 // Intersection
@@ -509,55 +371,54 @@ pub enum IntersectionMergeState {
     RightThenLeftFinish,
 }
 
-pub struct IntersectionMergeStreamingIterator<'a> {
-    pub left_iter:  Box<dyn StreamingIterator<Item = Posting> + 'a>,
-    pub right_iter: Box<dyn StreamingIterator<Item = Posting> + 'a>,
+pub struct IntersectionMergeIterator<'a> {
+    pub left_iter:  Box<dyn Iterator<Item = Posting> + 'a>,
+    pub right_iter: Box<dyn Iterator<Item = Posting> + 'a>,
     pub state: IntersectionMergeState,
+    pub curr: (Option<Posting>, Option<Posting>)
 
 } 
 
-impl <'a> IntersectionMergeStreamingIterator<'a> {
+impl <'a> IntersectionMergeIterator<'a> {
    pub fn new(
-       l:Box<dyn StreamingIterator<Item = Posting> + 'a>,
-       r:Box<dyn StreamingIterator<Item = Posting> + 'a>,
-   ) -> Self {
-       Self {
-        left_iter: l,
-        right_iter: r,
-        state: IntersectionMergeState::None,
+       l:Box<dyn Iterator<Item = Posting> + 'a>,
+       r:Box<dyn Iterator<Item = Posting> + 'a>,
+    ) -> Self {
+        Self {
+            left_iter: l,
+            right_iter: r,
+            state: IntersectionMergeState::None,
+            curr: (None,None),
+        }
     }
-   }
-} 
 
-impl <'a>StreamingIterator for IntersectionMergeStreamingIterator<'a>{
-    type Item = Posting;
 
     fn advance(&mut self) {
-        let mut items = match self.state {
-             IntersectionMergeState::RightThenLeftFinish => { // last time left side was 'get', advance it
-                (self.left_iter.next(), self.right_iter.get())
+        self.curr = match self.state {
+            IntersectionMergeState::RightThenLeftFinish => { // last time left side was 'get', advance it
+                (self.left_iter.next(), self.curr.1)
             },
             IntersectionMergeState::LeftThenRightFinish => { // last time right side was 'get', advance it 
-                (self.left_iter.get(), self.right_iter.next()) 
+                (self.curr.0, self.right_iter.next()) 
             },
             IntersectionMergeState::None => {
                 (self.left_iter.next(),self.right_iter.next())
             },
             IntersectionMergeState::LeftThenRightStart => { // completed left, need right
                 self.state = IntersectionMergeState::LeftThenRightFinish;
-                self.left_iter.next();
+                self.curr = (self.left_iter.next(),self.curr.1);
                 return;
             }, 
             IntersectionMergeState::RightThenLeftStart => { // completed right, need left
                 self.state = IntersectionMergeState::RightThenLeftFinish;
-                self.right_iter.next();
+                self.curr = (self.curr.0,self.right_iter.next());
                 return;
             }  
         };
 
         let mut skip_side;
         loop {
-            match items {
+            match self.curr {
                 (None, None) => {self.state = IntersectionMergeState::None; break;}, // loop around
                 (None, Some(_)) => {skip_side = SkipSide::Right},
                 (Some(_), None) => {skip_side = SkipSide::Left},
@@ -581,19 +442,29 @@ impl <'a>StreamingIterator for IntersectionMergeStreamingIterator<'a>{
                 }
             }
 
-            items = match skip_side {
-                SkipSide::Left =>  (self.left_iter.next(),self.right_iter.get()),
-                SkipSide::Right => (self.left_iter.get(), self.right_iter.next()),
+            self.curr = match skip_side {
+                SkipSide::Left =>  (self.left_iter.next(),self.curr.1),
+                SkipSide::Right => (self.curr.0, self.right_iter.next()),
             };
         }
+
     }
 
-    fn get(&self) -> Option<&Self::Item> {
+    fn get(&self) -> Option<Posting> {
         match self.state {
-            IntersectionMergeState::LeftThenRightStart | IntersectionMergeState::RightThenLeftFinish => self.left_iter.get(),
-            IntersectionMergeState::LeftThenRightFinish | IntersectionMergeState::RightThenLeftStart => self.right_iter.get(), 
+            IntersectionMergeState::LeftThenRightStart | IntersectionMergeState::RightThenLeftFinish => self.curr.0,
+            IntersectionMergeState::LeftThenRightFinish | IntersectionMergeState::RightThenLeftStart => self.curr.1, 
             IntersectionMergeState::None => None,
         }
+    }
+} 
+
+impl <'a>Iterator for IntersectionMergeIterator<'a>{
+    type Item = Posting;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.advance();
+        self.get()
     }
 }
 
@@ -608,37 +479,36 @@ pub enum DifferenceMergeState {
     LeftThenSkipRightFinish
 }
 
-pub struct DifferenceMergeStreamingIterator<'a> {
-    left_iter:  Box<dyn StreamingIterator<Item = Posting> + 'a>,
-    right_iter: Box<dyn StreamingIterator<Item = Posting> + 'a>,
+pub struct DifferenceMergeIterator<'a> {
+    left_iter:  Box<dyn Iterator<Item = Posting> + 'a>,
+    right_iter: Box<dyn Iterator<Item = Posting> + 'a>,
     state: DifferenceMergeState,
     highest_doc_r: i32,
+    curr: (Option<Posting>, Option<Posting>)
 } 
 
-impl <'a> DifferenceMergeStreamingIterator<'a> {
+impl <'a> DifferenceMergeIterator<'a> {
     pub fn new(
-        l:Box<dyn StreamingIterator<Item = Posting> + 'a>,
-        r:Box<dyn StreamingIterator<Item = Posting> + 'a>,
+        l:Box<dyn Iterator<Item = Posting> + 'a>,
+        r:Box<dyn Iterator<Item = Posting> + 'a>,
     ) -> Self {
         Self {
-         left_iter: l,
-         right_iter: r,
-         state: DifferenceMergeState::None,
-         highest_doc_r: -1
-     }
+            left_iter: l,
+            right_iter: r,
+            state: DifferenceMergeState::None,
+            highest_doc_r: -1,
+            curr: (None,None),
+        }
     }
-} 
 
-impl <'a>StreamingIterator for DifferenceMergeStreamingIterator<'a>{
-    type Item = Posting;
 
     fn advance(&mut self) {
-        let mut items = match self.state {
+        self.curr = match self.state {
             DifferenceMergeState::Left => { // last time left side was 'get', advance it
-                (self.left_iter.next(), self.right_iter.get())
+                (self.left_iter.next(), self.curr.1)
             },
             DifferenceMergeState::LeftThenSkipRightFinish => { // last time right side was 'get', advance it 
-                (self.left_iter.get(), self.right_iter.next()) 
+                (self.curr.0, self.right_iter.next()) 
             },
             DifferenceMergeState::None => {
                 (self.left_iter.next(),self.right_iter.next())
@@ -651,7 +521,7 @@ impl <'a>StreamingIterator for DifferenceMergeStreamingIterator<'a>{
     
         let mut skip_side;
         loop {
-            match items{
+            match self.curr{
                 (None, None) => {
                     self.state = DifferenceMergeState::None; 
                     break;
@@ -685,19 +555,29 @@ impl <'a>StreamingIterator for DifferenceMergeStreamingIterator<'a>{
                 },
             };
 
-            items = match skip_side {
-                SkipSide::Left =>  (self.left_iter.next(),self.right_iter.get()),
-                SkipSide::Right => (self.left_iter.get(), self.right_iter.next()),
+            self.curr = match skip_side {
+                SkipSide::Left =>  (self.left_iter.next(),self.curr.1),
+                SkipSide::Right => (self.curr.0, self.right_iter.next()),
             };
         }
     }
 
-    fn get(&self) -> Option<&Self::Item> {
+    fn get(&self) -> Option<Posting> {
         match self.state {
-            DifferenceMergeState::Left | DifferenceMergeState::LeftThenSkipRightStart => self.left_iter.get(),
+            DifferenceMergeState::Left | DifferenceMergeState::LeftThenSkipRightStart => self.curr.0,
             DifferenceMergeState::None => None,  
             _ => panic!() // should not receive any skips here          
         }
+    }
+} 
+
+impl <'a>Iterator for DifferenceMergeIterator<'a>{
+    type Item = Posting;
+
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.advance();
+        self.get()
     }
 }
 
@@ -713,53 +593,51 @@ enum DistanceMergeState {
     LeftThenRightFinish
 }
 
-pub struct DistanceMergeStreamingIterator<'a> {
-    left_iter:  Box<dyn StreamingIterator<Item = Posting> + 'a>,
-    right_iter: Box<dyn StreamingIterator<Item = Posting> + 'a>,
+pub struct DistanceMergeIterator<'a> {
+    left_iter:  Box<dyn Iterator<Item = Posting> + 'a>,
+    right_iter: Box<dyn Iterator<Item = Posting> + 'a>,
     state: DistanceMergeState,
     dst: u32,
     in_streak: bool,
     streak_start_pos : u32,
+    curr: (Option<Posting>, Option<Posting>)
 } 
 
-impl <'a> DistanceMergeStreamingIterator<'a> {
+impl <'a> DistanceMergeIterator<'a> {
     pub fn new(
         dst: u32,
-        l:Box<dyn StreamingIterator<Item = Posting> + 'a>,
-        r:Box<dyn StreamingIterator<Item = Posting> + 'a>,
+        l:Box<dyn Iterator<Item = Posting> + 'a>,
+        r:Box<dyn Iterator<Item = Posting> + 'a>,
     ) -> Self {
         Self {
-         left_iter: l,
-         right_iter: r,
-         state: DistanceMergeState::None,
-         dst: dst,
-         in_streak: false,
-         streak_start_pos: 0,
-     }
+            left_iter: l,
+            right_iter: r,
+            state: DistanceMergeState::None,
+            dst: dst,
+            in_streak: false,
+            streak_start_pos: 0,
+            curr: (None,None),            
+        }
     }
-} 
-
-impl <'a>StreamingIterator for DistanceMergeStreamingIterator<'a>{
-    type Item = Posting;
 
     fn advance(&mut self) {
-        let mut items = match self.state {
+        self.curr = match self.state {
             DistanceMergeState::Right | DistanceMergeState::LeftThenRightFinish  => { // last time right side was 'get', advance it 
-                (self.left_iter.get(), self.right_iter.next()) 
+                (self.curr.0, self.right_iter.next()) 
             },
             DistanceMergeState::None => {
                 (self.left_iter.next(),self.right_iter.next())
             },
             DistanceMergeState::LeftThenRightStart => { // completed left, need right
                 self.state = DistanceMergeState::LeftThenRightFinish;
-                self.left_iter.next();
+                self.curr = (self.left_iter.next(),self.curr.1);
                 return;
             },   
         };
 
         let mut skip_side;
         loop {
-            match items{
+            match self.curr{
                 (Some(l), Some(r)) => {
                         if l.document_id == r.document_id {
                             // compare to buffered l
@@ -799,20 +677,31 @@ impl <'a>StreamingIterator for DistanceMergeStreamingIterator<'a>{
                 },             
             };
 
-            items = match skip_side {
-                SkipSide::Left =>  (self.left_iter.next(),self.right_iter.get()),
-                SkipSide::Right => (self.left_iter.get(), self.right_iter.next()),
+            self.curr = match skip_side {
+                SkipSide::Left =>  (self.left_iter.next(),self.curr.1),
+                SkipSide::Right => (self.curr.0, self.right_iter.next()),
             };
         }
     }
     
 
-    fn get(&self) -> Option<&Self::Item> {
+    fn get(&self) -> Option<Posting> {
         match self.state {
-            DistanceMergeState::LeftThenRightStart => self.left_iter.get(),
+            DistanceMergeState::LeftThenRightStart => self.curr.0,
             DistanceMergeState::Right | 
-            DistanceMergeState::LeftThenRightFinish  => self.right_iter.get(),
+            DistanceMergeState::LeftThenRightFinish  => self.curr.1,
             DistanceMergeState::None => None,  
         }
+    }
+
+} 
+
+impl <'a>Iterator for DistanceMergeIterator<'a>{
+    type Item = Posting;
+
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.advance();
+        self.get()
     }
 }

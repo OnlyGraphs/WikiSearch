@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 #[derive(Default)]
 pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, PostingNode, 1000000>,
+    pub posting_nodes: DiskHashMap<String, PostingNode, 1000000, 0>,
     pub links: HashMap<u32, Vec<String>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub id_title_map: BiMap<u32, String>,
@@ -67,7 +67,7 @@ impl PreIndex {
 
         // collect DF values
         for s in self.curr_doc_appearances.drain() {
-            self.posting_nodes.get_mut(&s).unwrap().unwrap().df += 1;
+            self.posting_nodes.entry(&s).unwrap().lock().get_mut().unwrap().df += 1;
         }
 
         Ok(())
@@ -82,10 +82,18 @@ impl PreIndex {
     }
 
     fn add_posting(&mut self, token: &str, docid: u32, word_pos: u32) {
-        let node = self
-            .posting_nodes
-            .get_or_insert_default_mut(token.to_string())
-            .unwrap();
+
+        let ptr = self
+        .posting_nodes
+        .entry_or_default(token);
+
+        let mut lock = ptr
+                .lock();
+                
+        let node = lock
+                .get_mut()
+                .unwrap();
+
         self.curr_doc_appearances.insert(token.to_owned());
 
         node.postings.push(Posting {
