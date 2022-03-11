@@ -4,7 +4,7 @@ use crate::structs::{
     SearchParameters, UserFeedback,
 };
 use actix_web::ResponseError;
-use actix_web::http::header::{HttpDate, ContentType};
+use actix_web::http::header::{ContentType};
 use actix_web::{
     get,
     http::StatusCode,
@@ -13,20 +13,20 @@ use actix_web::{
 };
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use index::errors::IndexError;
+
 use index::index_structs::Posting;
 use log::{debug, info};
-use parser::errors::QueryError;
+
 use parser::parser::parse_query;
 use retrieval::execute_relational_query;
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
 use streaming_iterator::StreamingIterator;
-use std::cmp::{Ordering, max, min};
+use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display};
-use std::fmt::Debug;
+
 use std::time::Instant;
 
 pub struct APIError {

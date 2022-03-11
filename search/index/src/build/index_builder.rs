@@ -1,20 +1,20 @@
 use crate::{PreIndex};
 use crate::{
-    errors::{IndexError, IndexErrorKind},
+    errors::{IndexError},
     index::{Index},
     index_structs::{Citation, Document, Infobox},
 };
 use async_trait::async_trait;
-use itertools::{Itertools, Chunk};
+
 use log::{info, error};
 use sqlx::Row;
 use sqlx::{postgres::PgPoolOptions, query, query_scalar};
-use std::collections::HashMap;
-use std::future::Future;
-use std::ops::Range;
+
+
+
 use std::time::Instant;
 use num_integer::Integer;
-use default_env::default_env;
+
 use std::env;
 
 #[async_trait]

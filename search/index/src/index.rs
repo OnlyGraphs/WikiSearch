@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use log::info;
-use sqlx::database::HasArguments;
-use streaming_iterator::{convert_ref, StreamingIterator,convert};
+
+use streaming_iterator::{StreamingIterator};
 use utils::MemFootprintCalculator;
 
 use std::fmt::Debug;
@@ -14,18 +14,18 @@ use std::{
     fmt,
 };
 
-use crate::DecoderIterator;
-use crate::DeltaEncoder;
+
+
 use crate::DiskHashMap;
-use crate::EncodedPostingList;
+
 use crate::EncodedPostingNode;
-use crate::EncodedSequentialObject;
+
 use crate::Entry;
-use crate::{IdentityEncoder,VbyteEncoder};
-use crate::index_structs::{PosRange, Posting};
-use crate::PostingNode;
+use crate::{VbyteEncoder};
+use crate::index_structs::{PosRange};
+
 use crate::PreIndex;
-use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
+use parking_lot::{Mutex};
 // use crate::init_page_rank;
 
 

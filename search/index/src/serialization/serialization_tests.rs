@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf};
 
 use utils::MemFootprintCalculator;
 
@@ -7,9 +7,9 @@ use crate::{
     SequentialEncoder, Serializable, VbyteEncoder,
 };
 
-use crate::index::Index;
-use crate::utils::get_document_with_text;
-use crate::PreIndex;
+
+
+
 
 #[test]
 #[cfg(target_endian = "little")]
@@ -620,7 +620,7 @@ fn test_delta_and_vbyte_encoder_subset() {
     let target_vec = vec![target_1, target_2];
 
     // ----------------- serialise delta -------------
-    let mut obj_delta = EncodedSequentialObject::<Posting, DeltaEncoder>::from_iter(
+    let obj_delta = EncodedSequentialObject::<Posting, DeltaEncoder>::from_iter(
         vec![target_1, target_2].into_iter(),
     );
     let mut out = Vec::default();
@@ -631,7 +631,7 @@ fn test_delta_and_vbyte_encoder_subset() {
     assert_eq!(target_vec, out_delta_decoded);
 
     // ------------ serialise vbyte --------------
-    let mut obj_vbyte = EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(
+    let obj_vbyte = EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(
         vec![target_1, target_2].into_iter(),
     );
     let mut out = Vec::default();
@@ -687,7 +687,7 @@ fn test_delta_and_vbyte_encoder_subset_2() {
     ];
 
     // ----------------- serialise delta -------------
-    let mut obj_delta =
+    let obj_delta =
         EncodedSequentialObject::<Posting, DeltaEncoder>::from_iter(target_vec.clone().into_iter());
     let mut out = Vec::default();
     obj_delta.serialize(&mut out);
@@ -697,7 +697,7 @@ fn test_delta_and_vbyte_encoder_subset_2() {
     assert_eq!(target_vec, out_delta_decoded);
 
     // ------------ serialise vbyte --------------
-    let mut obj_vbyte =
+    let obj_vbyte =
         EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(target_vec.clone().into_iter());
     let mut out = Vec::default();
     obj_vbyte.serialize(&mut out);
@@ -819,7 +819,7 @@ fn test_disk_hash_map_path() {
 #[test]
 fn test_disk_hash_map_real_mem() {
     let mut d = DiskHashMap::<u32, u32, 7>::new(0);
-    let path = DiskHashMap::<u32, u32, 7>::path();
+    let _path = DiskHashMap::<u32, u32, 7>::path();
 
     d.insert(0, 3);
     d.insert(1, 4);
@@ -851,6 +851,6 @@ fn test_disk_hash_map_multiple_uses() {
 
 #[test]
 fn test_disk_hash_map_multiple_uses_consecutive() {
-    let a = DiskHashMap::<u32, u32, 9>::new(0);
-    let b = DiskHashMap::<u32, u32, 9>::new(0);
+    let _a = DiskHashMap::<u32, u32, 9>::new(0);
+    let _b = DiskHashMap::<u32, u32, 9>::new(0);
 }

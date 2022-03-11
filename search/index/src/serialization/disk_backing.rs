@@ -1,13 +1,12 @@
 use std::{
     borrow::Borrow,
-    env,
     fmt::Debug,
-    fs::{create_dir, remove_dir_all, File, remove_file, create_dir_all},
+    fs::{remove_dir_all, File, remove_file, create_dir_all},
     hash::Hash,
-    path::{PathBuf, Path}, rc::Rc, error::Error, io::Read, sync::{Arc},
+    path::{PathBuf, Path}, error::Error, io::Read, sync::{Arc},
 };
 
-use crate::{Serializable, EncodedPostingNode, SequentialEncoder, IdentityEncoder};
+use crate::{Serializable};
 use indexmap::{IndexMap};
 use log::info;
 use utils::MemFootprintCalculator;
@@ -126,7 +125,7 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
     // ensures the entry is in memory
     pub fn load(&mut self) -> Result<(), Box<dyn Error>>{
         match self {
-            Entry::Memory(v) => Ok(()),
+            Entry::Memory(_v) => Ok(()),
             Entry::Disk(id) => {
                 *self = Entry::Memory(
                     Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))? // TODO: env variable

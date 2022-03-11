@@ -1,14 +1,12 @@
 use crate::{EncodedPostingNode, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use core::fmt::Debug;
-use std::io::Bytes;
+
 use std::{
     cell::RefCell,
     collections::HashMap,
     io::{Read, Write},
     marker::PhantomData,
-    ops::{Deref, DerefMut},
-    rc::Rc,
 };
 use utils::MemFootprintCalculator;
 
@@ -186,7 +184,7 @@ impl DeltaEncoder {
 impl SequentialEncoder<Posting> for DeltaEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut bytes = Vec::default();
-        let mut diff = DeltaEncoder::compress(_prev, curr);
+        let diff = DeltaEncoder::compress(_prev, curr);
         let _count = diff.serialize(&mut bytes);
         bytes
     }
@@ -220,7 +218,7 @@ impl VbyteEncoder {
         bytes[len] = bytes[len] & !(1 << 7);
         return bytes;
     }
-    fn from_vbyte_deserialise<R: Read>(mut bytes: R) -> (Posting, usize) {
+    fn from_vbyte_deserialise<R: Read>(bytes: R) -> (Posting, usize) {
         let mut doc_id: u32 = 0; //To compute document_id for Posting
         let mut position: u32 = 0; //To compute position for Posting
         let mut reading_doc_id_flag = true; //set true to assign the following bytes until end of byte (continuation bit cleared) to doc id first
@@ -253,7 +251,7 @@ impl VbyteEncoder {
             }
         }
         //Create posting based on above computation
-        let mut vdiff = Posting {
+        let vdiff = Posting {
             document_id: doc_id,
             position: position,
         };
@@ -268,7 +266,7 @@ impl VbyteEncoder {
 impl SequentialEncoder<Posting> for VbyteEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut encoding_bytes = Vec::default();
-        let mut vdiff = DeltaEncoder::compress(_prev, curr);
+        let vdiff = DeltaEncoder::compress(_prev, curr);
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.document_id));
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.position));
         encoding_bytes

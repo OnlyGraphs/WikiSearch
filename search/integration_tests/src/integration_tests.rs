@@ -1,8 +1,8 @@
 use index::{get_document_with_links, Index, PreIndex, get_document_with_text, Posting, get_document_with_text_and_links};
 use parser::ast::{BinaryOp, Query, StructureElem, UnaryOp};
 use retrieval::{search::preprocess_query, get_docs_within_hops, execute_query};
-use std::collections::{HashSet, HashMap};
-use streaming_iterator::StreamingIterator;
+use std::collections::{HashMap};
+
 
 #[test]
 fn test_single_word() {

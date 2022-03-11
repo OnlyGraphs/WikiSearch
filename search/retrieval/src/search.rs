@@ -6,12 +6,12 @@ use index::{
 };
 
 use itertools::Itertools;
-use log::info;
+
 use parser::{ast::{Query}, UnaryOp, BinaryOp};
 use parser::errors::{QueryError, QueryErrorKind};
 use preprocessor::{Preprocessor, ProcessingOptions};
 
-use std::{collections::{HashSet, HashMap, VecDeque}, iter::empty};
+use std::{collections::{HashMap, VecDeque}, iter::empty};
 use utils::utils::merge;
 
 #[derive(Debug, PartialEq, PartialOrd)]

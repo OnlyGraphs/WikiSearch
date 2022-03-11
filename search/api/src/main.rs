@@ -195,7 +195,7 @@ async fn run_rest(
                             let with_extension = format!("{}{}{}", root, http_req.path(), ".html");
                             let file = match NamedFile::open_async(with_extension.clone()).await {
                                 Ok(v) => v,
-                                Err(e) => NamedFile::open_async(format!("{}/404.html", root))
+                                Err(_e) => NamedFile::open_async(format!("{}/404.html", root))
                                     .await
                                     .expect(&format!("No file named 404.html at {}",root)),
                             };
