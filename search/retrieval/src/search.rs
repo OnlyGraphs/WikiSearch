@@ -331,15 +331,19 @@ pub fn get_docs_within_hops(docid: u32, hops: u8, out: &mut HashMap<u32,u8>, ind
             let out_l = index.get_links(top);
             let in_l = index.get_incoming_links(top);
             let all_l = merge(in_l, out_l);
-            
+
+            let mut added = false;
             all_l.iter().for_each(|v| {
                 if !out.contains_key(v) {
                     queue.push_back(*v);
+                    added = true;
                 }
             });
 
-            if let Some(v) = queue.back(){
-                depth_increasing_nodes.push_back(*v);
+            if let Some(v) = queue.back() {
+                if added {
+                    depth_increasing_nodes.push_back(*v);
+                }
             }
 
 
