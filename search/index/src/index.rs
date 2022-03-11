@@ -240,14 +240,8 @@ impl Index {
         index.incoming_links.values_mut().for_each(|v| v.sort());
         info!("Took {}s", timer.elapsed().as_secs());
 
-        Self {
-            dump_id: p.dump_id,
-            posting_nodes: posting_nodes,
-            links: links.clone(),
-            incoming_links: back_links.clone(),
-            extent: p.extent,
-            last_updated_docs: p.last_updated_docs,
-            page_rank: compute_page_ranks(links.clone(), back_links.clone(), 0.85),
-        }
+        index.page_rank = compute_page_ranks(index.links.clone(), index.incoming_links.clone(), 0.85);
+        
+        return index;
     }
 }

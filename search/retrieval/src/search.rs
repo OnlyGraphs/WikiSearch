@@ -372,7 +372,7 @@ pub fn score_query(
         let mut page_rank = 0.0;
         let pr = index.page_rank.get(&post.document_id);
         match pr {
-            Some(v) => page_rank = v,
+            Some(v) => page_rank = *v,
             _ => page_rank = 0.0
         };
 
