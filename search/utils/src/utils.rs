@@ -2,16 +2,16 @@ use bimap::BiMap;
 use chrono::NaiveDateTime;
 use either::Either;
 use indexmap::IndexMap;
-use std::cell::RefCell;
+
 use std::collections::HashMap;
 
 use std::hash::Hash;
 use std::mem::size_of;
 use std::ops::Deref;
-use std::rc::Rc;
+
 use std::sync::{Arc};
-use parking_lot::{Mutex, MutexGuard, RawMutex};
-use std::fmt::Debug;
+use parking_lot::{Mutex};
+
 pub trait MemFootprintCalculator {
     fn real_mem(&self) -> u64;
 }

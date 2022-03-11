@@ -1,14 +1,13 @@
 use crate::{EncodedPostingNode, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use core::fmt::Debug;
-use std::io::Bytes;
+use core::hash::Hash;
+
 use std::{
     cell::RefCell,
     collections::HashMap,
     io::{Read, Write},
     marker::PhantomData,
-    ops::{Deref, DerefMut},
-    rc::Rc,
 };
 use utils::MemFootprintCalculator;
 
@@ -35,6 +34,7 @@ where
 
 /// An convenience iterator for decoding [EncodedSequentialObject]'s can be created with
 /// [EncodedSequentialObject]::into_iter()
+#[derive(Clone)]
 pub struct DecoderIterator<'a, T, E>
 where
     E: SequentialEncoder<T>,
@@ -62,7 +62,7 @@ impl<T: SequentialEncoder<Posting>> MemFootprintCalculator for EncodedPostingLis
     }
 }
 
-impl<E, T> Iterator for DecoderIterator<'_, T, E>
+impl<E, T: Clone> Iterator for DecoderIterator<'_, T, E>
 where
     E: SequentialEncoder<T>,
     T: Serializable + Debug,
@@ -78,6 +78,7 @@ where
                     // .as_slice(),
             );
             self.pos += count;
+            self.prev = Some(out.clone());
             Some(out)
         } else {
             None
@@ -115,7 +116,7 @@ impl<E: SequentialEncoder<T>, T: Serializable> FromIterator<T> for EncodedSequen
 impl<'a, E, T> IntoIterator for &'a EncodedSequentialObject<T, E>
 where
     E: SequentialEncoder<T>,
-    T: Serializable + Debug,
+    T: Serializable + Debug + Clone,
 {
     type Item = T;
 
@@ -184,7 +185,7 @@ impl DeltaEncoder {
 impl SequentialEncoder<Posting> for DeltaEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut bytes = Vec::default();
-        let mut diff = DeltaEncoder::compress(_prev, curr);
+        let diff = DeltaEncoder::compress(_prev, curr);
         let _count = diff.serialize(&mut bytes);
         bytes
     }
@@ -218,7 +219,7 @@ impl VbyteEncoder {
         bytes[len] = bytes[len] & !(1 << 7);
         return bytes;
     }
-    fn from_vbyte_deserialise<R: Read>(mut bytes: R) -> (Posting, usize) {
+    fn from_vbyte_deserialise<R: Read>(bytes: R) -> (Posting, usize) {
         let mut doc_id: u32 = 0; //To compute document_id for Posting
         let mut position: u32 = 0; //To compute position for Posting
         let mut reading_doc_id_flag = true; //set true to assign the following bytes until end of byte (continuation bit cleared) to doc id first
@@ -240,6 +241,7 @@ impl VbyteEncoder {
                     reading_doc_id_flag = false;
                 } else {
                     position = result;
+                    break;
                 }
                 //Reset now for position posting
                 result = 0;
@@ -250,7 +252,7 @@ impl VbyteEncoder {
             }
         }
         //Create posting based on above computation
-        let mut vdiff = Posting {
+        let vdiff = Posting {
             document_id: doc_id,
             position: position,
         };
@@ -265,7 +267,7 @@ impl VbyteEncoder {
 impl SequentialEncoder<Posting> for VbyteEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut encoding_bytes = Vec::default();
-        let mut vdiff = DeltaEncoder::compress(_prev, curr);
+        let vdiff = DeltaEncoder::compress(_prev, curr);
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.document_id));
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.position));
         encoding_bytes
@@ -385,18 +387,32 @@ impl<E: Serializable> Serializable for Vec<E> {
     }
 }
 
-impl<K: Serializable, V: Serializable> Serializable for HashMap<K, V> {
+impl<K, V> Serializable for HashMap<K, V>
+where 
+K: Serializable + Hash + Eq,
+V: Serializable,
+
+{
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
-        let count = 4;
+        let mut count = 4;
         buf.write_u32::<NativeEndian>(self.len() as u32).unwrap();
+        count = self.iter().fold(count, |a, (k,v)| a + k.serialize(buf) + v.serialize(buf));
 
         count
     }
 
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
-        let count = 4;
-        let _len = buf.read_u32::<NativeEndian>().unwrap();
+        let mut count = 4;
+        let len = buf.read_u32::<NativeEndian>().unwrap();
+        self.reserve(len as usize);
+        (0..len).for_each(|_v| {
+            let mut k = K::default();
+            let mut v = V::default();
 
+            count += k.deserialize(buf);
+            count += v.deserialize(buf);
+            self.insert(k,v);
+        });
         count
     }
 }

@@ -1,13 +1,12 @@
 use std::{
     borrow::Borrow,
-    env,
     fmt::Debug,
-    fs::{create_dir, remove_dir_all, File, remove_file, create_dir_all},
+    fs::{remove_dir_all, File, remove_file, create_dir_all},
     hash::Hash,
-    path::{PathBuf, Path}, rc::Rc, error::Error, io::Read, sync::{Arc},
+    path::{PathBuf, Path}, error::Error, io::Read, sync::{Arc},
 };
 
-use crate::{Serializable, EncodedPostingNode, SequentialEncoder, IdentityEncoder};
+use crate::{Serializable};
 use indexmap::{IndexMap};
 use log::info;
 use utils::MemFootprintCalculator;
@@ -126,7 +125,7 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
     // ensures the entry is in memory
     pub fn load(&mut self) -> Result<(), Box<dyn Error>>{
         match self {
-            Entry::Memory(v) => Ok(()),
+            Entry::Memory(_v) => Ok(()),
             Entry::Disk(id) => {
                 *self = Entry::Memory(
                     Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))? // TODO: env variable
@@ -228,9 +227,9 @@ where
 
     /// evicts unused records untill all records are checked or record limit is satisfied
     pub fn clean_cache(&self) -> u32 {
-
         // figure out how many records are in memory
         let mut records = self.cache_population();
+        info!("Cleaning cache, containing: {} entries",records);
 
 
         // reduce this number if needed
@@ -246,8 +245,28 @@ where
             }).for_each(drop);
         }
 
+        info!("Cache cleaned, now contains: {} entries", records);
+
         records
     }
+
+        /// evicts unused records untill all available records are evicted
+        pub fn clean_cache_all(&self) {
+            // figure out how many records are in memory
+            info!("Cleaning cache fully");
+    
+            // reduce this number if needed
+            self.map.values().enumerate().for_each(|(i,v)| {
+                if !v.is_locked() && v.lock().is_loaded(){
+                    // we are only ones using it 
+                    // evict candidate
+                    v.lock().unload(i as u32).unwrap();
+                };
+            });
+    
+            info!("Cache cleaned, now contains: {} entries", self.cache_population());
+    
+        }
 
     pub fn entry<Q : ?Sized>(&self, k:&Q) -> Option<Arc<Mutex<Entry<V,ID>>>>
     where 
@@ -317,15 +336,17 @@ where
     }
 }
 
-impl<K, V, const ID : u32> Drop for DiskHashMap<K, V, ID>
-where
-    K: Serializable + Hash + Eq + Clone,
-    V: Serializable + Debug,
-{
-    fn drop(&mut self) {
-        remove_dir_all(Self::path()).unwrap_or(());
-    }
-}
+// this doesn't work as i thought it would
+// impl<K, V, const ID : u32> Drop for DiskHashMap<K, V, ID>
+// where
+//     K: Serializable + Hash + Eq + Clone,
+//     V: Serializable + Debug,
+// {
+//     fn drop(&mut self) {
+//         info!("Dropping cache for DiskHashMap-{}",ID);
+//         remove_dir_all(Self::path()).unwrap_or(());
+//     }
+// }
 
 impl<K, V, const ID : u32> Default for DiskHashMap<K, V, ID>
 where

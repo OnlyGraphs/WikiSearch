@@ -6,17 +6,25 @@ use index::{
 };
 
 use itertools::Itertools;
+
 use parser::{ast::{Query}, UnaryOp, BinaryOp};
 use parser::errors::{QueryError, QueryErrorKind};
 use preprocessor::{Preprocessor, ProcessingOptions};
 
-use std::{collections::{HashSet, HashMap}, iter::empty};
+use std::{collections::{HashMap, VecDeque}, iter::empty};
 use utils::utils::merge;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct ScoredDocument {
     pub score: f64,
     pub doc_id: u32,
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
+pub struct ScoredRelationDocument {
+    pub score: f64,
+    pub doc_id: u32,
+    pub hops: u8,
 }
 
 pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
@@ -257,7 +265,7 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
 }
 
 /// own endpoint for relational query, scoring for it should happen here (i.e. Page Rank)
-pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> Vec<ScoredDocument> {
+pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> Vec<ScoredRelationDocument> {
 
         if let Query::RelationQuery{root, hops, sub} = &**query{
             let mut subset = HashMap::default();
@@ -268,9 +276,10 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
                     execute_query(&v, index)
                             .filter_map(move |c| {
                                 if subset.contains_key(&c.document_id){
-                                    Some(ScoredDocument{
-                                        score: (*hops as f64 - *subset.get(&c.document_id).unwrap() as f64) * 100.0, // magic number, choose whatever you want
+                                    Some(ScoredRelationDocument{
+                                        score: 0.0, // PAGE RANK
                                         doc_id: c.document_id,
+                                        hops: *subset.get(&c.document_id).unwrap()
                                     })
                                 } else {
                                     None
@@ -280,9 +289,10 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
                 None => {
                     subset
                         .into_iter()
-                        .map(move |(id,score)| ScoredDocument {
+                        .map(move |(id,hops)| ScoredRelationDocument {
+                            score: 0.0, // PAGE RANK
                             doc_id: id,
-                            score: (*hops as f64 - score as f64) * 100.0, // magic number, choose whatever you want
+                            hops: hops, // magic number, choose whatever you want
                         })
                         .collect()
                 }
@@ -294,28 +304,54 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
 
 /// finds documents within given hops off the root, also stores the number of hops from the root
 pub fn get_docs_within_hops(docid: u32, hops: u8, out: &mut HashMap<u32,u8>, index: &Index) {
-    get_docs_within_hops_sub(docid,hops,0, out, index)
-}
+    let mut queue = VecDeque::default();
+    let mut depth_increasing_nodes = VecDeque::default();
 
-#[inline(always)]
-fn get_docs_within_hops_sub(docid: u32,hops_max: u8 ,hops: u8, out: &mut HashMap<u32,u8>, index: &Index) {
-    out.insert(docid, hops);
+    queue.push_back(docid);
+    depth_increasing_nodes.push_back(docid);
 
-    if hops == hops_max {
-        return;
-    }
+    let mut curr_hops = 0;
+    loop {
+        let top = queue.pop_front();
 
-    let out_l = index.get_links(docid);
-    let in_l = index.get_incoming_links(docid);
-    let all_l = merge(in_l, out_l);
+        if let Some(top) = top {
+            out.insert(top, curr_hops);
 
-    all_l.iter().for_each(|v| {
-        if !out.contains_key(v) {
-            out.insert(*v, hops + 1);
-            get_docs_within_hops_sub(*v,hops_max, hops + 1, out, index);
+            if let Some(v) = depth_increasing_nodes.front(){
+                if *v == top{
+                    curr_hops += 1;
+                    depth_increasing_nodes.pop_front();
+                }
+            }
+            
+            if curr_hops == hops + 1{
+                return;
+            }
+
+            let out_l = index.get_links(top);
+            let in_l = index.get_incoming_links(top);
+            let all_l = merge(in_l, out_l);
+            
+            all_l.iter().for_each(|v| {
+                if !out.contains_key(v) {
+                    queue.push_back(*v);
+                }
+            });
+
+            if let Some(v) = queue.back(){
+                depth_increasing_nodes.push_back(*v);
+            }
+
+
+
+
+        } else {
+            return;
         }
-    })
+    }
 }
+
+
 
 
 /// scores all queries apart from the relational query which passes through its own endpoint
@@ -328,9 +364,17 @@ pub fn score_query(
     let mut scored_documents = Vec::default();
 
     for post in postings {
+
+        let mut page_rank = 0.0;
+        let pr = index.page_rank.get(&post.document_id);
+        match pr {
+            Some(v) => page_rank = v,
+            _ => page_rank = 0.0
+        };
+
         scored_documents.push(ScoredDocument {
             doc_id: post.document_id,
-            score: tfidf_query(post.document_id, query, index),
+            score: tfidf_query(post.document_id, query, index)*0.9+page_rank*0.1,
         });
     }
     return scored_documents;

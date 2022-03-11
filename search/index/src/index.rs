@@ -1,7 +1,6 @@
 use chrono::NaiveDateTime;
 use log::info;
-use sqlx::database::HasArguments;
-use streaming_iterator::{convert_ref, StreamingIterator,convert};
+
 use utils::MemFootprintCalculator;
 
 use std::fmt::Debug;
@@ -14,25 +13,25 @@ use std::{
     fmt,
 };
 
-use crate::DecoderIterator;
-use crate::DeltaEncoder;
+
+
 use crate::DiskHashMap;
-use crate::EncodedPostingList;
+
 use crate::EncodedPostingNode;
-use crate::EncodedSequentialObject;
+
 use crate::Entry;
-use crate::IdentityEncoder;
-use crate::index_structs::{PosRange, Posting};
-use crate::PostingNode;
+use crate::{VbyteEncoder};
+use crate::index_structs::{PosRange};
+
 use crate::PreIndex;
-use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
+use parking_lot::{Mutex};
 use crate::compute_page_ranks;
 
 
 #[derive(Default)]
 pub struct Index{
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1>, // index map because we want to keep this sorted
+    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder>,1>, // index map because we want to keep this sorted
     pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
@@ -136,7 +135,7 @@ impl Index {
     }
 
 
-    pub fn get_postings(&self, token: &str) -> Option<Arc<Mutex<Entry<EncodedPostingNode<IdentityEncoder>,1>>>>
+    pub fn get_postings(&self, token: &str) -> Option<Arc<Mutex<Entry<EncodedPostingNode<VbyteEncoder>,1>>>>
     {
         self.posting_nodes.entry(token)
     }
@@ -173,10 +172,18 @@ impl Index {
         // extract postings and sort
         let mut timer = Instant::now();
 
+        let mut index = Self {
+            dump_id: p.dump_id,
+            posting_nodes: DiskHashMap::new(p.posting_nodes.capacity()),
+            links: HashMap::with_capacity(p.links.len()),
+            incoming_links: HashMap::with_capacity(p.links.len()),
+            extent: p.extent,
+            last_updated_docs: p.last_updated_docs,
+            page_rank: HashMap::with_capacity(p.links.len()),
+        };
+
         let total_posting_lists = p.posting_nodes.len();
         info!("Sorting {} posting lists", total_posting_lists);
-        let mut posting_nodes : DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1> = DiskHashMap::new(p.posting_nodes.capacity());
-
         (0..p.posting_nodes.len()).for_each(|idx| {
 
             { 
@@ -191,47 +198,46 @@ impl Index {
                 .unwrap();
 
             let encoded_node = EncodedPostingNode::from(unwrapped);
-            posting_nodes.insert(k,encoded_node);
+            index.posting_nodes.insert(k,encoded_node);
             } // for dropping lock on v in case we want to evict it
 
             // every R records, clean cache, and report progress
-            if idx % posting_nodes.capacity() as usize == 0 {
-                info!("Sorted {}%, cache pop: {} ({}s)", (idx as f32 / total_posting_lists as f32) * 100.0,posting_nodes.clean_cache(),timer.elapsed().as_secs());
+            if idx % index.posting_nodes.capacity() as usize == 0 {
+                index.posting_nodes.clean_cache_all();
+                info!("Sorted {}% ({}s)", (idx as f32 / total_posting_lists as f32) * 100.0,timer.elapsed().as_secs());
                 timer = Instant::now();
                 
             }
         });
 
-        posting_nodes.clean_cache();
+        index.posting_nodes.clean_cache_all();
         
 
         // convert strings in the links to u32's
         // sort all links
         info!("Reconciling links with IDs");
         timer = Instant::now();
-        let mut links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(p.links.len());
         p.links.iter().for_each(|(from, to)| {
-            let mut targets: Vec<u32> = Vec::with_capacity(links.len());
+            let mut targets: Vec<u32> = Vec::with_capacity(index.links.len());
             to.iter().for_each(|l| {
                 p.id_title_map.get_by_right(l).map(|v| {
                     targets.push(*v);
                 });
             });
             targets.sort();
-            let _ = links.insert(*from, targets);
+            let _ = index.links.insert(*from, targets);
         });
         info!("Took {}s", timer.elapsed().as_secs());
 
         // back links
         info!("Generating back links");
         timer = Instant::now();
-        let mut back_links: HashMap<u32, Vec<u32>> = HashMap::with_capacity(p.links.len());
-        links.iter().for_each(|(source, target)| {
+        index.links.iter().for_each(|(source, target)| {
             target.iter().for_each(|v| {
-                back_links.entry(*v).or_default().push(*source);
+                index.incoming_links.entry(*v).or_default().push(*source);
             })
         });
-        back_links.values_mut().for_each(|v| v.sort());
+        index.incoming_links.values_mut().for_each(|v| v.sort());
         info!("Took {}s", timer.elapsed().as_secs());
 
         Self {
