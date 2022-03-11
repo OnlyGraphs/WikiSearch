@@ -113,7 +113,6 @@ pub fn get_random_documents(p: &IndexBenchParameters) -> Vec<Box<Document>> {
             title: i.to_string(),
             categories: "".to_string(),
             last_updated_date: "".to_string(),
-            namespace: 2,
             main_text: get_random_string(words_main, rng),
             article_links: (0..p.links_count)
                 .map(|_| rng.gen_range(0..p.articles_count).to_string())
@@ -189,7 +188,7 @@ pub fn build_index_with_docs(docs: Vec<Box<Document>>) -> Index {
 
 pub fn execute_query_with_index(idx: &Index, mut q: Box<Query>) {
     preprocess_query(&mut *q).unwrap();
-    let mut postings = execute_query(&q, &idx).cloned().collect::<Vec<Posting>>();
+    let mut postings = execute_query(&q, &idx).collect::<Vec<Posting>>();
     score_query(&q, &idx, &mut postings);
 }
 
