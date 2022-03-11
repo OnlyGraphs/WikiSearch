@@ -608,7 +608,7 @@ fn test_v_byte_with_prev_different_document_decode() {
 ///
 #[test]
 #[cfg(target_endian = "little")]
-fn test_delta_and_vbyte_encoder_vs_identity() {
+fn test_delta_and_vbyte_encoder_subset() {
     let target_1 = Posting {
         document_id: 90,
         position: 40,
@@ -618,15 +618,6 @@ fn test_delta_and_vbyte_encoder_vs_identity() {
         position: 42,
     };
     let target_vec = vec![target_1, target_2];
-
-    //Serialise identity
-    let obj_identity = EncodedSequentialObject::<Posting, IdentityEncoder>::from_iter(
-        vec![target_1, target_2].into_iter(),
-    );
-    let mut out_identity = Vec::default();
-    obj_identity.serialize(&mut out_identity);
-    //Test identity works quickly
-    assert_eq!(out_identity, b"\x10\0\0\0Z\0\0\0(\0\0\0c\0\0\0*\0\0\0");
 
     // ----------------- serialise delta -------------
     let mut obj_delta = EncodedSequentialObject::<Posting, DeltaEncoder>::from_iter(
@@ -643,6 +634,71 @@ fn test_delta_and_vbyte_encoder_vs_identity() {
     let mut obj_vbyte = EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(
         vec![target_1, target_2].into_iter(),
     );
+    let mut out = Vec::default();
+    obj_vbyte.serialize(&mut out);
+
+    //Test deserialisation now
+    let out_vbyte_decoded = obj_vbyte.into_iter().collect::<Vec<Posting>>();
+
+    assert_eq!(target_vec, out_vbyte_decoded);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_delta_and_vbyte_encoder_subset_2() {
+    let target_1 = Posting {
+        document_id: 90,
+        position: 40,
+    };
+    let target_2 = Posting {
+        document_id: 99,
+        position: 42,
+    };
+    let target_3 = Posting {
+        document_id: 127,
+        position: 42,
+    };
+    let target_4 = Posting {
+        document_id: 128,
+        position: 10,
+    };
+    let target_5 = Posting {
+        document_id: 3040,
+        position: 4983,
+    };
+    let target_6 = Posting {
+        document_id: 3040,
+        position: 5000,
+    };
+    let target_7 = Posting {
+        document_id: 3041,
+        position: 1,
+    };
+    let target_8 = Posting {
+        document_id: 182737,
+        position: 2,
+    };
+    let target_9 = Posting {
+        document_id: 182737,
+        position: 10,
+    };
+    let target_vec = vec![
+        target_1, target_2, target_3, target_4, target_5, target_6, target_7, target_8, target_9,
+    ];
+
+    // ----------------- serialise delta -------------
+    let mut obj_delta =
+        EncodedSequentialObject::<Posting, DeltaEncoder>::from_iter(target_vec.clone().into_iter());
+    let mut out = Vec::default();
+    obj_delta.serialize(&mut out);
+
+    //Test deserialisation now
+    let out_delta_decoded = obj_delta.into_iter().collect::<Vec<Posting>>();
+    assert_eq!(target_vec, out_delta_decoded);
+
+    // ------------ serialise vbyte --------------
+    let mut obj_vbyte =
+        EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(target_vec.clone().into_iter());
     let mut out = Vec::default();
     obj_vbyte.serialize(&mut out);
 
