@@ -194,7 +194,7 @@ pub async fn search(
         .into_iter()
         .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
 
-    info!("Query: {} took: {}us",&q.query, timer.elapsed().as_micros());
+    info!("Query: {} took: {}s",&q.query, timer.elapsed().as_secs());
 
     Ok(Json(future_documents))
 }
@@ -256,7 +256,7 @@ pub async fn relational(
     let capped_max_results = min(q.max_results.0,150) as usize;
 
     let mut scored_documents = execute_relational_query(query, &idx);
-    scored_documents.sort_by(|a,b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)); // TODO; hmm
+    scored_documents.sort_by(|a,b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // TODO; hmm
     scored_documents = scored_documents
         .into_iter()
         .take(capped_max_results)
@@ -339,7 +339,7 @@ pub async fn relational(
         })
         .collect();
 
-    info!("Relational Query: {:?} took: {}us",&q.query, timer.elapsed().as_micros());
+    info!("Relational Query: {:?} took: {}s",&q.query, timer.elapsed().as_secs());
 
     Ok(Json(RelationSearchOutput {
         documents: documents,

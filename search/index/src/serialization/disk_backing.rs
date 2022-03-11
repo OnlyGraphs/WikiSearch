@@ -228,9 +228,9 @@ where
 
     /// evicts unused records untill all records are checked or record limit is satisfied
     pub fn clean_cache(&self) -> u32 {
-
         // figure out how many records are in memory
         let mut records = self.cache_population();
+        info!("Cleaning cache, containing: {} entries",records);
 
 
         // reduce this number if needed
@@ -245,6 +245,8 @@ where
                 records > self.capacity
             }).for_each(drop);
         }
+
+        info!("Cache cleaned, now contains: {} entries", records);
 
         records
     }

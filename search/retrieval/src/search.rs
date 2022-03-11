@@ -6,11 +6,12 @@ use index::{
 };
 
 use itertools::Itertools;
+use log::info;
 use parser::{ast::{Query}, UnaryOp, BinaryOp};
 use parser::errors::{QueryError, QueryErrorKind};
 use preprocessor::{Preprocessor, ProcessingOptions};
 
-use std::{collections::{HashSet, HashMap}, iter::empty};
+use std::{collections::{HashSet, HashMap, VecDeque}, iter::empty};
 use utils::utils::merge;
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -294,28 +295,54 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
 
 /// finds documents within given hops off the root, also stores the number of hops from the root
 pub fn get_docs_within_hops(docid: u32, hops: u8, out: &mut HashMap<u32,u8>, index: &Index) {
-    get_docs_within_hops_sub(docid,hops,0, out, index)
-}
+    let mut queue = VecDeque::default();
+    let mut depth_increasing_nodes = VecDeque::default();
 
-#[inline(always)]
-fn get_docs_within_hops_sub(docid: u32,hops_max: u8 ,hops: u8, out: &mut HashMap<u32,u8>, index: &Index) {
-    out.insert(docid, hops);
+    queue.push_back(docid);
+    depth_increasing_nodes.push_back(docid);
 
-    if hops == hops_max {
-        return;
-    }
+    let mut curr_hops = 0;
+    loop {
+        let top = queue.pop_front();
 
-    let out_l = index.get_links(docid);
-    let in_l = index.get_incoming_links(docid);
-    let all_l = merge(in_l, out_l);
+        if let Some(top) = top {
+            out.insert(top, curr_hops);
 
-    all_l.iter().for_each(|v| {
-        if !out.contains_key(v) {
-            out.insert(*v, hops + 1);
-            get_docs_within_hops_sub(*v,hops_max, hops + 1, out, index);
+            if let Some(v) = depth_increasing_nodes.front(){
+                if *v == top{
+                    curr_hops += 1;
+                    depth_increasing_nodes.pop_front();
+                }
+            }
+            
+            if curr_hops == hops + 1{
+                return;
+            }
+
+            let out_l = index.get_links(top);
+            let in_l = index.get_incoming_links(top);
+            let all_l = merge(in_l, out_l);
+            
+            all_l.iter().for_each(|v| {
+                if !out.contains_key(v) {
+                    queue.push_back(*v);
+                }
+            });
+
+            if let Some(v) = queue.back(){
+                depth_increasing_nodes.push_back(*v);
+            }
+
+
+
+
+        } else {
+            return;
         }
-    })
+    }
 }
+
+
 
 
 /// scores all queries apart from the relational query which passes through its own endpoint
