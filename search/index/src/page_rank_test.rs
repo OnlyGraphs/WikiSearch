@@ -1,4 +1,4 @@
-use crate::page_rank::{init_page_rank, update_page_rank};
+use crate::page_rank::{init_page_rank, update_page_rank, page_rank_converged, update_all_page_ranks, compute_page_ranks};
 use std::collections::HashMap;
 
 #[test]
@@ -73,5 +73,144 @@ fn test_update_page_rank_complex_1() {
 
     let expected_pr = 2.2325;
     assert!((updated_pr-expected_pr).abs() < 0.000001);
+}
 
+#[test]
+pub fn test_page_ranks_converged_true() {
+
+    // Setup
+
+    let mut prev_pr = HashMap::new();
+    prev_pr.insert(0, 0.2775);
+    prev_pr.insert(1, 0.21375);
+    prev_pr.insert(2, 0.34125);
+
+    let mut current_pr = HashMap::new();
+    current_pr.insert(1, 0.21375000000000002);
+    current_pr.insert(0,0.2775);
+    current_pr.insert(2, 0.34125);
+
+    let pr_converged = page_rank_converged(prev_pr, current_pr);
+
+    assert!(pr_converged);
+}
+
+#[test]
+pub fn test_page_ranks_converged_false() {
+
+    // Setup
+
+    let mut prev_pr = HashMap::new();
+    prev_pr.insert(0, 1.0);
+    prev_pr.insert(1, 1.5);
+    prev_pr.insert(2, 5.9);
+    prev_pr.insert(3, 0.9);
+
+    let mut current_pr = HashMap::new();
+    current_pr.insert(0,1.0001);
+    current_pr.insert(1, 1.5);
+    current_pr.insert(2, 5.9);
+    current_pr.insert(3, 0.900000001);
+
+    let pr_converged = page_rank_converged(prev_pr, current_pr);
+
+    assert!(!pr_converged);
+}
+
+#[test]
+pub fn test_update_page_rank_for_all_simple_step1() {
+
+    let mut outgoing_links = HashMap::new();
+    outgoing_links.insert(0, vec![1]);
+    outgoing_links.insert(1, vec![0, 2]);
+    outgoing_links.insert(2, vec![0,1]);
+
+    let mut incoming_links = HashMap::new();
+    incoming_links.insert(0, vec![1,2]);
+    incoming_links.insert(1, vec![0, 2]);
+    incoming_links.insert(2, vec![1]);
+
+    let mut current_pr = HashMap::new();
+    current_pr.insert(1, 0.0);
+    current_pr.insert(0, 0.0);
+    current_pr.insert(2, 0.0);
+
+    let actual_pr = update_all_page_ranks(outgoing_links, incoming_links, current_pr, 0.85);
+
+    let mut expected_pr = HashMap::new();
+    expected_pr.insert(1, 0.15);
+    expected_pr.insert(0, 0.15);
+    expected_pr.insert(2, 0.15);
+
+    assert!(page_rank_converged(actual_pr, expected_pr));
+}
+
+#[test]
+pub fn test_update_page_rank_for_all_simple_step2() {
+
+    let mut outgoing_links = HashMap::new();
+    outgoing_links.insert(0, vec![1]);
+    outgoing_links.insert(1, vec![0, 2]);
+    outgoing_links.insert(2, vec![0,1]);
+
+    let mut incoming_links = HashMap::new();
+    incoming_links.insert(0, vec![1,2]);
+    incoming_links.insert(1, vec![0, 2]);
+    incoming_links.insert(2, vec![1]);
+
+    let mut current_pr = HashMap::new();
+    current_pr.insert(1, 0.15);
+    current_pr.insert(0, 0.15);
+    current_pr.insert(2, 0.15);
+
+    let actual_pr = update_all_page_ranks(outgoing_links, incoming_links, current_pr, 0.85);
+    let mut expected_pr = HashMap::new();
+    expected_pr.insert(0, 0.2775);
+    expected_pr.insert(1, 0.34125);
+    expected_pr.insert(2, 0.21375);
+    assert!(page_rank_converged(actual_pr, expected_pr));
+}
+
+pub fn test_update_page_rank_for_all_simple_step3() {
+
+    let mut outgoing_links = HashMap::new();
+    outgoing_links.insert(0, vec![1]);
+    outgoing_links.insert(1, vec![0, 2]);
+    outgoing_links.insert(2, vec![0,1]);
+
+    let mut incoming_links = HashMap::new();
+    incoming_links.insert(0, vec![1,2]);
+    incoming_links.insert(1, vec![0, 2]);
+    incoming_links.insert(2, vec![1]);
+
+    let mut current_pr = HashMap::new();
+    current_pr.insert(1, 0.2775);
+    current_pr.insert(0, 0.34125);
+    current_pr.insert(2, 0.21375);
+
+    let actual_pr = update_all_page_ranks(outgoing_links, incoming_links, current_pr, 0.85);
+    let mut expected_pr = HashMap::new();
+    expected_pr.insert(0, 0.385875);
+    expected_pr.insert(1, 0.47671875);
+    expected_pr.insert(2, 0.29503125);
+    assert!(page_rank_converged(actual_pr, expected_pr));
+}
+
+#[test]
+fn test_calculate_page_rank() {
+    let mut outgoing_links = HashMap::new();
+    outgoing_links.insert(0, vec![1]);
+    outgoing_links.insert(1, vec![0, 2]);
+    outgoing_links.insert(2, vec![0,1]);
+
+    let mut incoming_links = HashMap::new();
+    incoming_links.insert(0, vec![1,2]);
+    incoming_links.insert(1, vec![0, 2]);
+    incoming_links.insert(2, vec![1]);
+
+    let pr = compute_page_ranks(outgoing_links, incoming_links, 0.85);
+
+    for (key, value) in pr {
+        println!("Page {}: {}", key, value);
+    }
 }
