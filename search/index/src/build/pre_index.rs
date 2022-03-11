@@ -1,5 +1,5 @@
 use crate::{
-    DiskHashMap, Document, IndexError, IndexErrorKind, PosRange, Posting, PostingNode,
+    DiskTstMap, Document, IndexError, IndexErrorKind, PosRange, Posting, PostingNode,
     DATE_TIME_FORMAT,
 };
 use bimap::BiMap;
@@ -8,9 +8,9 @@ use parser::StructureElem;
 use std::collections::{HashMap, HashSet};
 
 /// a common backbone from which any index can be intialized
-pub struct PreIndex{
+pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, PostingNode, 0>,
+    pub posting_nodes: DiskTstMap<PostingNode, 0>,
     pub links: HashMap<u32, Vec<String>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub id_title_map: BiMap<u32, String>,
@@ -21,32 +21,34 @@ pub struct PreIndex{
 
 impl Default for PreIndex {
     fn default() -> Self {
-        Self { 
+        Self {
             dump_id: Default::default(),
-            posting_nodes: DiskHashMap::new(1000000),
-            links: Default::default(), extent: Default::default(), 
-            id_title_map: Default::default(), 
-            last_updated_docs: Default::default(), 
-            curr_doc_appearances: Default::default() }
+            posting_nodes: DiskTstMap::new(1000000),
+            links: Default::default(),
+            extent: Default::default(),
+            id_title_map: Default::default(),
+            last_updated_docs: Default::default(),
+            curr_doc_appearances: Default::default(),
+        }
     }
 }
 
 impl PreIndex {
-
-    pub fn with_capacity(cap : u32) -> Self {
-        Self { 
+    pub fn with_capacity(cap: u32) -> Self {
+        Self {
             dump_id: Default::default(),
-            posting_nodes: DiskHashMap::new(cap),
-            links: Default::default(), extent: Default::default(), 
-            id_title_map: Default::default(), 
-            last_updated_docs: Default::default(), 
-            curr_doc_appearances: Default::default() }
+            posting_nodes: DiskTstMap::new(cap),
+            links: Default::default(),
+            extent: Default::default(),
+            id_title_map: Default::default(),
+            last_updated_docs: Default::default(),
+            curr_doc_appearances: Default::default(),
+        }
     }
 
-    pub fn clean_cache(&self){
+    pub fn clean_cache(&self) {
         self.posting_nodes.clean_cache();
     }
-
 
     pub fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError> {
         let mut word_pos = 0;
@@ -92,7 +94,13 @@ impl PreIndex {
 
         // collect DF values
         for s in self.curr_doc_appearances.drain() {
-            self.posting_nodes.entry(&s).unwrap().lock().get_mut().unwrap().df += 1;
+            self.posting_nodes
+                .entry(&s)
+                .unwrap()
+                .lock()
+                .get_mut()
+                .unwrap()
+                .df += 1;
         }
 
         Ok(())
@@ -107,17 +115,11 @@ impl PreIndex {
     }
 
     fn add_posting(&mut self, token: &str, docid: u32, word_pos: u32) {
+        let ptr = self.posting_nodes.entry_or_default(token);
 
-        let ptr = self
-        .posting_nodes
-        .entry_or_default(token);
+        let mut lock = ptr.lock();
 
-        let mut lock = ptr
-                .lock();
-                
-        let node = lock
-                .get_mut()
-                .unwrap();
+        let node = lock.get_mut().unwrap();
 
         self.curr_doc_appearances.insert(token.to_owned());
 

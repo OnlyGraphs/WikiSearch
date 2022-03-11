@@ -8,30 +8,39 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Instant;
-use std::{
-    collections::HashMap,
-    fmt,
-};
+use std::{collections::HashMap, fmt};
 
-
-
-use crate::DiskHashMap;
+use crate::DiskTstMap;
 
 use crate::EncodedPostingNode;
 
+use crate::index_structs::PosRange;
 use crate::Entry;
-use crate::{VbyteEncoder};
-use crate::index_structs::{PosRange};
+use crate::VbyteEncoder;
 
 use crate::PreIndex;
-use parking_lot::{Mutex};
+use parking_lot::Mutex;
+
 // use crate::init_page_rank;
 
+impl Default for Index {
+    fn default() -> Index {
+        Index {
+            dump_id: 0,
+            posting_nodes: DiskTstMap::new(10000),
+            links: HashMap::new(),
+            incoming_links: HashMap::new(),
+            extent: HashMap::new(),
+            last_updated_docs: HashMap::new(),
+            page_rank: HashMap::new(),
+        }
+    }
+}
 
-#[derive(Default)]
-pub struct Index{
+pub struct Index {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder>,1>, // index map because we want to keep this sorted
+    // pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder>, 1>, // index map because we want to keep this sorted
+    pub posting_nodes: DiskTstMap<EncodedPostingNode<VbyteEncoder>, 1>,
     pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
@@ -100,7 +109,6 @@ impl Debug for Index {
 }
 
 impl Index {
-
     pub fn get_incoming_links(&self, source: u32) -> &[u32] {
         match self.incoming_links.get(&source) {
             Some(v) => v,
@@ -124,8 +132,15 @@ impl Index {
 
     pub fn tf(&self, token: &str, docid: u32) -> u32 {
         match self.posting_nodes.entry(token) {
-            Some(v) => v.deref().lock().get().unwrap().tf
-                                                                    .get(&docid).cloned().unwrap_or(0),
+            Some(v) => v
+                .deref()
+                .lock()
+                .get()
+                .unwrap()
+                .tf
+                .get(&docid)
+                .cloned()
+                .unwrap_or(0),
             None => 0,
         }
     }
@@ -134,12 +149,12 @@ impl Index {
         self.last_updated_docs.len() as u32
     }
 
-
-    pub fn get_postings(&self, token: &str) -> Option<Arc<Mutex<Entry<EncodedPostingNode<VbyteEncoder>,1>>>>
-    {
+    pub fn get_postings(
+        &self,
+        token: &str,
+    ) -> Option<Arc<Mutex<Entry<EncodedPostingNode<VbyteEncoder>, 1>>>> {
         self.posting_nodes.entry(token)
     }
-
 
     pub fn get_extent_for(&self, itype: &str, doc_id: &u32) -> Option<&PosRange> {
         self.extent.get(itype).and_then(|r| r.get(doc_id))
@@ -153,13 +168,11 @@ impl Index {
         self.last_updated_docs.get(&doc_id).cloned()
     }
 
-    pub fn with_capacity(
-        posting_list_mem_limit: u32,
-        articles: u32
-    ) -> Self {
+    pub fn with_capacity(posting_list_mem_limit: u32, articles: u32) -> Self {
         Self {
             dump_id: 0,
-            posting_nodes: DiskHashMap::new(posting_list_mem_limit),
+            // posting_nodes: DiskHashMap::new(posting_list_mem_limit),
+            posting_nodes: DiskTstMap::new(posting_list_mem_limit),
             links: HashMap::with_capacity(articles as usize),
             incoming_links: HashMap::with_capacity(articles as usize),
             extent: HashMap::with_capacity(256),
@@ -174,35 +187,43 @@ impl Index {
 
         let total_posting_lists = p.posting_nodes.len();
         info!("Sorting {} posting lists", total_posting_lists);
-        let mut posting_nodes : DiskHashMap<String, EncodedPostingNode<VbyteEncoder>,1> = DiskHashMap::new(p.posting_nodes.capacity());
+        let mut posting_nodes: DiskTstMap<EncodedPostingNode<VbyteEncoder>, 1> =
+            DiskTstMap::new(p.posting_nodes.capacity());
 
         (0..p.posting_nodes.len()).for_each(|idx| {
+            {
+                // let (k, v) = p.posting_nodes.pop().unwrap();
+                let (k, v) = p.posting_nodes.pop();
+                // println!("{:?}", k.to_string());
+                let v = v.unwrap();
 
-            { 
-            let (k, v) = p.posting_nodes.pop().unwrap();
-            v.lock().get_mut().unwrap().postings.sort();
+                v.lock().get_mut().unwrap().postings.sort();
 
-            let unwrapped = match Arc::try_unwrap(v) {
-                Ok(v) => v,
-                Err(_) => panic!(),
-            }  .into_inner()
+                let unwrapped = match Arc::try_unwrap(v) {
+                    Ok(v) => v,
+                    Err(_) => panic!(),
+                }
+                .into_inner()
                 .into_inner()
                 .unwrap();
 
-            let encoded_node = EncodedPostingNode::from(unwrapped);
-            posting_nodes.insert(k,encoded_node);
+                let encoded_node = EncodedPostingNode::from(unwrapped);
+                posting_nodes.insert(&k, encoded_node);
             } // for dropping lock on v in case we want to evict it
 
             // every R records, clean cache, and report progress
             if idx % posting_nodes.capacity() as usize == 0 {
-                info!("Sorted {}%, cache pop: {} ({}s)", (idx as f32 / total_posting_lists as f32) * 100.0,posting_nodes.clean_cache(),timer.elapsed().as_secs());
+                info!(
+                    "Sorted {}%, cache pop: {} ({}s)",
+                    (idx as f32 / total_posting_lists as f32) * 100.0,
+                    posting_nodes.clean_cache(),
+                    timer.elapsed().as_secs()
+                );
                 timer = Instant::now();
-                
             }
         });
 
         posting_nodes.clean_cache();
-        
 
         // convert strings in the links to u32's
         // sort all links

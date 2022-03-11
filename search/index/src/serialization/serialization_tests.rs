@@ -1,15 +1,11 @@
-use std::{path::PathBuf};
+use std::path::PathBuf;
 
 use utils::MemFootprintCalculator;
 
 use crate::{
-    DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting,
-    SequentialEncoder, Serializable, VbyteEncoder,
+    DeltaEncoder, DiskTstMap, EncodedSequentialObject, IdentityEncoder, Posting, SequentialEncoder,
+    Serializable, VbyteEncoder,
 };
-
-
-
-
 
 #[test]
 #[cfg(target_endian = "little")]
@@ -746,11 +742,11 @@ fn test_from_and_to_iter() {
 
 #[test]
 fn test_disk_hash_map_above_capacity() {
-    let mut d = DiskHashMap::<String, u32, 0>::new(2);
+    let mut d = DiskTstMap::<u32, 0>::new(2);
 
-    d.insert("0123".to_string(), 32);
-    d.insert("3210".to_string(), 16);
-    d.insert("1023".to_string(), 8);
+    d.insert("0123", 32);
+    d.insert("3210", 16);
+    d.insert("1023", 8);
     assert_eq!(*d.entry("0123").unwrap().lock().get().unwrap(), 32 as u32);
     assert_eq!(*d.entry("1023").unwrap().lock().get().unwrap(), 8 as u32);
     assert_eq!(d.cache_population(), 3);
@@ -760,11 +756,11 @@ fn test_disk_hash_map_above_capacity() {
 
 #[test]
 fn test_disk_hash_map_zero_capacity() {
-    let mut d = DiskHashMap::<String, u32, 1>::new(0);
+    let mut d = DiskTstMap::<u32, 1>::new(0);
 
-    d.insert("0123".to_string(), 32);
-    d.insert("3210".to_string(), 16);
-    d.insert("1023".to_string(), 8);
+    d.insert("0123", 32);
+    d.insert("3210", 16);
+    d.insert("1023", 8);
 
     assert_eq!(*d.entry("1023").unwrap().lock().get().unwrap(), 8 as u32);
     assert_eq!(d.cache_population(), 3);
@@ -774,10 +770,10 @@ fn test_disk_hash_map_zero_capacity() {
 
 #[test]
 fn test_disk_hash_map_insert_existing() {
-    let mut d = DiskHashMap::<String, u32, 2>::new(1);
+    let mut d = DiskTstMap::<u32, 2>::new(1);
 
-    d.insert("0123".to_string(), 32);
-    let o = d.insert("0123".to_string(), 16);
+    d.insert("0123", 32);
+    let o = d.insert("0123", 16);
 
     assert_eq!(*d.entry("0123").unwrap().lock().get().unwrap(), 16 as u32);
     assert_eq!(*o.unwrap().lock().get().unwrap(), 32);
@@ -787,11 +783,11 @@ fn test_disk_hash_map_insert_existing() {
 
 #[test]
 fn test_disk_hash_map_clean_up() {
-    let mut d = DiskHashMap::<String, u32, 3>::new(0);
-    let path = DiskHashMap::<String, u32, 3>::path();
+    let mut d = DiskTstMap::<u32, 3>::new(0);
+    let path = DiskTstMap::<u32, 3>::path();
 
-    d.insert("0123".to_string(), 3);
-    d.insert("0124".to_string(), 4);
+    d.insert("0123", 3);
+    d.insert("0124", 4);
     assert_eq!(d.len(), 2);
     assert_eq!(d.cache_population(), 2);
     assert_eq!(d.clean_cache(), 0);
@@ -803,40 +799,39 @@ fn test_disk_hash_map_clean_up() {
 #[test]
 fn test_disk_hash_map_path() {
     assert_eq!(
-        DiskHashMap::<String, u32, 4>::path(),
-        PathBuf::from("/tmp/diskhashmap-4")
+        DiskTstMap::<u32, 4>::path(),
+        PathBuf::from("/tmp/DiskTstMap-4")
     );
     assert_eq!(
-        DiskHashMap::<String, u32, 5>::path(),
-        PathBuf::from("/tmp/diskhashmap-5")
+        DiskTstMap::<u32, 5>::path(),
+        PathBuf::from("/tmp/DiskTstMap-5")
     );
     assert_eq!(
-        DiskHashMap::<String, u32, 6>::path(),
-        PathBuf::from("/tmp/diskhashmap-6")
+        DiskTstMap::<u32, 6>::path(),
+        PathBuf::from("/tmp/DiskTstMap-6")
     );
 }
 
-#[test]
-fn test_disk_hash_map_real_mem() {
-    let mut d = DiskHashMap::<u32, u32, 7>::new(0);
-    let _path = DiskHashMap::<u32, u32, 7>::path();
+//////////// TEST DEPRECATED: Tst crate has its own bytes count function /////////////
+// fn test_disk_hash_map_real_mem() {
+//     let mut d = DiskTstMap::<u32, 7>::new(0);
+//     let _path = DiskTstMap::<u32, 7>::path();
 
-    d.insert(0, 3);
-    d.insert(1, 4);
-    d.insert(2, 4);
-    d.insert(3, 4);
-    assert_eq!(d.clean_cache(), 0);
-    assert_eq!(d.real_mem(), 104);
-}
-
+//     d.insert("0", 3);
+//     d.insert("1", 4);
+//     d.insert("2", 4);
+//     d.insert("3", 4);
+//     assert_eq!(d.clean_cache(), 0);
+//     // assert_eq!(d.real_mem(), 104);
+// }
 #[test]
 fn test_disk_hash_map_clean_cache_cache_pop() {
-    let mut d = DiskHashMap::<u32, u32, 7>::new(0);
+    let mut d = DiskTstMap::<u32, 7>::new(0);
 
-    d.insert(0, 3);
-    d.insert(1, 4);
-    d.insert(2, 4);
-    d.insert(3, 4);
+    d.insert("0", 3);
+    d.insert("1", 4);
+    d.insert("2", 4);
+    d.insert("3", 4);
     assert_eq!(d.cache_population(), 4);
     assert_eq!(d.clean_cache(), 0);
     assert_eq!(d.cache_population(), 0);
@@ -844,13 +839,13 @@ fn test_disk_hash_map_clean_cache_cache_pop() {
 
 #[test]
 fn test_disk_hash_map_multiple_uses() {
-    drop(DiskHashMap::<u32, u32, 8>::new(0));
-    drop(DiskHashMap::<u32, u32, 8>::new(0));
-    drop(DiskHashMap::<u32, u32, 8>::new(0));
+    drop(DiskTstMap::<u32, 8>::new(0));
+    drop(DiskTstMap::<u32, 8>::new(0));
+    drop(DiskTstMap::<u32, 8>::new(0));
 }
 
 #[test]
 fn test_disk_hash_map_multiple_uses_consecutive() {
-    let _a = DiskHashMap::<u32, u32, 9>::new(0);
-    let _b = DiskHashMap::<u32, u32, 9>::new(0);
+    let _a = DiskTstMap::<u32, 9>::new(0);
+    let _b = DiskTstMap::<u32, 9>::new(0);
 }
