@@ -1,7 +1,6 @@
 use chrono::NaiveDateTime;
 use log::info;
 
-use streaming_iterator::{StreamingIterator};
 use utils::MemFootprintCalculator;
 
 use std::fmt::Debug;

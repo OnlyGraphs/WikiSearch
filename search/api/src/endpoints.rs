@@ -22,7 +22,6 @@ use retrieval::execute_relational_query;
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
-use streaming_iterator::StreamingIterator;
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display};

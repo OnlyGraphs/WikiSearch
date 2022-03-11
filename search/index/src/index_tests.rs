@@ -7,7 +7,6 @@ use crate::{
 };
 use std::array::IntoIter;
 use std::collections::HashMap;
-use streaming_iterator::StreamingIterator;
 use utils::utils::MemFootprintCalculator;
 
 use chrono::NaiveDateTime;
