@@ -26,7 +26,7 @@ use crate::index_structs::{PosRange, Posting};
 use crate::PostingNode;
 use crate::PreIndex;
 use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
-// use crate::init_page_rank;
+use crate::compute_page_ranks;
 
 
 #[derive(Default)]
@@ -237,11 +237,11 @@ impl Index {
         Self {
             dump_id: p.dump_id,
             posting_nodes: posting_nodes,
-            links: links,
-            incoming_links: back_links,
+            links: links.clone(),
+            incoming_links: back_links.clone(),
             extent: p.extent,
             last_updated_docs: p.last_updated_docs,
-            page_rank: HashMap::default(), //init_page_rank(back_links, 1.0),
+            page_rank: compute_page_ranks(links.clone(), back_links.clone(), 0.85),
         }
     }
 }
