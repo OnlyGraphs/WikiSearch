@@ -1,13 +1,16 @@
 use crate::{EncodedPostingNode, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use utils::MemFootprintCalculator;
 use core::fmt::Debug;
 use std::io::Bytes;
 use std::{
+    cell::RefCell,
     collections::HashMap,
     io::{Read, Write},
-    marker::PhantomData, rc::Rc, cell::RefCell, ops::{Deref, DerefMut},
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    rc::Rc,
 };
+use utils::MemFootprintCalculator;
 
 /// Implementations encapsulate any sort of encoding mechanism
 /// an encoder is the bridge between a list of bytes [u8] and the in-memory object representation
@@ -32,6 +35,7 @@ where
 
 /// An convenience iterator for decoding [EncodedSequentialObject]'s can be created with
 /// [EncodedSequentialObject]::into_iter()
+#[derive(Clone)]
 pub struct DecoderIterator<'a, T, E>
 where
     E: SequentialEncoder<T>,
@@ -47,20 +51,19 @@ where
     pos: usize,
 }
 
-impl <T : SequentialEncoder<Posting>>MemFootprintCalculator for EncodedPostingNode<T>{
+impl<T: SequentialEncoder<Posting>> MemFootprintCalculator for EncodedPostingNode<T> {
     fn real_mem(&self) -> u64 {
         self.postings.real_mem() + self.tf.real_mem() + self.df.real_mem()
     }
 }
 
-impl <T : SequentialEncoder<Posting>>MemFootprintCalculator for EncodedPostingList<T>{
+impl<T: SequentialEncoder<Posting>> MemFootprintCalculator for EncodedPostingList<T> {
     fn real_mem(&self) -> u64 {
         self.bytes.len() as u64
     }
 }
 
-
-impl<E, T> Iterator for DecoderIterator<'_, T, E>
+impl<E, T: Clone> Iterator for DecoderIterator<'_, T, E>
 where
     E: SequentialEncoder<T>,
     T: Serializable + Debug,
@@ -76,6 +79,7 @@ where
                     // .as_slice(),
             );
             self.pos += count;
+            self.prev = Some(out.clone());
             Some(out)
         } else {
             None
@@ -113,7 +117,7 @@ impl<E: SequentialEncoder<T>, T: Serializable> FromIterator<T> for EncodedSequen
 impl<'a, E, T> IntoIterator for &'a EncodedSequentialObject<T, E>
 where
     E: SequentialEncoder<T>,
-    T: Serializable + Debug,
+    T: Serializable + Debug + Clone,
 {
     type Item = T;
 
@@ -187,7 +191,7 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
         bytes
     }
 
-    fn decode<R: Read>(_prev: &Option<Posting>,  bytes: &mut R) -> (Posting, usize) {
+    fn decode<R: Read>(_prev: &Option<Posting>, bytes: &mut R) -> (Posting, usize) {
         let mut a = Posting::default();
         let count = a.deserialize(bytes);
 
@@ -238,6 +242,7 @@ impl VbyteEncoder {
                     reading_doc_id_flag = false;
                 } else {
                     position = result;
+                    break;
                 }
                 //Reset now for position posting
                 result = 0;
@@ -288,8 +293,7 @@ pub trait Serializable: Default {
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize;
 }
 
-
-impl <T: Serializable> Serializable for RefCell<T>{
+impl<T: Serializable> Serializable for RefCell<T> {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         self.borrow().serialize(buf)
     }
@@ -327,7 +331,6 @@ impl Serializable for String {
         len as usize
     }
 }
-
 
 impl<T, E> Serializable for EncodedSequentialObject<T, E>
 where

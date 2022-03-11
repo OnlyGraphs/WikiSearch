@@ -1,4 +1,4 @@
-use std::{sync::Arc, path::PathBuf};
+use std::{path::PathBuf, sync::Arc};
 
 use utils::MemFootprintCalculator;
 
@@ -7,8 +7,9 @@ use crate::{
     SequentialEncoder, Serializable, VbyteEncoder,
 };
 
-
-
+use crate::index::Index;
+use crate::utils::get_document_with_text;
+use crate::PreIndex;
 
 #[test]
 #[cfg(target_endian = "little")]
@@ -255,7 +256,7 @@ fn test_delta_with_prev_same_document_decode() {
         document_id: 69,
         position: 50,
     });
-    let source = b"\0\0\0\02\0\0\0".to_vec(); //Delta of prev and next, where delta doc_id = 0, and delta position is 50
+    let source = b"\0\0\0\0<\0\0\0".to_vec(); //Delta of prev and next, where delta doc_id = 0, and delta position is 60
 
     let (encoded, size): (Posting, usize) = DeltaEncoder::decode(
         prev,
@@ -264,7 +265,7 @@ fn test_delta_with_prev_same_document_decode() {
 
     let target = Posting {
         document_id: 69,
-        position: 100,
+        position: 110,
     };
     assert_eq!(encoded, target);
     assert_eq!(size, 8);
@@ -277,7 +278,7 @@ fn test_delta_with_prev_different_document_decode() {
         document_id: 42,
         position: 69,
     });
-    let source = b"\0\0\0\x46\0\0\0".to_vec(); //Delta of prev and next, where delta doc_id = 27 , and delta position is 70 (irrespective of previous document)
+    let source = b"\x1B\0\0\0\x46\0\0\0".to_vec(); //Delta of prev and next, where delta doc_id = 27 , and delta position is 70 (irrespective of previous document)
     let (encoded, size): (Posting, usize) = DeltaEncoder::decode(
         prev,
         &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
@@ -286,6 +287,27 @@ fn test_delta_with_prev_different_document_decode() {
     let target = Posting {
         document_id: 69,
         position: 70,
+    };
+    assert_eq!(encoded, target);
+    assert_eq!(size, 8);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_delta_with_prev_different_document_decode_2() {
+    let prev = &Some(Posting {
+        document_id: 90,
+        position: 40,
+    });
+    let source = b"\x09\0\0\0\x2A\0\0\0".to_vec(); //represents delta, where delta of doc_id == 9 and position is 42 (disregards previous document)
+    let (encoded, size): (Posting, usize) = DeltaEncoder::decode(
+        prev,
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+
+    let target = Posting {
+        document_id: 99,
+        position: 42,
     };
     assert_eq!(encoded, target);
     assert_eq!(size, 8);
@@ -581,6 +603,111 @@ fn test_v_byte_with_prev_different_document_decode() {
     assert_eq!(size, 4);
 }
 
+///// ------------
+///
+///
+#[test]
+#[cfg(target_endian = "little")]
+fn test_delta_and_vbyte_encoder_subset() {
+    let target_1 = Posting {
+        document_id: 90,
+        position: 40,
+    };
+    let target_2 = Posting {
+        document_id: 99,
+        position: 42,
+    };
+    let target_vec = vec![target_1, target_2];
+
+    // ----------------- serialise delta -------------
+    let mut obj_delta = EncodedSequentialObject::<Posting, DeltaEncoder>::from_iter(
+        vec![target_1, target_2].into_iter(),
+    );
+    let mut out = Vec::default();
+    obj_delta.serialize(&mut out);
+
+    //Test deserialisation now
+    let out_delta_decoded = obj_delta.into_iter().collect::<Vec<Posting>>();
+    assert_eq!(target_vec, out_delta_decoded);
+
+    // ------------ serialise vbyte --------------
+    let mut obj_vbyte = EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(
+        vec![target_1, target_2].into_iter(),
+    );
+    let mut out = Vec::default();
+    obj_vbyte.serialize(&mut out);
+
+    //Test deserialisation now
+    let out_vbyte_decoded = obj_vbyte.into_iter().collect::<Vec<Posting>>();
+
+    assert_eq!(target_vec, out_vbyte_decoded);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_delta_and_vbyte_encoder_subset_2() {
+    let target_1 = Posting {
+        document_id: 90,
+        position: 40,
+    };
+    let target_2 = Posting {
+        document_id: 99,
+        position: 42,
+    };
+    let target_3 = Posting {
+        document_id: 127,
+        position: 42,
+    };
+    let target_4 = Posting {
+        document_id: 128,
+        position: 10,
+    };
+    let target_5 = Posting {
+        document_id: 3040,
+        position: 4983,
+    };
+    let target_6 = Posting {
+        document_id: 3040,
+        position: 5000,
+    };
+    let target_7 = Posting {
+        document_id: 3041,
+        position: 1,
+    };
+    let target_8 = Posting {
+        document_id: 182737,
+        position: 2,
+    };
+    let target_9 = Posting {
+        document_id: 182737,
+        position: 10,
+    };
+    let target_vec = vec![
+        target_1, target_2, target_3, target_4, target_5, target_6, target_7, target_8, target_9,
+    ];
+
+    // ----------------- serialise delta -------------
+    let mut obj_delta =
+        EncodedSequentialObject::<Posting, DeltaEncoder>::from_iter(target_vec.clone().into_iter());
+    let mut out = Vec::default();
+    obj_delta.serialize(&mut out);
+
+    //Test deserialisation now
+    let out_delta_decoded = obj_delta.into_iter().collect::<Vec<Posting>>();
+    assert_eq!(target_vec, out_delta_decoded);
+
+    // ------------ serialise vbyte --------------
+    let mut obj_vbyte =
+        EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(target_vec.clone().into_iter());
+    let mut out = Vec::default();
+    obj_vbyte.serialize(&mut out);
+
+    //Test deserialisation now
+    let out_vbyte_decoded = obj_vbyte.into_iter().collect::<Vec<Posting>>();
+
+    assert_eq!(target_vec, out_vbyte_decoded);
+}
+
 /// ---------------- Compression Tests [END] ----------------
 #[test]
 fn test_from_and_to_iter() {
@@ -604,125 +731,126 @@ fn test_from_and_to_iter() {
 }
 
 //// IMPORTANT!!!
-/// Tests are run in parallel by default 
+/// Tests are run in parallel by default
 /// to make sure they work nicely, each disk hash map MUST use a different id unique between tests!
 ///
-/// 
-/// 
-/// 
-/// 
-/// 
-/// 
-/// 
-/// 
+///
+///
+///
+///
+///
+///
+///
+///
 /// IMPORTANT!!!
 
 #[test]
-fn test_disk_hash_map_above_capacity(){
-    let mut d = DiskHashMap::<String,u32,0>::new(2);
+fn test_disk_hash_map_above_capacity() {
+    let mut d = DiskHashMap::<String, u32, 0>::new(2);
 
-    d.insert("0123".to_string(),32);
-    d.insert("3210".to_string(),16);
-    d.insert("1023".to_string(),8);
-    assert_eq!(*d.entry("0123").unwrap().lock().get().unwrap(),32 as u32);
-    assert_eq!(*d.entry("1023").unwrap().lock().get().unwrap(),8 as u32);
-    assert_eq!(d.cache_population(),3);
-    assert_eq!(d.clean_cache(),2);
-    assert_eq!(d.len(),3);
-
+    d.insert("0123".to_string(), 32);
+    d.insert("3210".to_string(), 16);
+    d.insert("1023".to_string(), 8);
+    assert_eq!(*d.entry("0123").unwrap().lock().get().unwrap(), 32 as u32);
+    assert_eq!(*d.entry("1023").unwrap().lock().get().unwrap(), 8 as u32);
+    assert_eq!(d.cache_population(), 3);
+    assert_eq!(d.clean_cache(), 2);
+    assert_eq!(d.len(), 3);
 }
 
 #[test]
-fn test_disk_hash_map_zero_capacity(){
-    let mut d = DiskHashMap::<String,u32,1>::new(0);
+fn test_disk_hash_map_zero_capacity() {
+    let mut d = DiskHashMap::<String, u32, 1>::new(0);
 
-    d.insert("0123".to_string(),32);
-    d.insert("3210".to_string(),16);
-    d.insert("1023".to_string(),8);
+    d.insert("0123".to_string(), 32);
+    d.insert("3210".to_string(), 16);
+    d.insert("1023".to_string(), 8);
 
-    assert_eq!(*d.entry("1023").unwrap().lock().get().unwrap(),8 as u32);
-    assert_eq!(d.cache_population(),3);
-    assert_eq!(d.clean_cache(),0);
-    assert_eq!(d.len(),3);
+    assert_eq!(*d.entry("1023").unwrap().lock().get().unwrap(), 8 as u32);
+    assert_eq!(d.cache_population(), 3);
+    assert_eq!(d.clean_cache(), 0);
+    assert_eq!(d.len(), 3);
 }
 
 #[test]
-fn test_disk_hash_map_insert_existing(){
-    let mut d = DiskHashMap::<String,u32,2>::new(1);
+fn test_disk_hash_map_insert_existing() {
+    let mut d = DiskHashMap::<String, u32, 2>::new(1);
 
-    d.insert("0123".to_string(),32);
-    let o = d.insert("0123".to_string(),16);
+    d.insert("0123".to_string(), 32);
+    let o = d.insert("0123".to_string(), 16);
 
-    assert_eq!(*d.entry("0123").unwrap().lock().get().unwrap(),16  as u32);
-    assert_eq!(*o.unwrap().lock().get().unwrap(),32);
-    assert_eq!(d.len(),1);
-    assert_eq!(d.cache_population(),1);
+    assert_eq!(*d.entry("0123").unwrap().lock().get().unwrap(), 16 as u32);
+    assert_eq!(*o.unwrap().lock().get().unwrap(), 32);
+    assert_eq!(d.len(), 1);
+    assert_eq!(d.cache_population(), 1);
 }
-
 
 #[test]
 fn test_disk_hash_map_clean_up() {
-    let mut d = DiskHashMap::<String, u32,3>::new(0);
-    let path = DiskHashMap::<String, u32,3>::path();
+    let mut d = DiskHashMap::<String, u32, 3>::new(0);
+    let path = DiskHashMap::<String, u32, 3>::path();
 
     d.insert("0123".to_string(), 3);
     d.insert("0124".to_string(), 4);
-    assert_eq!(d.len(),2);
-    assert_eq!(d.cache_population(),2);
+    assert_eq!(d.len(), 2);
+    assert_eq!(d.cache_population(), 2);
     assert_eq!(d.clean_cache(), 0);
     drop(d);
 
     assert!(!path.is_dir());
 }
 
-
 #[test]
 fn test_disk_hash_map_path() {
-    assert_eq!(DiskHashMap::<String, u32,4>::path(),PathBuf::from("/tmp/diskhashmap-4"));
-    assert_eq!(DiskHashMap::<String, u32,5>::path(),PathBuf::from("/tmp/diskhashmap-5"));
-    assert_eq!(DiskHashMap::<String, u32,6>::path(),PathBuf::from("/tmp/diskhashmap-6"));
-
+    assert_eq!(
+        DiskHashMap::<String, u32, 4>::path(),
+        PathBuf::from("/tmp/diskhashmap-4")
+    );
+    assert_eq!(
+        DiskHashMap::<String, u32, 5>::path(),
+        PathBuf::from("/tmp/diskhashmap-5")
+    );
+    assert_eq!(
+        DiskHashMap::<String, u32, 6>::path(),
+        PathBuf::from("/tmp/diskhashmap-6")
+    );
 }
-
 
 #[test]
 fn test_disk_hash_map_real_mem() {
-    let mut d = DiskHashMap::<u32, u32,7>::new(0);
-    let path = DiskHashMap::<u32, u32,7>::path();
+    let mut d = DiskHashMap::<u32, u32, 7>::new(0);
+    let path = DiskHashMap::<u32, u32, 7>::path();
 
     d.insert(0, 3);
     d.insert(1, 4);
     d.insert(2, 4);
     d.insert(3, 4);
-    assert_eq!(d.clean_cache(),0);
-    assert_eq!(d.real_mem(),104);
-
+    assert_eq!(d.clean_cache(), 0);
+    assert_eq!(d.real_mem(), 104);
 }
 
 #[test]
 fn test_disk_hash_map_clean_cache_cache_pop() {
-    let mut d = DiskHashMap::<u32, u32,7>::new(0);
-
+    let mut d = DiskHashMap::<u32, u32, 7>::new(0);
 
     d.insert(0, 3);
     d.insert(1, 4);
     d.insert(2, 4);
     d.insert(3, 4);
-    assert_eq!(d.cache_population(),4);
-    assert_eq!(d.clean_cache(),0);
-    assert_eq!(d.cache_population(),0);
-
+    assert_eq!(d.cache_population(), 4);
+    assert_eq!(d.clean_cache(), 0);
+    assert_eq!(d.cache_population(), 0);
 }
 
 #[test]
 fn test_disk_hash_map_multiple_uses() {
-    drop(DiskHashMap::<u32, u32,8>::new(0));
-    drop(DiskHashMap::<u32, u32,8>::new(0));
-    drop(DiskHashMap::<u32, u32,8>::new(0)); 
+    drop(DiskHashMap::<u32, u32, 8>::new(0));
+    drop(DiskHashMap::<u32, u32, 8>::new(0));
+    drop(DiskHashMap::<u32, u32, 8>::new(0));
 }
 
 #[test]
 fn test_disk_hash_map_multiple_uses_consecutive() {
-    let a = DiskHashMap::<u32, u32,9>::new(0);
-    let b =  DiskHashMap::<u32, u32,9>::new(0);
+    let a = DiskHashMap::<u32, u32, 9>::new(0);
+    let b = DiskHashMap::<u32, u32, 9>::new(0);
 }
