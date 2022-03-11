@@ -96,7 +96,7 @@ pub async fn search(
 
     info!("received query: {}", q.query);
 
-    let timer = Instant::now();
+    let mut timer = Instant::now();
 
     //Initialise Database connection to retrieve article title and abstract for each document found for the query
     let pool = PgPoolOptions::new()
@@ -113,17 +113,18 @@ pub async fn search(
     let (_, ref mut query) = parse_query(&q.query)
         .map_err(|e| APIError::new_user_error(&e,&e))?;
     
-    info!("preprocessing query: {}", q.query);
     preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
+    info!("preproced query: {:?}, {}s", query, timer.elapsed().as_secs_f32());
 
-    info!("executing query: {}", q.query);
-
+    timer = Instant::now();
     let postings_query = execute_query(query, &idx);
-    info!("collecting query: {}", q.query);
+    info!("executed query: {}s", timer.elapsed().as_secs_f32());
+
+    timer = Instant::now();
     let mut postings = postings_query.collect::<Vec<Posting>>();
+    info!("sorted query: {}s", timer.elapsed().as_secs_f32());
 
-    info!("sorting query: {}", q.query);
-
+    timer = Instant::now();
     let capped_max_results = min(q.results_per_page.0,150);
     // score documents if necessary and sort appropriately
     let ordered_docs: Vec<ScoredDocument> = match q.sort_by {
@@ -192,7 +193,7 @@ pub async fn search(
         .into_iter()
         .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
 
-    info!("Query: {} took: {}s",&q.query, timer.elapsed().as_secs());
+    info!("Query: {} took: {}s",&q.query, timer.elapsed().as_secs_f32());
 
     Ok(Json(future_documents))
 }
@@ -310,7 +311,6 @@ pub async fn relational(
     let relations: HashSet<Relation> = scored_documents
         .iter()
         .flat_map(|ScoredDocument { doc_id, score: _ }| {
-            debug!("DOC: {}",doc_id);
             idx.get_links(*doc_id)
                 .iter()
                 .filter_map(|target| {
@@ -337,7 +337,7 @@ pub async fn relational(
         })
         .collect();
 
-    info!("Relational Query: {:?} took: {}s",&q.query, timer.elapsed().as_secs());
+    info!("Relational Query: {:?} took: {}s",&q.query, timer.elapsed().as_secs_f32());
 
     Ok(Json(RelationSearchOutput {
         documents: documents,
