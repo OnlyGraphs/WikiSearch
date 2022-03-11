@@ -1,6 +1,7 @@
 use crate::{EncodedPostingNode, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use core::fmt::Debug;
+use core::hash::Hash;
 
 use std::{
     cell::RefCell,
@@ -386,18 +387,32 @@ impl<E: Serializable> Serializable for Vec<E> {
     }
 }
 
-impl<K: Serializable, V: Serializable> Serializable for HashMap<K, V> {
+impl<K, V> Serializable for HashMap<K, V>
+where 
+K: Serializable + Hash + Eq,
+V: Serializable,
+
+{
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
-        let count = 4;
+        let mut count = 4;
         buf.write_u32::<NativeEndian>(self.len() as u32).unwrap();
+        count = self.iter().fold(count, |a, (k,v)| a + k.serialize(buf) + v.serialize(buf));
 
         count
     }
 
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
-        let count = 4;
-        let _len = buf.read_u32::<NativeEndian>().unwrap();
+        let mut count = 4;
+        let len = buf.read_u32::<NativeEndian>().unwrap();
+        self.reserve(len as usize);
+        (0..len).for_each(|_v| {
+            let mut k = K::default();
+            let mut v = V::default();
 
+            count += k.deserialize(buf);
+            count += v.deserialize(buf);
+            self.insert(k,v);
+        });
         count
     }
 }

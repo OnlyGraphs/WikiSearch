@@ -1,6 +1,7 @@
 IMAGE_NAME=wiki_search_api
 IMAGE_VERSION=1.1.0
 GRPC_PORT=50051
+ARGS=''
 export SQLX_OFFLINE=true
 export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
 export SEARCH_PORT=8000
@@ -39,7 +40,7 @@ build:
 	cd search && cargo build --release 
 
 test:
-	cd search && cargo test --workspace
+	cd search && cargo test --workspace -- --test-threads=1 ${ARGS}
 
 docs:
 	cd search && cargo doc --open --no-deps
