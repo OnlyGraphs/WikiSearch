@@ -158,7 +158,6 @@ pub async fn search(
         }
     };
 
-    info!("{:?}",&ordered_docs);
     let future_documents = ordered_docs
         .into_iter() // consumes ordered_docs
         .map(|doc| {

@@ -16,6 +16,7 @@ run_img: #build_img
 		-e DATABASE_URL=${DATABASE_URL} \
 		-e RUST_LOG=${RUST_LOG} \
 		-e STATIC_DIR=./out \
+		-e CACHE_SIZE=${CACHE_SIZE} \
 		--rm -a stdin -a stdout -a stderr --network "host" ${IMAGE_NAME}:${IMAGE_VERSION} \
 
 build_img:

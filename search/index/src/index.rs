@@ -21,7 +21,7 @@ use crate::EncodedPostingList;
 use crate::EncodedPostingNode;
 use crate::EncodedSequentialObject;
 use crate::Entry;
-use crate::IdentityEncoder;
+use crate::{IdentityEncoder,VbyteEncoder};
 use crate::index_structs::{PosRange, Posting};
 use crate::PostingNode;
 use crate::PreIndex;
@@ -32,7 +32,7 @@ use parking_lot::{Mutex, MutexGuard, MappedMutexGuard};
 #[derive(Default)]
 pub struct Index{
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1>, // index map because we want to keep this sorted
+    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder>,1>, // index map because we want to keep this sorted
     pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
@@ -136,7 +136,7 @@ impl Index {
     }
 
 
-    pub fn get_postings(&self, token: &str) -> Option<Arc<Mutex<Entry<EncodedPostingNode<IdentityEncoder>,1>>>>
+    pub fn get_postings(&self, token: &str) -> Option<Arc<Mutex<Entry<EncodedPostingNode<VbyteEncoder>,1>>>>
     {
         self.posting_nodes.entry(token)
     }
@@ -175,7 +175,7 @@ impl Index {
 
         let total_posting_lists = p.posting_nodes.len();
         info!("Sorting {} posting lists", total_posting_lists);
-        let mut posting_nodes : DiskHashMap<String, EncodedPostingNode<IdentityEncoder>,1> = DiskHashMap::new(p.posting_nodes.capacity());
+        let mut posting_nodes : DiskHashMap<String, EncodedPostingNode<VbyteEncoder>,1> = DiskHashMap::new(p.posting_nodes.capacity());
 
         (0..p.posting_nodes.len()).for_each(|idx| {
 
