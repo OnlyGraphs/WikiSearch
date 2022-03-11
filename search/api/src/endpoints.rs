@@ -1,3 +1,4 @@
+use crate::RelationDocument;
 use crate::structs::SortType;
 use crate::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
@@ -18,7 +19,7 @@ use index::index_structs::Posting;
 use log::{debug, info};
 
 use parser::parser::parse_query;
-use retrieval::execute_relational_query;
+use retrieval::{execute_relational_query, ScoredRelationDocument};
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
@@ -255,11 +256,11 @@ pub async fn relational(
     let capped_max_results = min(q.max_results.0,150) as usize;
 
     let mut scored_documents = execute_relational_query(query, &idx);
-    scored_documents.sort_by(|a,b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // TODO; hmm
+    scored_documents.sort_by(|a,b| a.hops.partial_cmp(&b.hops).unwrap_or(std::cmp::Ordering::Equal)); // TODO; hmm
     scored_documents = scored_documents
         .into_iter()
         .take(capped_max_results)
-        .collect::<Vec<ScoredDocument>>();
+        .collect::<Vec<ScoredRelationDocument>>();
 
     // keep track of the translations between titles and ids
     // as well as the documents present in the query for later
@@ -286,19 +287,20 @@ pub async fn relational(
                     .try_get("abstracts")
                     .map_err(|e| APIError::new_internal_error(&e))?;
 
-                Ok::<Document, APIError>(Document {
+                Ok::<RelationDocument, APIError>(RelationDocument {
                     id: doc.doc_id,
                     title: title,
                     article_abstract: abstracts,
                     score: doc.score,
+                    hops: doc.hops,
                 })
             }
         })
         .collect::<FuturesUnordered<_>>()
-        .collect::<Vec<Result<Document, APIError>>>()
+        .collect::<Vec<Result<RelationDocument, APIError>>>()
         .await
         .into_iter()
-        .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
+        .collect::<Result<Vec<RelationDocument>, APIError>>()?; // fail on a single internal error
 
     let mut title_map: HashMap<u32, &str> = HashMap::with_capacity(documents.len());
     documents.iter().for_each(|d| {
@@ -310,7 +312,7 @@ pub async fn relational(
     // also there may be duplicates, need to retrieve this while crawling the graph
     let relations: HashSet<Relation> = scored_documents
         .iter()
-        .flat_map(|ScoredDocument { doc_id, score: _ }| {
+        .flat_map(|ScoredRelationDocument { doc_id, ..}| {
             idx.get_links(*doc_id)
                 .iter()
                 .filter_map(|target| {

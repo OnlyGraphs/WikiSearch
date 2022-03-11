@@ -44,7 +44,7 @@ impl PreIndex {
     }
 
     pub fn clean_cache(&self){
-        self.posting_nodes.clean_cache();
+        self.posting_nodes.clean_cache_all();
     }
 
 

@@ -8,7 +8,6 @@ export SEARCH_PORT=8000
 export RUST_LOG=warning,search_api=debug,index=debug,retrieval=debug,parser=debug,search_lib=debug,search_api=debug,actix_web=info
 export BACKEND=http://localhost:8000
 export RUST_BACKTRACE=1
-export CACHE_SIZE=10000000
 run_img: #build_img
 	docker run \
 		-e SEARCH_PORT \

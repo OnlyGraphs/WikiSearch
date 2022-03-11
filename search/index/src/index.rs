@@ -203,7 +203,8 @@ impl Index {
 
             // every R records, clean cache, and report progress
             if idx % index.posting_nodes.capacity() as usize == 0 {
-                info!("Sorted {}%, cache pop: {} ({}s)", (idx as f32 / total_posting_lists as f32) * 100.0,index.posting_nodes.clean_cache(),timer.elapsed().as_secs());
+                index.posting_nodes.clean_cache_all();
+                info!("Sorted {}% ({}s)", (idx as f32 / total_posting_lists as f32) * 100.0,timer.elapsed().as_secs());
                 timer = Instant::now();
                 
             }

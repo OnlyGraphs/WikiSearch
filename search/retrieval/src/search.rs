@@ -20,6 +20,13 @@ pub struct ScoredDocument {
     pub doc_id: u32,
 }
 
+#[derive(Debug, PartialEq, PartialOrd)]
+pub struct ScoredRelationDocument {
+    pub score: f64,
+    pub doc_id: u32,
+    pub hops: u8,
+}
+
 pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
     // first pass, preprocess
     let ref opts = ProcessingOptions::default();
@@ -258,7 +265,7 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
 }
 
 /// own endpoint for relational query, scoring for it should happen here (i.e. Page Rank)
-pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> Vec<ScoredDocument> {
+pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> Vec<ScoredRelationDocument> {
 
         if let Query::RelationQuery{root, hops, sub} = &**query{
             let mut subset = HashMap::default();
@@ -269,9 +276,10 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
                     execute_query(&v, index)
                             .filter_map(move |c| {
                                 if subset.contains_key(&c.document_id){
-                                    Some(ScoredDocument{
-                                        score: (*hops as f64 - *subset.get(&c.document_id).unwrap() as f64) * 100.0, // magic number, choose whatever you want
+                                    Some(ScoredRelationDocument{
+                                        score: 0.0, // PAGE RANK
                                         doc_id: c.document_id,
+                                        hops: *subset.get(&c.document_id).unwrap()
                                     })
                                 } else {
                                     None
@@ -281,9 +289,10 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
                 None => {
                     subset
                         .into_iter()
-                        .map(move |(id,score)| ScoredDocument {
+                        .map(move |(id,hops)| ScoredRelationDocument {
+                            score: 0.0, // PAGE RANK
                             doc_id: id,
-                            score: (*hops as f64 - score as f64) * 100.0, // magic number, choose whatever you want
+                            hops: hops, // magic number, choose whatever you want
                         })
                         .collect()
                 }
