@@ -302,7 +302,7 @@ where
             Some(s) => Arc::clone(s),
             None => {
                 self.insert(&k.to_owned(), V::default());
-                self.entry(k).unwrap()
+                self.entry(k).expect("This should not happen.")
             }
         }
     }

@@ -2,7 +2,10 @@ use index::{
     get_document_with_links, get_document_with_text, get_document_with_text_and_links, Index,
     Posting, PreIndex,
 };
-use parser::ast::{BinaryOp, Query, StructureElem, UnaryOp};
+use parser::{
+    ast::{BinaryOp, Query, StructureElem, UnaryOp},
+    parse_query,
+};
 use retrieval::{execute_query, get_docs_within_hops, search::preprocess_query};
 use std::collections::HashMap;
 
@@ -202,7 +205,7 @@ fn test_phrase_query() {
 fn test_wildcard_query() {
     let mut q = Query::WildcardQuery {
         prefix: "the".to_string(),
-        postfix: "bArs".to_string(),
+        suffix: "bArs".to_string(),
     };
 
     preprocess_query(&mut q).unwrap();
@@ -211,10 +214,282 @@ fn test_wildcard_query() {
         q,
         Query::WildcardQuery {
             prefix: "the".to_string(),
-            postfix: "bars".to_string(),
+            suffix: "bars".to_string(),
         }
     )
 }
+#[test]
+fn test_wildcard_execute_query_results() {
+    let mut pre_idx = PreIndex::default();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "aaa bbb")],
+            "hell",
+            vec!["eee world"],
+            "ggg hhh",
+        ))
+        .unwrap();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "iii aaa")],
+            "hellfire",
+            vec!["mmm nnn"],
+            "world ppp",
+        ))
+        .unwrap();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            4,
+            "d4",
+            vec![("", "iii aaa")],
+            "hellish environment",
+            vec!["mmm nnn"],
+            "world ppp",
+        ))
+        .unwrap();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            5,
+            "d5",
+            vec![("", "iii aaa")],
+            "hello world",
+            vec!["mmm nnn"],
+            "world ppp",
+        ))
+        .unwrap();
+
+    let idx = Index::from_pre_index(pre_idx);
+    println!("{:?}", idx.posting_nodes.entry_wild_card("hell*"));
+    println!("{:?}", idx.posting_nodes.entry("hellfire"));
+
+    assert_eq!(
+        execute_query(
+            &Box::new(Query::WildcardQuery {
+                //To represent hell*, where * is a placeholder for a single character
+                prefix: "hell".to_string(),
+                suffix: "".to_string(),
+            }),
+            &idx
+        )
+        .collect::<Vec<Posting>>(),
+        vec![Posting {
+            document_id: 5,
+            position: 2
+        }]
+    );
+}
+
+#[test]
+fn test_wildcard_execute_query_results_2() {
+    let mut pre_idx = PreIndex::default();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "d1",
+            vec![("", "aaa bbb")],
+            "shrine",
+            vec!["eee world"],
+            "ggg hhh",
+        ))
+        .unwrap();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "iii aaa")],
+            "swine",
+            vec!["mmm nnn"],
+            "world ppp",
+        ))
+        .unwrap();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "iii aaa")],
+            "spine",
+            vec!["mmm nnn"],
+            "world ppp",
+        ))
+        .unwrap();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            4,
+            "d4",
+            vec![("", "iii aaa")],
+            "sane",
+            vec!["mmm nnn"],
+            "world ppp",
+        ))
+        .unwrap();
+
+    let idx = Index::from_pre_index(pre_idx);
+
+    assert_eq!(
+        execute_query(
+            &Box::new(Query::WildcardQuery {
+                // to represent s*ine, where * is a SINGLE character placeholder. correct answers would be swine and spine
+                prefix: "s".to_string(),
+                suffix: "ine".to_string(),
+            }),
+            &idx
+        )
+        .collect::<Vec<Posting>>(),
+        vec![
+            Posting {
+                document_id: 2,
+                position: 2
+            },
+            Posting {
+                document_id: 3,
+                position: 2
+            },
+        ]
+    );
+}
+
+// #[test]
+// fn test_parse_and_execute_on_wildcard_complex_query() {
+//     let mut pre_idx = PreIndex::default();
+
+//     pre_idx
+//         .add_document(get_document_with_text(
+//             1,
+//             "d1",
+//             vec![("", "aaa bbb")],
+//             "shrine",
+//             vec!["eee world"],
+//             "ggg hhh",
+//         ))
+//         .unwrap();
+
+//     pre_idx
+//         .add_document(get_document_with_text(
+//             2,
+//             "d2",
+//             vec![("", "iii aaa")],
+//             "cast pearls before swine",
+//             vec!["mmm nnn"],
+//             "world ppp",
+//         ))
+//         .unwrap();
+
+//     pre_idx
+//         .add_document(get_document_with_text(
+//             3,
+//             "d3",
+//             vec![("", "iii aaa")],
+//             "strong spine",
+//             vec!["mmm nnn"],
+//             "world ppp",
+//         ))
+//         .unwrap();
+
+//     pre_idx
+//         .add_document(get_document_with_text(
+//             4,
+//             "d4",
+//             vec![("", "iii aaa")],
+//             "sane",
+//             vec!["mmm nnn"],
+//             "world ppp",
+//         ))
+//         .unwrap();
+
+//     let idx = Index::from_pre_index(pre_idx);
+//     let q = "#DIST,3,pearls,sw*ne";
+//     let (_, ref mut query) = parse_query(q).unwrap();
+
+//     let postings_query = execute_query(query, &idx);
+//     let computed_postings = postings_query.collect::<Vec<Posting>>();
+//     assert_eq!(
+//         computed_postings,
+//         vec![Posting {
+//             document_id: 2,
+//             position: 3
+//         },]
+//     );
+// }
+
+// #[test]
+// fn test_parse_and_execute_on_wildcard_complex_query_2() {
+//     let mut pre_idx = PreIndex::default();
+
+//     pre_idx
+//         .add_document(get_document_with_text(
+//             1,
+//             "d1",
+//             vec![("", "aaa bbb")],
+//             "change of heart",
+//             vec!["eee world"],
+//             "ggg hhh",
+//         ))
+//         .unwrap();
+
+//     pre_idx
+//         .add_document(get_document_with_text(
+//             2,
+//             "d2",
+//             vec![("", "iii aaa")],
+//             "scare",
+//             vec!["mmm nnn"],
+//             "world ppp",
+//         ))
+//         .unwrap();
+
+//     pre_idx
+//         .add_document(get_document_with_text(
+//             3,
+//             "d3",
+//             vec![("", "iii aaa")],
+//             "spare change",
+//             vec!["mmm nnn"],
+//             "world ppp",
+//         ))
+//         .unwrap();
+
+//     let idx = Index::from_pre_index(pre_idx);
+
+//     let q = "change s*are ";
+//     let (_, ref mut query) = parse_query(q).unwrap();
+
+//     let postings_query = execute_query(query, &idx);
+//     let computed_postings = postings_query.collect::<Vec<Posting>>();
+
+//     assert_eq!(
+//         computed_postings,
+//         vec![
+//             Posting {
+//                 document_id: 1,
+//                 position: 2
+//             },
+//             Posting {
+//                 document_id: 2,
+//                 position: 2
+//             },
+//             Posting {
+//                 document_id: 3,
+//                 position: 2
+//             },
+//             Posting {
+//                 document_id: 3,
+//                 position: 3
+//             }
+//         ]
+//     );
+// }
 
 macro_rules! map {
     ( $( ($x:expr,$y:expr) ),* ) => {  // Match zero or more comma delimited items

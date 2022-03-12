@@ -60,8 +60,8 @@ pub enum Query {
         sub: Option<Box<Query>>,
     },
     WildcardQuery {
-        prefix: String,  // before wildcard
-        postfix: String, // after wildcard
+        prefix: String, // before wildcard
+        suffix: String, // after wildcard
     },
     FreetextQuery {
         tokens: Vec<String>,

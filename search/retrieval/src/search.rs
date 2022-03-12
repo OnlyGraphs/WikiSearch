@@ -84,15 +84,15 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
         }
         Query::WildcardQuery {
             ref mut prefix,
-            ref mut postfix,
+            ref mut suffix,
         } => {
             // *prefix = prefix.to_lowercase(); // needs a more thorough look
-            // *postfix = postfix.to_lowercase();
+            // *suffix = suffix.to_lowercase();
             *prefix = Preprocessor::process(opts_wild_card, prefix.to_string())
                 .into_iter()
                 .filter(|w| !w.trim().is_empty())
                 .collect();
-            *postfix = Preprocessor::process(opts_wild_card, postfix.to_string())
+            *suffix = Preprocessor::process(opts_wild_card, suffix.to_string())
                 .into_iter()
                 .filter(|w| !w.trim().is_empty())
                 .collect();
@@ -194,13 +194,13 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
         }
         Query::WildcardQuery {
             ref prefix,
-            ref postfix,
+            ref suffix,
         } => {
             let init = PostingIterator::new(empty::<Posting>());
             let mut wild_token: String = "".to_string();
             wild_token.push_str(prefix);
             wild_token.push_str("*");
-            wild_token.push_str(postfix);
+            wild_token.push_str(suffix);
             let vec_encoded_postings = index.posting_nodes.entry_wild_card(&wild_token);
             vec_encoded_postings.iter().fold(init, |a, iter| {
                 PostingIterator::new(UnionMergeIterator::new(

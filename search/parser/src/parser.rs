@@ -105,10 +105,10 @@ pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
     alt((
         parse_relation_query,
         parse_dist_query,
+        parse_wildcard_query,
         parse_binary_query,
         parse_not_query,
         parse_structure_query,
-        parse_wildcard_query,
         parse_freetext_query,
         parse_phrase_query,
     ))(nxt)
@@ -263,7 +263,7 @@ pub fn parse_wildcard_query(nxt: &str) -> IResult<&str, Box<Query>> {
         nxt,
         Box::new(Query::WildcardQuery {
             prefix: lhs.to_string(),
-            postfix: rhs.to_string(),
+            suffix: rhs.to_string(),
         }),
     ))
 }

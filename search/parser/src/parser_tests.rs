@@ -228,7 +228,7 @@ fn test_parse_simple_wildcard_query() {
     let query = "p*kin";
     let expected = Query::WildcardQuery {
         prefix: "p".to_string(),
-        postfix: "kin".to_string(),
+        suffix: "kin".to_string(),
     };
     let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
@@ -241,7 +241,7 @@ fn test_parse_wildcard_query_with_whitespace() {
     let query = " p * kin           ";
     let expected = Query::WildcardQuery {
         prefix: "p".to_string(),
-        postfix: "kin".to_string(),
+        suffix: "kin".to_string(),
     };
     let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
@@ -254,7 +254,7 @@ fn test_parse_wildcard_query_no_prefix() {
     let query = "*kin";
     let expected = Query::WildcardQuery {
         prefix: "".to_string(),
-        postfix: "kin".to_string(),
+        suffix: "kin".to_string(),
     };
     let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
@@ -267,7 +267,7 @@ fn test_parse_simple_wildcard_query_no_suffix() {
     let query = "p*";
     let expected = Query::WildcardQuery {
         prefix: "p".to_string(),
-        postfix: "".to_string(),
+        suffix: "".to_string(),
     };
     let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
     match *wildcard_query {
@@ -280,7 +280,7 @@ fn test_wildcard_query() {
     let query = "a*ril";
     let expected = Box::new(Query::WildcardQuery {
         prefix: "a".to_string(),
-        postfix: "ril".to_string(),
+        suffix: "ril".to_string(),
     });
     assert_eq!(parse_query(query), Ok(("", expected)));
 }
@@ -290,7 +290,7 @@ fn test_wildcard_query_2() {
     let query = "alche*";
     let expected = Box::new(Query::WildcardQuery {
         prefix: "alche".to_string(),
-        postfix: "".to_string(),
+        suffix: "".to_string(),
     });
     assert_eq!(parse_query(query), Ok(("", expected)));
 }
