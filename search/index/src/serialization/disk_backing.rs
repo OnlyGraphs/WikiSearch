@@ -14,8 +14,11 @@ use default_env::default_env;
 use indexmap::IndexMap;
 use log::info;
 use parking_lot::Mutex;
-use ternary_tree::Tst;
+use ternary_tree::{Tst, TstCrosswordIterator, TstNeighborIterator};
 use utils::MemFootprintCalculator;
+
+use crate::EncodedPostingNode;
+use crate::VbyteEncoder;
 
 pub struct Iter {
     max_len: usize,
@@ -299,10 +302,16 @@ where
             Some(s) => Arc::clone(s),
             None => {
                 self.insert(&k.to_owned(), V::default());
-                // self.entry(k).expect("This shouldn't happen")
                 self.entry(k).unwrap()
             }
         }
+    }
+    pub fn entry_wild_card(&self, k: &str) -> Vec<Arc<Mutex<Entry<V, ID>>>> {
+        let mut v = Vec::new();
+
+        self.map
+            .visit_crossword_values(k, '*', |s| v.push(s.clone()));
+        v
     }
 
     pub fn path() -> PathBuf {

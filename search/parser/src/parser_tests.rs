@@ -276,6 +276,26 @@ fn test_parse_simple_wildcard_query_no_suffix() {
 }
 
 #[test]
+fn test_wildcard_query() {
+    let query = "a*ril";
+    let expected = Box::new(Query::WildcardQuery {
+        prefix: "a".to_string(),
+        postfix: "ril".to_string(),
+    });
+    assert_eq!(parse_query(query), Ok(("", expected)));
+}
+
+#[test]
+fn test_wildcard_query_2() {
+    let query = "alche*";
+    let expected = Box::new(Query::WildcardQuery {
+        prefix: "alche".to_string(),
+        postfix: "".to_string(),
+    });
+    assert_eq!(parse_query(query), Ok(("", expected)));
+}
+
+#[test]
 fn test_compound_query_or_and() {
     let query = "pumpkin pie OR pumpkin AND patch";
 

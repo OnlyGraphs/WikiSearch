@@ -1,8 +1,10 @@
-use index::{get_document_with_links, Index, PreIndex, get_document_with_text, Posting, get_document_with_text_and_links};
+use index::{
+    get_document_with_links, get_document_with_text, get_document_with_text_and_links, Index,
+    Posting, PreIndex,
+};
 use parser::ast::{BinaryOp, Query, StructureElem, UnaryOp};
-use retrieval::{search::preprocess_query, get_docs_within_hops, execute_query};
-use std::collections::{HashMap};
-
+use retrieval::{execute_query, get_docs_within_hops, search::preprocess_query};
+use std::collections::HashMap;
 
 #[test]
 fn test_single_word() {
@@ -214,8 +216,6 @@ fn test_wildcard_query() {
     )
 }
 
-
-
 macro_rules! map {
     ( $( ($x:expr,$y:expr) ),* ) => {  // Match zero or more comma delimited items
         {
@@ -230,75 +230,95 @@ macro_rules! map {
 
 #[test]
 fn test_docs_within_hops_line() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_links(0, "A", "B")) .unwrap();
-    pre_idx.add_document(get_document_with_links(1, "B", "C")).unwrap();
-    pre_idx.add_document(get_document_with_links(2, "C", "D")).unwrap();
-    pre_idx.add_document(get_document_with_links(3, "D", "E")).unwrap();
-    pre_idx.add_document(get_document_with_links(4, "E", "")).unwrap();
+    pre_idx
+        .add_document(get_document_with_links(0, "A", "B"))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(1, "B", "C"))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(2, "C", "D"))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(3, "D", "E"))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(4, "E", ""))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
     let mut out = HashMap::default();
-    get_docs_within_hops(0,1, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1)]);
+    get_docs_within_hops(0, 1, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1)]);
     out.clear();
 
-    get_docs_within_hops(0,2, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1),(2,2)]);
+    get_docs_within_hops(0, 2, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1), (2, 2)]);
     out.clear();
 
-    get_docs_within_hops(0,3, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3)]);
+    get_docs_within_hops(0, 3, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1), (2, 2), (3, 3)]);
     out.clear();
 
-    get_docs_within_hops(0,4, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3),(4,4)]);
+    get_docs_within_hops(0, 4, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]);
     out.clear();
 
-    get_docs_within_hops(0,5, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3),(4,4)]);
+    get_docs_within_hops(0, 5, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]);
     out.clear();
 }
 
 #[test]
 fn test_docs_within_hops_inverse_line() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_links(0, "A", "")) .unwrap();
-    pre_idx.add_document(get_document_with_links(1, "B", "A")).unwrap();
-    pre_idx.add_document(get_document_with_links(2, "C", "B")).unwrap();
-    pre_idx.add_document(get_document_with_links(3, "D", "C")).unwrap();
-    pre_idx.add_document(get_document_with_links(4, "E", "D")).unwrap();
+    pre_idx
+        .add_document(get_document_with_links(0, "A", ""))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(1, "B", "A"))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(2, "C", "B"))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(3, "D", "C"))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(4, "E", "D"))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
     let mut out = HashMap::default();
-    get_docs_within_hops(0,1, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1)]);
+    get_docs_within_hops(0, 1, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1)]);
     out.clear();
 
-    get_docs_within_hops(0,2, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1),(2,2)]);
+    get_docs_within_hops(0, 2, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1), (2, 2)]);
     out.clear();
 
-    get_docs_within_hops(0,3, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3)]);
+    get_docs_within_hops(0, 3, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1), (2, 2), (3, 3)]);
     out.clear();
 
-    get_docs_within_hops(0,4, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3),(4,4)]);
+    get_docs_within_hops(0, 4, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]);
     out.clear();
 
-    get_docs_within_hops(0,5, &mut out, &idx);
-    assert_eq!(out,map![(0,0),(1,1),(2,2),(3,3),(4,4)]);
+    get_docs_within_hops(0, 5, &mut out, &idx);
+    assert_eq!(out, map![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]);
     out.clear();
 }
 
 #[test]
 fn test_docs_within_hops_complex() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
     //               2   3
     //               C - D
     //               |
@@ -306,11 +326,21 @@ fn test_docs_within_hops_complex() {
     //               |
     //               E 4
 
-    pre_idx.add_document(get_document_with_links(0, "A", "")) .unwrap();
-    pre_idx.add_document(get_document_with_links(1, "B", "A\tE")).unwrap();
-    pre_idx.add_document(get_document_with_links(2, "C", "B\tD")).unwrap();
-    pre_idx.add_document(get_document_with_links(3, "D", "")).unwrap();
-    pre_idx.add_document(get_document_with_links(4, "E", "")).unwrap();
+    pre_idx
+        .add_document(get_document_with_links(0, "A", ""))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(1, "B", "A\tE"))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(2, "C", "B\tD"))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(3, "D", ""))
+        .unwrap();
+    pre_idx
+        .add_document(get_document_with_links(4, "E", ""))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -319,43 +349,44 @@ fn test_docs_within_hops_complex() {
     // assert_eq!(out,map![(1,0)]);
     // out.clear();
 
-    get_docs_within_hops(1,1, &mut out, &idx);
-    assert_eq!(out,map![(1,0),(0,1),(2,1),(4,1)]);
+    get_docs_within_hops(1, 1, &mut out, &idx);
+    assert_eq!(out, map![(1, 0), (0, 1), (2, 1), (4, 1)]);
     out.clear();
 
-    get_docs_within_hops(1,2, &mut out, &idx);
-    assert_eq!(out,map![(1,0),(0,1),(2,1),(4,1),(3,2)]);
+    get_docs_within_hops(1, 2, &mut out, &idx);
+    assert_eq!(out, map![(1, 0), (0, 1), (2, 1), (4, 1), (3, 2)]);
     out.clear();
 
-    get_docs_within_hops(3,2, &mut out, &idx);
-    assert_eq!(out,map![(1,2),(2,1),(3,0)]);
+    get_docs_within_hops(3, 2, &mut out, &idx);
+    assert_eq!(out, map![(1, 2), (2, 1), (3, 0)]);
     out.clear();
-
 }
 
 #[test]
 fn test_one_word_query() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "aaa bbb")],
-        "ccc ddd",
-        vec!["eee ddd"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "aaa bbb")],
+            "ccc ddd",
+            vec!["eee ddd"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "aaa bbb")],
-        "ccc ddd",
-        vec!["eee ddd"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "aaa bbb")],
+            "ccc ddd",
+            vec!["eee ddd"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -365,7 +396,8 @@ fn test_one_word_query() {
                 tokens: vec!["ddd".to_string()]
             }),
             &idx
-        ).collect::<Vec<Posting>>(),
+        )
+        .collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 2,
@@ -389,27 +421,29 @@ fn test_one_word_query() {
 
 #[test]
 fn test_and_query() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "aaa bbb")],
-        "ccc hello",
-        vec!["eee world"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "aaa bbb")],
+            "ccc hello",
+            vec!["eee world"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "iii aaa")],
-        "hello lll",
-        vec!["mmm nnn"],
-        "world ppp",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "iii aaa")],
+            "hello lll",
+            vec!["mmm nnn"],
+            "world ppp",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -425,7 +459,8 @@ fn test_and_query() {
                 }),
             }),
             &idx
-        ).collect::<Vec<Posting>>(),
+        )
+        .collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 2,
@@ -449,27 +484,29 @@ fn test_and_query() {
 
 #[test]
 fn test_multiple_word_query_same_as_or() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "aaa bbb")],
-        "ccc hello",
-        vec!["eee world"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "aaa bbb")],
+            "ccc hello",
+            vec!["eee world"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "iii jjj")],
-        "hello lll",
-        vec!["mmm nnn"],
-        "ooo ppp",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "iii jjj")],
+            "hello lll",
+            vec!["mmm nnn"],
+            "ooo ppp",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -479,7 +516,8 @@ fn test_multiple_word_query_same_as_or() {
                 tokens: vec!["hello".to_string(), "world".to_string()]
             }),
             &idx
-        ).collect::<Vec<Posting>>(),
+        )
+        .collect::<Vec<Posting>>(),
         execute_query(
             &Box::new(Query::BinaryQuery {
                 op: BinaryOp::Or,
@@ -491,7 +529,8 @@ fn test_multiple_word_query_same_as_or() {
                 }),
             }),
             &idx
-        ).collect::<Vec<Posting>>()
+        )
+        .collect::<Vec<Posting>>()
     );
 }
 
@@ -570,27 +609,29 @@ fn test_multiple_word_query_same_as_or() {
 
 #[test]
 fn test_distance_query_execute() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "world hello")],
-        "hello ddd",
-        vec!["world world"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "world hello")],
+            "hello ddd",
+            vec!["world world"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "iii world")],
-        "hello lll",
-        vec!["hello world"],
-        "ooo ppp",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "iii world")],
+            "hello lll",
+            vec!["hello world"],
+            "ooo ppp",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -602,7 +643,8 @@ fn test_distance_query_execute() {
                 rhs: "world".to_string(),
             }),
             &idx
-        ).collect::<Vec<Posting>>(),
+        )
+        .collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 2,
@@ -630,17 +672,18 @@ fn test_distance_query_execute() {
 
 #[test]
 fn test_distance_query_overlap() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "dddd dddd")],
-        "hello ddd",
-        vec!["world world"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "dddd dddd")],
+            "hello ddd",
+            vec!["world world"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -652,7 +695,8 @@ fn test_distance_query_overlap() {
                 rhs: "world".to_string(),
             }),
             &idx
-        ).collect::<Vec<Posting>>(),
+        )
+        .collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 3,
@@ -672,27 +716,29 @@ fn test_distance_query_overlap() {
 
 #[test]
 fn test_phrase_query_execute() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "world hello")],
-        "hello world",
-        vec!["eee world"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "world hello")],
+            "hello world",
+            vec!["eee world"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "iii world")],
-        "hello lll",
-        vec!["hello world"],
-        "ooo ppp",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "iii world")],
+            "hello lll",
+            vec!["hello world"],
+            "ooo ppp",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -702,7 +748,8 @@ fn test_phrase_query_execute() {
                 tks: vec!["hello".to_string(), "world".to_string()]
             }),
             &idx
-        ).collect::<Vec<Posting>>(),
+        )
+        .collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 2,
@@ -726,27 +773,29 @@ fn test_phrase_query_execute() {
 
 #[test]
 fn test_phrase_query_multiple() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "world hello")],
-        "hello world momma",
-        vec!["eee world"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "world hello")],
+            "hello world momma",
+            vec!["eee world"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "iii world")],
-        "hello lll",
-        vec!["hello world"],
-        "ooo ppp",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "iii world")],
+            "hello lll",
+            vec!["hello world"],
+            "ooo ppp",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -759,7 +808,8 @@ fn test_phrase_query_multiple() {
             ],
         }),
         &idx,
-    ).collect::<Vec<Posting>>();
+    )
+    .collect::<Vec<Posting>>();
 
     out.dedup(); // allow consecutive duplicates (due to overlaps)
 
@@ -784,27 +834,29 @@ fn test_phrase_query_multiple() {
 
 #[test]
 fn test_phrase_query_multiple_same_start() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "hello world momma")],
-        "fff eee ddd",
-        vec!["eee world"],
-        "hello world",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "hello world momma")],
+            "fff eee ddd",
+            vec!["eee world"],
+            "hello world",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "hello world momma")],
-        "hello world",
-        vec!["hello world"],
-        "ooo ppp",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "hello world momma")],
+            "hello world",
+            vec!["hello world"],
+            "ooo ppp",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -817,7 +869,8 @@ fn test_phrase_query_multiple_same_start() {
             ],
         }),
         &idx,
-    ).collect::<Vec<Posting>>();
+    )
+    .collect::<Vec<Posting>>();
     out.dedup(); // allow consecutive duplicates due to overlaps
 
     assert_eq!(
@@ -853,27 +906,29 @@ fn test_phrase_query_multiple_same_start() {
 
 #[test]
 fn test_structure_search_citation() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "aaa bbb")],
-        "hello world",
-        vec!["hello world"],
-        "ggg hhh",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "aaa bbb")],
+            "hello world",
+            vec!["hello world"],
+            "ggg hhh",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "hello world")],
-        "hello world",
-        vec!["ddd ddd"],
-        "ooo ppp",
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "hello world")],
+            "hello world",
+            vec!["ddd ddd"],
+            "ooo ppp",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -886,7 +941,8 @@ fn test_structure_search_citation() {
                 })
             }),
             &idx
-        ).collect::<Vec<Posting>>(),
+        )
+        .collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 3,
@@ -900,79 +956,80 @@ fn test_structure_search_citation() {
     );
 }
 
-
 #[test]
 fn test_relational_search() {
-    let mut pre_idx= PreIndex::default();
+    let mut pre_idx = PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text_and_links(
-        0,
-        "A",
-        vec![("", "aaa hello")],
-        "helasdlo world",
-        vec!["asd world"],
-        "ggg hhh",
+    pre_idx
+        .add_document(get_document_with_text_and_links(
+            0,
+            "A",
+            vec![("", "aaa hello")],
+            "helasdlo world",
+            vec!["asd world"],
+            "ggg hhh",
+            "B",
+        ))
+        .unwrap();
 
-        "B"
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text_and_links(
+            1,
+            "B",
+            vec![("", "hello world")],
+            "asd asd",
+            vec!["ddd ddd"],
+            "ooo ppp",
+            "",
+        ))
+        .unwrap();
 
-    pre_idx.add_document(get_document_with_text_and_links(
-        1,
-        "B",
-        vec![("", "hello world")],
-        "asd asd",
-        vec!["ddd ddd"],
-        "ooo ppp",
-        ""
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text_and_links(
+            2,
+            "C",
+            vec![("", "hello world")],
+            "asd world",
+            vec!["ddd ddd"],
+            "ooo ppp",
+            "B\tD",
+        ))
+        .unwrap();
 
-
-    pre_idx.add_document(get_document_with_text_and_links(
-        2,
-        "C",
-        vec![("", "hello world")],
-        "asd world",
-        vec!["ddd ddd"],
-        "ooo ppp",
-        "B\tD"
-    ))
-    .unwrap();
-
-    pre_idx.add_document(get_document_with_text_and_links(
-        3,
-        "D",
-        vec![("", "hello world")],
-        "asd world",
-        vec!["ddd ddd"],
-        "ooo ppp",
-        ""
-    ))
-    .unwrap();
+    pre_idx
+        .add_document(get_document_with_text_and_links(
+            3,
+            "D",
+            vec![("", "hello world")],
+            "asd world",
+            vec!["ddd ddd"],
+            "ooo ppp",
+            "",
+        ))
+        .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
-    let q = |i| Box::new(Query::RelationQuery {
-        root: 0,
-        hops: i,
-        sub: Some(Box::new(Query::FreetextQuery {
-            tokens: vec!["hello".to_string()]
-        }))
-    });
+    let q = |i| {
+        Box::new(Query::RelationQuery {
+            root: 0,
+            hops: i,
+            sub: Some(Box::new(Query::FreetextQuery {
+                tokens: vec!["hello".to_string()],
+            })),
+        })
+    };
 
     assert_eq!(
-        execute_query(&q(0),&idx).collect::<Vec<Posting>>(),
-        vec![
-            Posting {
-                document_id: 0,
-                position: 1
-            }
-        ]
+        execute_query(&q(0), &idx).collect::<Vec<Posting>>(),
+        vec![Posting {
+            document_id: 0,
+            position: 1
+        }]
     );
 
     assert_eq!(
-        execute_query(&q(1),&idx).collect::<Vec<Posting>>(),
+        execute_query(&q(1), &idx).collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 0,
@@ -986,7 +1043,7 @@ fn test_relational_search() {
     );
 
     assert_eq!(
-        execute_query(&q(2),&idx).collect::<Vec<Posting>>(),
+        execute_query(&q(2), &idx).collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 0,
@@ -1003,9 +1060,8 @@ fn test_relational_search() {
         ]
     );
 
-
     assert_eq!(
-        execute_query(&q(3),&idx).collect::<Vec<Posting>>(),
+        execute_query(&q(3), &idx).collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 0,
@@ -1027,12 +1083,15 @@ fn test_relational_search() {
     );
 
     assert_eq!(
-        execute_query(&Box::new(Query::RelationQuery {
+        execute_query(
+            &Box::new(Query::RelationQuery {
                 root: 0,
                 hops: 3,
                 sub: None
-            })
-            ,&idx).collect::<Vec<Posting>>(),
+            }),
+            &idx
+        )
+        .collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 0,

@@ -108,8 +108,11 @@ impl PreIndex {
 
     fn add_tokens(&mut self, doc_id: u32, text_to_add: &str, mut word_pos: u32) -> u32 {
         for token in text_to_add.split(" ") {
-            self.add_posting(token, doc_id, word_pos);
-            word_pos += 1;
+            //Ensure no empty tokens are passed
+            if token != "" {
+                self.add_posting(token, doc_id, word_pos);
+                word_pos += 1;
+            }
         }
         return word_pos;
     }

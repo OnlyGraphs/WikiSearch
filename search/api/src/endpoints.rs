@@ -3,8 +3,8 @@ use crate::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
     SearchParameters, UserFeedback,
 };
+use actix_web::http::header::ContentType;
 use actix_web::ResponseError;
-use actix_web::http::header::{ContentType};
 use actix_web::{
     get,
     http::StatusCode,
@@ -22,7 +22,7 @@ use retrieval::execute_relational_query;
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
-use std::cmp::{Ordering, min};
+use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display};
 
@@ -42,7 +42,11 @@ impl fmt::Display for APIError {
 
 impl fmt::Debug for APIError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("APIError").field("code", &self.code).field("msg", &self.msg).field("hidden_msg", &self.hidden_msg).finish()
+        f.debug_struct("APIError")
+            .field("code", &self.code)
+            .field("msg", &self.msg)
+            .field("hidden_msg", &self.hidden_msg)
+            .finish()
     }
 }
 
@@ -55,27 +59,26 @@ impl ResponseError for APIError {
 impl APIError {
     fn error_response(&self) -> HttpResponse {
         HttpResponse::build(self.status_code())
-        .insert_header(ContentType::html())
-        .body(self.to_string())
+            .insert_header(ContentType::html())
+            .body(self.to_string())
     }
 
-    fn new_user_error<T : Display, O : Display>( user_msg : &T, hidden_msg : &O) -> Self {
-        APIError{
+    fn new_user_error<T: Display, O: Display>(user_msg: &T, hidden_msg: &O) -> Self {
+        APIError {
             code: StatusCode::UNPROCESSABLE_ENTITY,
             hidden_msg: hidden_msg.to_string(),
             msg: user_msg.to_string(),
         }
     }
 
-    fn new_internal_error<T : Display + ?Sized>( hidden_msg : &T) -> Self {
-        APIError{
+    fn new_internal_error<T: Display + ?Sized>(hidden_msg: &T) -> Self {
+        APIError {
             code: StatusCode::INTERNAL_SERVER_ERROR,
             hidden_msg: hidden_msg.to_string(),
             msg: "Something went wrong, please try again later!".to_string(),
         }
     }
 }
-
 
 impl std::error::Error for APIError {}
 
@@ -93,7 +96,6 @@ pub async fn search(
     data: Data<RESTSearchData>,
     q: Query<SearchParameters>,
 ) -> Result<impl Responder, APIError> {
-
     info!("received query: {}", q.query);
 
     let timer = Instant::now();
@@ -103,28 +105,32 @@ pub async fn search(
         .max_connections(1)
         .connect(&data.connection_string)
         .await
-        .map_err(|_e| APIError::new_internal_error("Failed to initialise connection with postgres"))?;
+        .map_err(|_e| {
+            APIError::new_internal_error("Failed to initialise connection with postgres")
+        })?;
 
     // construct + execute query
     let idx = data
         .index_rest
         .read()
         .map_err(|e| APIError::new_internal_error(&e))?;
-    let (_, ref mut query) = parse_query(&q.query)
-        .map_err(|e| APIError::new_user_error(&e,&e))?;
-    
+    let (_, ref mut query) = parse_query(&q.query).map_err(|e| APIError::new_user_error(&e, &e))?;
     info!("preprocessing query: {}", q.query);
-    preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
+    preprocess_query(query).map_err(|e| APIError::new_user_error(&e, &e))?;
 
     info!("executing query: {}", q.query);
 
     let postings_query = execute_query(query, &idx);
     info!("collecting query: {}", q.query);
     let mut postings = postings_query.collect::<Vec<Posting>>();
-
+    //TODO! Test on ap*il, a*, and *p
+    //TODO! Spell correct under here. Check if postings empty, if they are run teranry neighbour values
+    // if postings.is_empty() {
+    //     APIError::new_user_error(&e, &e))
+    // }
     info!("sorting query: {}", q.query);
 
-    let capped_max_results = min(q.results_per_page.0,150);
+    let capped_max_results = min(q.results_per_page.0, 150);
     // score documents if necessary and sort appropriately
     let ordered_docs: Vec<ScoredDocument> = match q.sort_by {
         SortType::Relevance => {
@@ -192,7 +198,7 @@ pub async fn search(
         .into_iter()
         .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
 
-    info!("Query: {} took: {}s",&q.query, timer.elapsed().as_secs());
+    info!("Query: {} took: {}s", &q.query, timer.elapsed().as_secs());
 
     Ok(Json(future_documents))
 }
@@ -203,9 +209,7 @@ pub async fn relational(
     data: Data<RESTSearchData>,
     q: Query<RelationalSearchParameters>,
 ) -> Result<impl Responder, APIError> {
-
     let timer = Instant::now();
-
 
     let pool = PgPoolOptions::new()
         .max_connections(1)
@@ -222,9 +226,15 @@ pub async fn relational(
     .bind(q.root.clone())
     .fetch_one(&pool)
     .await
-    .map_err(|e| APIError::new_user_error(
-        &format!("The root article provided `{}` is not a valid root article title",q.root),&e))?;
-    
+    .map_err(|e| {
+        APIError::new_user_error(
+            &format!(
+                "The root article provided `{}` is not a valid root article title",
+                q.root
+            ),
+            &e,
+        )
+    })?;
 
     let root_id: i64 = root_article
         .try_get("articleid")
@@ -234,8 +244,6 @@ pub async fn relational(
         .index_rest
         .read()
         .map_err(|e| APIError::new_internal_error(&e))?;
-    
-    
     let query_string = format!(
         "#LINKSTO, {},{} {}",
         root_id,
@@ -243,18 +251,18 @@ pub async fn relational(
         q.query
             .clone()
             .map(|v| format!(",{}", v))
-            .unwrap_or("".to_string()));
+            .unwrap_or("".to_string())
+    );
 
-    let (_, ref mut query) = parse_query(&query_string)
-        .map_err(|e| APIError::new_user_error(&e,&e))?;
+    let (_, ref mut query) =
+        parse_query(&query_string).map_err(|e| APIError::new_user_error(&e, &e))?;
 
+    preprocess_query(query).map_err(|e| APIError::new_user_error(&e, &e))?;
 
-    preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
-
-    let capped_max_results = min(q.max_results.0,150) as usize;
+    let capped_max_results = min(q.max_results.0, 150) as usize;
 
     let mut scored_documents = execute_relational_query(query, &idx);
-    scored_documents.sort_by(|a,b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // TODO; hmm
+    scored_documents.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // TODO; hmm
     scored_documents = scored_documents
         .into_iter()
         .take(capped_max_results)
@@ -310,7 +318,7 @@ pub async fn relational(
     let relations: HashSet<Relation> = scored_documents
         .iter()
         .flat_map(|ScoredDocument { doc_id, score: _ }| {
-            debug!("DOC: {}",doc_id);
+            debug!("DOC: {}", doc_id);
             idx.get_links(*doc_id)
                 .iter()
                 .filter_map(|target| {
@@ -337,7 +345,11 @@ pub async fn relational(
         })
         .collect();
 
-    info!("Relational Query: {:?} took: {}s",&q.query, timer.elapsed().as_secs());
+    info!(
+        "Relational Query: {:?} took: {}s",
+        &q.query,
+        timer.elapsed().as_secs()
+    );
 
     Ok(Json(RelationSearchOutput {
         documents: documents,

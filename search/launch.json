@@ -1,16 +1,59 @@
 {
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch 'Search' LLDB",
             "type": "lldb",
             "request": "launch",
-            "name": "Rust Debug Launch",
-            "cwd": "${workspaceRoot}",
-            "cargo":{
-                "args": ["test","--workspace"],
+            "program": "${workspaceRoot}/search/target/debug/search_api",
+            "args": [],
+            "cwd": "${workspaceRoot}/search",
+            "env": {
+                "SEARCH_PORT": "8000",
+                "GRPC_PORT": "50051",
+                "DATABASE_URL": "postgresql://postgres:password@localhost:8001/only_graph",
+                "SQLX_OFFLINE": "true",
+                "CACHE_SIZE": "10000000",
+                "STATIC_DIR": "${workspaceRoot}/search/staticfiles",
+                "RUST_LOG": "debug"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'search'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=search",
+                    "--package=search"
+                ],
+                "filter": {
+                    "name": "search",
+                    "kind": "bin"
+                }
             },
-            "args": ["cd","search"],
-            "sourceLanguages": ["rust"]
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'search'",
+            "cargo": {
+                "args": [
+                    "test",
+                ],
+                "filter": {
+                    "name": "search_api",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}/search"
         }
     ]
 }
