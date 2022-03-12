@@ -313,6 +313,15 @@ where
             .visit_crossword_values(k, '*', |s| v.push(s.clone()));
         v
     }
+    pub fn find_nearest_neighbour_keys(&self, k: &str, distance_to_key: usize) -> (String, String) {
+        let mut it = self.map.iter_neighbor(k, distance_to_key);
+        let _ = it.next();
+        let first_key = it.current_key();
+        let _ = it.next();
+        let second_key = it.current_key();
+
+        return (first_key, second_key);
+    }
 
     pub fn path() -> PathBuf {
         PathBuf::from(format!(

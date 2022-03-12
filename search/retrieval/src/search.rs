@@ -4,6 +4,7 @@ use index::{index::Index, index_structs::Posting, PosRange};
 
 use itertools::Itertools;
 
+use log::info;
 use parser::errors::{QueryError, QueryErrorKind};
 use parser::{ast::Query, BinaryOp, UnaryOp};
 use preprocessor::{Normalisation, Preprocessor, ProcessingOptions};
@@ -18,6 +19,28 @@ use utils::utils::merge;
 pub struct ScoredDocument {
     pub score: f64,
     pub doc_id: u32,
+}
+
+// Naive way of doing spell correction.
+pub fn investigate_query_naive_correction<'a>(query: &'a mut Box<Query>, index: &'a Index) {
+    let mut tries = 2;
+    let mut distance_to_key = 2;
+    while tries > 0 {
+        if let Query::FreetextQuery { ref mut tokens } = **query {
+            let (first_key, second_key) = index.posting_nodes.find_nearest_neighbour_keys(
+                &tokens.pop().unwrap_or("".to_string()),
+                distance_to_key,
+            );
+            info!("First key {:?}", first_key);
+            info!("Second key {:?}", second_key);
+            if !first_key.is_empty() {
+                break;
+            } else {
+                tries -= 1;
+                distance_to_key += 1;
+            }
+        }
+    }
 }
 
 pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {

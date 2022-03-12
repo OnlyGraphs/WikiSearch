@@ -19,15 +19,14 @@ use log::{debug, info};
 
 use parser::parser::parse_query;
 use retrieval::execute_relational_query;
+use retrieval::investigate_query_naive_correction;
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display};
-
 use std::time::Instant;
-
 pub struct APIError {
     pub code: StatusCode,
     pub msg: String,
@@ -123,11 +122,11 @@ pub async fn search(
     let postings_query = execute_query(query, &idx);
     info!("collecting query: {}", q.query);
     let mut postings = postings_query.collect::<Vec<Posting>>();
-    //TODO! Test on ap*il, a*, and *p
     //TODO! Spell correct under here. Check if postings empty, if they are run teranry neighbour values
-    // if postings.is_empty() {
-    //     APIError::new_user_error(&e, &e))
-    // }
+    if postings.is_empty() {
+        investigate_query_naive_correction(query, &idx);
+    }
+
     info!("sorting query: {}", q.query);
 
     let capped_max_results = min(q.results_per_page.0, 150);
