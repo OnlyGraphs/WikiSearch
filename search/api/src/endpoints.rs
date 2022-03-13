@@ -1,4 +1,4 @@
-use crate::RelationDocument;
+use crate::{RelationDocument, SearchOutput};
 use crate::structs::SortType;
 use crate::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
@@ -25,6 +25,7 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::fmt::{self, Display};
 
 use std::time::Instant;
@@ -198,7 +199,10 @@ pub async fn search(
 
     info!("Query: {} took: {}s",&q.query, timer_whole.elapsed().as_secs_f32());
 
-    Ok(Json(future_documents))
+    Ok(Json(SearchOutput{
+        documents: future_documents,
+        domain: env::var("DOMAIN").unwrap_or("en".to_string())
+    }))
 }
 
 /// Endpoint for performing relational searches stretching from a given root
@@ -346,6 +350,7 @@ pub async fn relational(
     Ok(Json(RelationSearchOutput {
         documents: documents,
         relations: relations.into_iter().collect(),
+        domain: env::var("DOMAIN").unwrap_or("en".to_string())
     }))
 }
 
