@@ -19,6 +19,13 @@ pub struct ScoredDocument {
     pub doc_id: u32,
 }
 
+#[derive(Debug, PartialEq, PartialOrd)]
+pub struct ScoredRelationDocument {
+    pub score: f64,
+    pub doc_id: u32,
+    pub hops: u8,
+}
+
 pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
     // first pass, preprocess
     let ref opts = ProcessingOptions::default();
@@ -317,36 +324,33 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
 }
 
 /// own endpoint for relational query, scoring for it should happen here (i.e. Page Rank)
-pub fn execute_relational_query<'a>(
-    query: &'a Box<Query>,
-    index: &'a Index,
-) -> Vec<ScoredDocument> {
-    if let Query::RelationQuery { root, hops, sub } = &**query {
+pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> Vec<ScoredRelationDocument> {
+    if let Query::RelationQuery{root, hops, sub} = &**query {
         let mut subset = HashMap::default();
         get_docs_within_hops(*root, *hops, &mut subset, index);
 
         match sub {
             Some(v) => {
                 execute_query(&v, index)
-                    .filter_map(move |c| {
-                        if subset.contains_key(&c.document_id) {
-                            Some(ScoredDocument {
-                                score: (*hops as f64 - *subset.get(&c.document_id).unwrap() as f64)
-                                    * 100.0, // magic number, choose whatever you want
-                                doc_id: c.document_id,
-                            })
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
+                        .filter_map(move |c| {
+                            if subset.contains_key(&c.document_id){
+                                Some(ScoredRelationDocument{
+                                    score: 0.0, // PAGE RANK
+                                    doc_id: c.document_id,
+                                    hops: *subset.get(&c.document_id).unwrap()
+                                })
+                            } else {
+                                None
+                            }
+                        }).collect()
             }
             None => {
                 subset
                     .into_iter()
-                    .map(move |(id, score)| ScoredDocument {
+                    .map(move |(id,hops)| ScoredRelationDocument {
+                        score: 0.0, // PAGE RANK
                         doc_id: id,
-                        score: (*hops as f64 - score as f64) * 100.0, // magic number, choose whatever you want
+                        hops: hops, // magic number, choose whatever you want
                     })
                     .collect()
             }
@@ -385,14 +389,19 @@ pub fn get_docs_within_hops(docid: u32, hops: u8, out: &mut HashMap<u32, u8>, in
             let out_l = index.get_links(top);
             let in_l = index.get_incoming_links(top);
             let all_l = merge(in_l, out_l);
+
+            let mut added = false;
             all_l.iter().for_each(|v| {
                 if !out.contains_key(v) {
                     queue.push_back(*v);
+                    added = true;
                 }
             });
 
             if let Some(v) = queue.back() {
-                depth_increasing_nodes.push_back(*v);
+                if added {
+                    depth_increasing_nodes.push_back(*v);
+                }
             }
         } else {
             return;

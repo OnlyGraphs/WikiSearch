@@ -284,6 +284,23 @@ where
 
         records
     }
+    /// evicts unused records untill all available records are evicted
+    pub fn clean_cache_all(&self) {
+        // figure out how many records are in memory
+        info!("Cleaning cache fully");
+
+        // reduce this number if needed
+        self.map.iter().enumerate().for_each(|(i,v)| {
+            if !v.is_locked() && v.lock().is_loaded(){
+                // we are only ones using it 
+                // evict candidate
+                v.lock().unload(i as u32).unwrap();
+            };
+        });
+
+        info!("Cache cleaned, now contains: {} entries", self.cache_population());
+
+    }
 
     pub fn entry(&self, k: &str) -> Option<Arc<Mutex<Entry<V, ID>>>>
 where
@@ -335,7 +352,7 @@ where
     }
 
     pub fn insert(&mut self, k: &str, v: V) -> Option<Arc<Mutex<Entry<V, ID>>>>
-where {
+    {
         self.map.insert(k, Arc::new(Mutex::new(Entry::Memory(v))))
     }
 
@@ -382,15 +399,17 @@ where
     }
 }
 
-impl<V, const ID: u32> Drop for DiskTstMap<V, ID>
-where
-    // K: Serializable + Hash + Eq + Clone,
-    V: Serializable + Debug,
-{
-    fn drop(&mut self) {
-        remove_dir_all(Self::path()).unwrap_or(());
-    }
-}
+// this doesn't work as i thought it would
+// impl<K, V, const ID : u32> Drop for DiskHashMap<K, V, ID>
+// where
+//     K: Serializable + Hash + Eq + Clone,
+//     V: Serializable + Debug,
+// {
+//     fn drop(&mut self) {
+//         info!("Dropping cache for DiskHashMap-{}",ID);
+//         remove_dir_all(Self::path()).unwrap_or(());
+//     }
+// }
 
 impl<V, const ID: u32> Default for DiskTstMap<V, ID>
 where

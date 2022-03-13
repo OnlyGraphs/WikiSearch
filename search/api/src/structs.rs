@@ -78,6 +78,20 @@ pub struct SearchOutput {
     pub suggested_query: String,
 }
 
+#[derive(Serialize, Debug)]
+
+pub struct RelationDocument {
+    #[serde(skip_serializing)]
+    pub id: u32,
+
+    pub title: String,
+    pub score: f64,
+    pub hops: u8,
+
+    #[serde(rename = "abstract")]
+    pub article_abstract: String,
+}
+
 /// Represents a relation between two articles
 /// where source is the origin of a link
 /// and destination is the destination of the link
@@ -90,7 +104,7 @@ pub struct Relation {
 /// Represents a collection of documents and relations
 #[derive(Serialize, Debug)]
 pub struct RelationSearchOutput {
-    pub documents: Vec<Document>,
+    pub documents: Vec<RelationDocument>,
     pub relations: Vec<Relation>,
 }
 

@@ -46,8 +46,8 @@ impl PreIndex {
         }
     }
 
-    pub fn clean_cache(&self) {
-        self.posting_nodes.clean_cache();
+    pub fn clean_cache(&self){
+        self.posting_nodes.clean_cache_all();
     }
 
     pub fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError> {
