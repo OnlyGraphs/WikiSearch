@@ -18,15 +18,23 @@ use index::index_structs::Posting;
 use log::{debug, info};
 
 use parser::parser::parse_query;
+use retrieval::correct_query;
 use retrieval::execute_relational_query;
-use retrieval::investigate_query_naive_correction;
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
+use serde::Serialize;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display};
 use std::time::Instant;
+
+#[derive(Serialize)]
+pub struct APIResults {
+    documents: Vec<Document>,
+    suggested_query: String,
+}
+
 pub struct APIError {
     pub code: StatusCode,
     pub msg: String,
@@ -116,16 +124,17 @@ pub async fn search(
     let (_, ref mut query) = parse_query(&q.query).map_err(|e| APIError::new_user_error(&e, &e))?;
     info!("preprocessing query: {}", q.query);
     preprocess_query(query).map_err(|e| APIError::new_user_error(&e, &e))?;
+    // info!("{}", format!("{}", q.query));
 
     info!("executing query: {}", q.query);
 
     let postings_query = execute_query(query, &idx);
     info!("collecting query: {}", q.query);
     let mut postings = postings_query.collect::<Vec<Posting>>();
-    //TODO! Spell correct under here. Check if postings empty, if they are run teranry neighbour values
-    if postings.is_empty() {
-        investigate_query_naive_correction(query, &idx);
-    }
+
+    //Spell correction
+    let suggested_query = correct_query(query, &idx);
+    info!("{}", format!("Suggested Query:\n {}", suggested_query));
 
     info!("sorting query: {}", q.query);
 
@@ -199,7 +208,10 @@ pub async fn search(
 
     info!("Query: {} took: {}s", &q.query, timer.elapsed().as_secs());
 
-    Ok(Json(future_documents))
+    Ok(Json(APIResults {
+        documents: future_documents,
+        suggested_query: suggested_query,
+    }))
 }
 
 /// Endpoint for performing relational searches stretching from a given root

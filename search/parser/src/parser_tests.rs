@@ -316,48 +316,6 @@ fn test_binary_with_wildcard_query() {
 }
 
 #[test]
-fn test_binary_with_wildcard_query_2() {
-    let query = "pie AND pumpk*n OR stup*d";
-
-    let l = Box::new(Query::WildcardQuery {
-        prefix: "pumpk".to_string(),
-        suffix: "n".to_string(),
-    });
-    let r = Box::new(Query::FreetextQuery {
-        tokens: vec!["pie".to_string()],
-    });
-    let (_s, binary_node) = parse_query(query).unwrap();
-
-    let target = Box::new(Query::BinaryQuery {
-        op: BinaryOp::And,
-        lhs: l,
-        rhs: r,
-    });
-    assert_eq!(target, binary_node);
-}
-
-#[test]
-fn test_binary_with_wildcard_query_3() {
-    let query = "pie AND pumpk*n OR stup*d";
-
-    let l = Box::new(Query::WildcardQuery {
-        prefix: "pumpk".to_string(),
-        suffix: "n".to_string(),
-    });
-    let r = Box::new(Query::FreetextQuery {
-        tokens: vec!["pie".to_string()],
-    });
-    let (_s, binary_node) = parse_query(query).unwrap();
-
-    let target = Box::new(Query::BinaryQuery {
-        op: BinaryOp::And,
-        lhs: l,
-        rhs: r,
-    });
-    assert_eq!(target, binary_node);
-}
-
-#[test]
 fn test_compound_query_or_and() {
     let query = "pumpkin pie OR pumpkin AND patch";
 
@@ -409,6 +367,49 @@ fn test_compound_query_or_and_2() {
             })
         ))
     );
+}
+
+#[test]
+fn test_compound_query_or_and_with_wildcard() {
+    let query = "pumpkin pie AND pumpkin OR p*tch";
+
+    assert_eq!(
+        parse_query(query),
+        Ok((
+            "",
+            Box::new(Query::BinaryQuery {
+                lhs: Box::new(Query::FreetextQuery {
+                    tokens: vec!["pumpkin".to_string(), "pie".to_string()],
+                }),
+                op: BinaryOp::And,
+                rhs: Box::new(Query::BinaryQuery {
+                    lhs: Box::new(Query::FreetextQuery {
+                        tokens: vec!["pumpkin".to_string()],
+                    }),
+                    op: BinaryOp::Or,
+                    rhs: Box::new(Query::WildcardQuery {
+                        prefix: "p".to_string(),
+                        suffix: "tch".to_string()
+                    }),
+                }),
+            })
+        ))
+    );
+}
+
+#[test]
+fn test_not_with_wildcard() {
+    let query = "NOT ca*";
+    let (_s, unary_node) = parse_not_query(query).unwrap();
+    let target = Box::new(Query::UnaryQuery {
+        op: UnaryOp::Not,
+        sub: Box::new(Query::WildcardQuery {
+            prefix: "ca".to_string(),
+            suffix: "".to_string(),
+        }),
+    });
+
+    assert_eq!(target, unary_node)
 }
 
 #[test]

@@ -8,21 +8,21 @@ use api_rs::wiki_search::{
     wiki_search_server::{WikiSearch, WikiSearchServer},
     CheckIndexRequest,
 };
-use index::index::{Index};
+use core::time;
+use index::index::Index;
 use log::{error, info};
 use pretty_env_logger;
 use search_lib::endpoints;
 use search_lib::grpc_server::CheckIndexService;
 use search_lib::structs::RESTSearchData;
-use core::time;
 use std::path::Path;
 use std::process;
 use std::{
     env,
+    fs::read_dir,
     io::{Error, ErrorKind},
     sync::{Arc, RwLock},
     thread,
-    fs::read_dir
 };
 use tonic::{transport::Server, Request};
 
@@ -45,10 +45,12 @@ fn main() -> std::io::Result<()> {
     let rest_ip: String = env::var("SEARCH_IP").unwrap_or(DEFAULT_REST_IP.to_string());
     let rest_port = env::var("SEARCH_PORT").unwrap_or(DEFAULT_REST_PORT.to_string());
     let static_serve_dir = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string());
-    
+
     info!("Reading Directories at STATIC_DIR:");
-    read_dir(Path::new(&static_serve_dir)).unwrap().map(|v| v.unwrap().path())
-     .for_each(|v| info!("\t {}",v.display()) );
+    read_dir(Path::new(&static_serve_dir))
+        .unwrap()
+        .map(|v| v.unwrap().path())
+        .for_each(|v| info!("\t {}", v.display()));
 
     // create shared memory for index
     let index: Arc<RwLock<Index>> = Arc::new(RwLock::new(Index::default()));
@@ -57,44 +59,40 @@ fn main() -> std::io::Result<()> {
     // with redeclarations of the handle, no idea if any version of that would work
     let connection_string_grpc = connection_string.clone();
     let index_grpc = index.clone();
-    thread::spawn(move || {
-        loop {
-            let status = run_grpc(
-                index_grpc.clone(),
-                grpc_address.clone(),
-                connection_string_grpc.clone(),
-            );
+    thread::spawn(move || loop {
+        let status = run_grpc(
+            index_grpc.clone(),
+            grpc_address.clone(),
+            connection_string_grpc.clone(),
+        );
 
-            if status.is_err() {
-                error!("GRPC server error: {:?}", status.err().unwrap());
-                info!("GRPC server failed, restarting in 30s ..");
-                thread::sleep(time::Duration::from_secs(30));
-            } else {
-                info!("GRPC server successfully shutdown.");
-                break;
-            }
+        if status.is_err() {
+            error!("GRPC server error: {:?}", status.err().unwrap());
+            info!("GRPC server failed, restarting in 30s ..");
+            thread::sleep(time::Duration::from_secs(30));
+        } else {
+            info!("GRPC server successfully shutdown.");
+            break;
         }
     });
     let connection_string_rest = connection_string.clone();
     let index_rest = index.clone();
-    let handle = thread::spawn(move || {
-        loop {
-            let status = run_rest(
-                rest_ip.clone(),
-                rest_port.clone(),
-                static_serve_dir.clone(),
-                index_rest.clone(),
-                connection_string_rest.clone(),
-            );
-            if status.is_err() {
-                error!("REST service error: {:?}", status.err().unwrap());
-                info!("REST service failed, restarting..");
-                info!("REST service failed, retrying in 30s ..");
-                thread::sleep(time::Duration::from_secs(30));
-            } else {
-                info!("REST service successfully shutdown.");
-                break;
-            }
+    let handle = thread::spawn(move || loop {
+        let status = run_rest(
+            rest_ip.clone(),
+            rest_port.clone(),
+            static_serve_dir.clone(),
+            index_rest.clone(),
+            connection_string_rest.clone(),
+        );
+        if status.is_err() {
+            error!("REST service error: {:?}", status.err().unwrap());
+            info!("REST service failed, restarting..");
+            info!("REST service failed, retrying in 30s ..");
+            thread::sleep(time::Duration::from_secs(30));
+        } else {
+            info!("REST service successfully shutdown.");
+            break;
         }
     });
 
@@ -166,7 +164,7 @@ async fn run_rest(
     let bind_address = format!("{}:{}", ip, port);
 
     info!("Binding to: {}", bind_address);
-    
+
     HttpServer::new(move || {
         let cors = Cors::permissive();
         let data = RESTSearchData {
@@ -197,7 +195,7 @@ async fn run_rest(
                                 Ok(v) => v,
                                 Err(_e) => NamedFile::open_async(format!("{}/404.html", root))
                                     .await
-                                    .expect(&format!("No file named 404.html at {}",root)),
+                                    .expect(&format!("No file named 404.html at {}", root)),
                             };
 
                             let res = file.into_response(&http_req);

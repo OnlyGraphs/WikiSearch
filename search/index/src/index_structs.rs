@@ -20,7 +20,7 @@ pub struct PostingNode {
     pub tf: HashMap<u32, u32>,
 }
 
-#[derive(Debug, Eq, PartialEq, Default,Clone)]
+#[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct EncodedPostingNode<E>
 where
     E: SequentialEncoder<Posting>,
@@ -28,12 +28,13 @@ where
     pub postings: EncodedPostingList<E>,
     pub df: u32,
     pub tf: HashMap<u32, u32>,
+    pub postings_count: u32,
 }
 
-impl <E : SequentialEncoder<Posting>>From<PostingNode> for EncodedPostingNode<E> {
+impl<E: SequentialEncoder<Posting>> From<PostingNode> for EncodedPostingNode<E> {
     fn from(o: PostingNode) -> Self {
-        
         Self {
+            postings_count: o.postings.len() as u32,
             postings: EncodedPostingList::from_iter(o.postings.into_iter()),
             df: o.df,
             tf: o.tf,

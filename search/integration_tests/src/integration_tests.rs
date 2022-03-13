@@ -360,71 +360,70 @@ fn test_wildcard_execute_query_results_2() {
     );
 }
 
+#[test]
+fn test_parse_and_execute_on_wildcard_complex_query_in_binary_query() {
+    let mut pre_idx = PreIndex::default();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            1,
+            "d1",
+            vec![("", "aaa bbb")],
+            "change of heart",
+            vec!["eee world"],
+            "ggg hhh",
+        ))
+        .unwrap();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("", "iii aaa")],
+            "scare",
+            vec!["mmm nnn"],
+            "world ppp",
+        ))
+        .unwrap();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "iii aaa")],
+            "spare change",
+            vec!["mmm nnn"],
+            "world ppp",
+        ))
+        .unwrap();
+
+    let idx = Index::from_pre_index(pre_idx);
+    //Boolean query
+    let q = "s*are AND change";
+    let (_, ref mut query) = parse_query(q).unwrap();
+
+    let postings_query = execute_query(query, &idx);
+    let computed_postings = postings_query.collect::<Vec<Posting>>();
+
+    assert_eq!(
+        computed_postings,
+        vec![
+            Posting {
+                document_id: 3,
+                position: 2
+            },
+            Posting {
+                document_id: 3,
+                position: 3
+            }
+        ]
+    );
+}
+
+// -------- REMOVED- tests which involve wildcard with freetextquery doesnt work as current grammar doesnt support it. Wildcard is supported  with binary queries currently
+
 // #[test]
-// fn test_parse_and_execute_on_wildcard_complex_query() {
-//     let mut pre_idx = PreIndex::default();
-
-//     pre_idx
-//         .add_document(get_document_with_text(
-//             1,
-//             "d1",
-//             vec![("", "aaa bbb")],
-//             "shrine",
-//             vec!["eee world"],
-//             "ggg hhh",
-//         ))
-//         .unwrap();
-
-//     pre_idx
-//         .add_document(get_document_with_text(
-//             2,
-//             "d2",
-//             vec![("", "iii aaa")],
-//             "cast pearls before swine",
-//             vec!["mmm nnn"],
-//             "world ppp",
-//         ))
-//         .unwrap();
-
-//     pre_idx
-//         .add_document(get_document_with_text(
-//             3,
-//             "d3",
-//             vec![("", "iii aaa")],
-//             "strong spine",
-//             vec!["mmm nnn"],
-//             "world ppp",
-//         ))
-//         .unwrap();
-
-//     pre_idx
-//         .add_document(get_document_with_text(
-//             4,
-//             "d4",
-//             vec![("", "iii aaa")],
-//             "sane",
-//             vec!["mmm nnn"],
-//             "world ppp",
-//         ))
-//         .unwrap();
-
-//     let idx = Index::from_pre_index(pre_idx);
-//     let q = "#DIST,3,pearls,sw*ne";
-//     let (_, ref mut query) = parse_query(q).unwrap();
-
-//     let postings_query = execute_query(query, &idx);
-//     let computed_postings = postings_query.collect::<Vec<Posting>>();
-//     assert_eq!(
-//         computed_postings,
-//         vec![Posting {
-//             document_id: 2,
-//             position: 3
-//         },]
-//     );
-// }
-
-// #[test]
-// fn test_parse_and_execute_on_wildcard_complex_query_2() {
+// fn test_parse_and_execute_on_wildcard_complex_query_in_freetext() {
 //     let mut pre_idx = PreIndex::default();
 
 //     pre_idx
@@ -462,7 +461,7 @@ fn test_wildcard_execute_query_results_2() {
 
 //     let idx = Index::from_pre_index(pre_idx);
 
-//     let q = "change s*are ";
+//     let q = "sp*re change";
 //     let (_, ref mut query) = parse_query(q).unwrap();
 
 //     let postings_query = execute_query(query, &idx);

@@ -5,6 +5,7 @@ use std::{
     fs::{create_dir_all, remove_dir_all, remove_file, File},
     hash::Hash,
     io::Read,
+    iter::Map,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -14,7 +15,7 @@ use default_env::default_env;
 use indexmap::IndexMap;
 use log::info;
 use parking_lot::Mutex;
-use ternary_tree::{Tst, TstCrosswordIterator, TstNeighborIterator};
+use ternary_tree::{Tst, TstCrosswordIterator, TstIterator, TstNeighborIterator};
 use utils::MemFootprintCalculator;
 
 use crate::EncodedPostingNode;
@@ -313,14 +314,15 @@ where
             .visit_crossword_values(k, '*', |s| v.push(s.clone()));
         v
     }
-    pub fn find_nearest_neighbour_keys(&self, k: &str, distance_to_key: usize) -> (String, String) {
+    pub fn find_nearest_neighbour_keys(&self, k: &str, distance_to_key: usize) -> Vec<String> {
+        let mut closest_neighbour_keys: Vec<String> = Vec::new();
         let mut it = self.map.iter_neighbor(k, distance_to_key);
-        let _ = it.next();
-        let first_key = it.current_key();
-        let _ = it.next();
-        let second_key = it.current_key();
 
-        return (first_key, second_key);
+        while let Some(_) = it.next() {
+            closest_neighbour_keys.push(it.current_key());
+        }
+
+        closest_neighbour_keys
     }
 
     pub fn path() -> PathBuf {

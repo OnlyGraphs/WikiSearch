@@ -413,6 +413,7 @@ where
         count += self.postings.serialize(buf);
         count += self.df.serialize(buf);
         count += self.tf.serialize(buf);
+        count += self.postings_count.serialize(buf);
         count
     }
 
@@ -421,6 +422,8 @@ where
         count += self.postings.deserialize(buf);
         count += self.df.deserialize(buf);
         count += self.tf.deserialize(buf);
+        count += self.postings_count.deserialize(buf);
+
         count
     }
 }
