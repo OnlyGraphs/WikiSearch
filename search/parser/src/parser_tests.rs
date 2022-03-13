@@ -296,6 +296,68 @@ fn test_wildcard_query_2() {
 }
 
 #[test]
+fn test_binary_with_wildcard_query() {
+    let query = "pumpk*n AND pie";
+    let l = Box::new(Query::WildcardQuery {
+        prefix: "pumpk".to_string(),
+        suffix: "n".to_string(),
+    });
+    let r = Box::new(Query::FreetextQuery {
+        tokens: vec!["pie".to_string()],
+    });
+    let (_s, binary_node) = parse_query(query).unwrap();
+
+    let target = Box::new(Query::BinaryQuery {
+        op: BinaryOp::And,
+        lhs: l,
+        rhs: r,
+    });
+    assert_eq!(target, binary_node);
+}
+
+#[test]
+fn test_binary_with_wildcard_query_2() {
+    let query = "pie AND pumpk*n OR stup*d";
+
+    let l = Box::new(Query::WildcardQuery {
+        prefix: "pumpk".to_string(),
+        suffix: "n".to_string(),
+    });
+    let r = Box::new(Query::FreetextQuery {
+        tokens: vec!["pie".to_string()],
+    });
+    let (_s, binary_node) = parse_query(query).unwrap();
+
+    let target = Box::new(Query::BinaryQuery {
+        op: BinaryOp::And,
+        lhs: l,
+        rhs: r,
+    });
+    assert_eq!(target, binary_node);
+}
+
+#[test]
+fn test_binary_with_wildcard_query_3() {
+    let query = "pie AND pumpk*n OR stup*d";
+
+    let l = Box::new(Query::WildcardQuery {
+        prefix: "pumpk".to_string(),
+        suffix: "n".to_string(),
+    });
+    let r = Box::new(Query::FreetextQuery {
+        tokens: vec!["pie".to_string()],
+    });
+    let (_s, binary_node) = parse_query(query).unwrap();
+
+    let target = Box::new(Query::BinaryQuery {
+        op: BinaryOp::And,
+        lhs: l,
+        rhs: r,
+    });
+    assert_eq!(target, binary_node);
+}
+
+#[test]
 fn test_compound_query_or_and() {
     let query = "pumpkin pie OR pumpkin AND patch";
 
