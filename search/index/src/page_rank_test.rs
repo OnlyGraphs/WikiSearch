@@ -61,7 +61,7 @@ fn test_update_page_rank_simple() {
     // Only page 1 links to page 0
     let in_links = vec![1];
 
-    update_page_rank(page, d, &in_links, &mut current_pr, &out_links);
+    update_page_rank(page, d, &in_links,&current_pr.clone(), &mut current_pr, &out_links);
     let expected_pr = 0.15;
     let pr = current_pr.get(&page).unwrap();
     assert!((pr - expected_pr).abs() < 0.000001);
@@ -89,7 +89,7 @@ fn test_update_page_rank_complex_1() {
     current_pr.insert(2, 0.9);
     current_pr.insert(3, 1.0);
 
-    update_page_rank(page, 0.85, &in_links, &mut current_pr, &out_links);
+    update_page_rank(page, 0.85, &in_links,&current_pr.clone(), &mut current_pr, &out_links);
     let updated_pr = current_pr.get(&page).unwrap();
 
     let expected_pr = 2.2325;
