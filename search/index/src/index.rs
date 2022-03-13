@@ -25,7 +25,7 @@ use crate::index_structs::{PosRange};
 
 use crate::PreIndex;
 use parking_lot::{Mutex};
-// use crate::init_page_rank;
+use crate::compute_page_ranks;
 
 
 #[derive(Default)]
@@ -240,6 +240,11 @@ impl Index {
         index.incoming_links.values_mut().for_each(|v| v.sort());
         info!("Took {}s", timer.elapsed().as_secs());
 
-        index
+        info!("Calculating page rank");
+        timer = Instant::now();
+        index.page_rank = compute_page_ranks(&index.links, &index.incoming_links, 0.85);
+        info!("Took {}s", timer.elapsed().as_secs());
+
+        return index;
     }
 }

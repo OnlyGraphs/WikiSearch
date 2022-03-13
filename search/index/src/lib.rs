@@ -8,6 +8,7 @@ pub mod page_rank;
 
 #[cfg(test)]
 pub mod index_tests;
+pub mod page_rank_test;
 
 pub use {
     crate::index::*, crate::utils::*, build::*, errors::*, index_structs::*, serialization::*,page_rank::*,

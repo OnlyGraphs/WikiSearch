@@ -175,10 +175,7 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
                 },
             }
         },
-        Query::WildcardQuery {
-            prefix: _,
-            postfix: _,
-        } => todo!(),// TODO: needs index support
+        Query::WildcardQuery {..} => todo!(),// TODO: needs index support
         Query::StructureQuery { ref elem, ref sub } => 
             PostingIterator::new(
                 execute_query(sub, index)
@@ -277,7 +274,7 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
                             .filter_map(move |c| {
                                 if subset.contains_key(&c.document_id){
                                     Some(ScoredRelationDocument{
-                                        score: 0.0, // PAGE RANK
+                                        score: *index.page_rank.get(&c.document_id).unwrap_or(&0.0), // PAGE RANK
                                         doc_id: c.document_id,
                                         hops: *subset.get(&c.document_id).unwrap()
                                     })
@@ -290,7 +287,7 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
                     subset
                         .into_iter()
                         .map(move |(id,hops)| ScoredRelationDocument {
-                            score: 0.0, // PAGE RANK
+                            score: *index.page_rank.get(&id).unwrap_or(&0.0), // PAGE RANK
                             doc_id: id,
                             hops: hops, // magic number, choose whatever you want
                         })
@@ -346,9 +343,6 @@ pub fn get_docs_within_hops(docid: u32, hops: u8, out: &mut HashMap<u32,u8>, ind
                 }
             }
 
-
-
-
         } else {
             return;
         }
@@ -368,9 +362,17 @@ pub fn score_query(
     let mut scored_documents = Vec::default();
 
     for post in postings {
+
+        let mut page_rank = 0.0;
+        let pr = index.page_rank.get(&post.document_id);
+        match pr {
+            Some(v) => page_rank = *v,
+            _ => page_rank = 0.0
+        };
+
         scored_documents.push(ScoredDocument {
             doc_id: post.document_id,
-            score: tfidf_query(post.document_id, query, index),
+            score: tfidf_query(post.document_id, query, index)*0.9+page_rank*0.1,
         });
     }
     return scored_documents;
