@@ -95,9 +95,10 @@ pub async fn search(
     q: Query<SearchParameters>,
 ) -> Result<impl Responder, APIError> {
 
+    let mut timer_whole = Instant::now();
+
     info!("received query: {}", q.query);
 
-    let mut timer = Instant::now();
 
     //Initialise Database connection to retrieve article title and abstract for each document found for the query
     let pool = PgPoolOptions::new()
@@ -114,6 +115,7 @@ pub async fn search(
     let (_, ref mut query) = parse_query(&q.query)
         .map_err(|e| APIError::new_user_error(&e,&e))?;
     
+    let mut timer = Instant::now();
     preprocess_query(query).map_err(|e| APIError::new_user_error(&e,&e))?;
     info!("preproced query: {:?}, {}s", query, timer.elapsed().as_secs_f32());
 
@@ -123,9 +125,7 @@ pub async fn search(
 
     timer = Instant::now();
     let mut postings = postings_query.collect::<Vec<Posting>>();
-    info!("sorted query: {}s", timer.elapsed().as_secs_f32());
 
-    timer = Instant::now();
     let capped_max_results = min(q.results_per_page.0,150);
     // score documents if necessary and sort appropriately
     let ordered_docs: Vec<ScoredDocument> = match q.sort_by {
@@ -193,8 +193,10 @@ pub async fn search(
         .await
         .into_iter()
         .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
+        
+    info!("sorted query: {}s", timer.elapsed().as_secs_f32());
 
-    info!("Query: {} took: {}s",&q.query, timer.elapsed().as_secs_f32());
+    info!("Query: {} took: {}s",&q.query, timer_whole.elapsed().as_secs_f32());
 
     Ok(Json(future_documents))
 }
