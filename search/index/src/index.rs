@@ -240,8 +240,11 @@ impl Index {
         index.incoming_links.values_mut().for_each(|v| v.sort());
         info!("Took {}s", timer.elapsed().as_secs());
 
-        index.page_rank = compute_page_ranks(index.links.clone(), index.incoming_links.clone(), 0.85);
-        
+        info!("Calculating page rank");
+        timer = Instant::now();
+        index.page_rank = compute_page_ranks(&index.links, &index.incoming_links, 0.85);
+        info!("Took {}s", timer.elapsed().as_secs());
+
         return index;
     }
 }
