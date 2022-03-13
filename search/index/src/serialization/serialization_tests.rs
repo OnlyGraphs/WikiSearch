@@ -1,4 +1,4 @@
-use std::{path::PathBuf,collections::HashMap};
+use std::{collections::HashMap, path::PathBuf};
 
 use utils::MemFootprintCalculator;
 
@@ -22,20 +22,20 @@ fn test_serialize_string() {
 #[test]
 #[cfg(target_endian = "little")]
 fn test_serialize_hashmap() {
-    let mut a : HashMap<u32,u32> = HashMap::new();
+    let mut a: HashMap<u32, u32> = HashMap::new();
 
-    a.insert(42,69);
-    a.insert(69,42);
+    a.insert(42, 69);
+    a.insert(69, 42);
 
     let mut out = Vec::default();
 
     a.serialize(&mut out);
 
-    let mut des = HashMap::<u32,u32>::default();
+    let mut des = HashMap::<u32, u32>::default();
 
     des.deserialize(&mut &out[..]);
 
-    assert_eq!(a,des); // ascii codes
+    assert_eq!(a, des); // ascii codes
 }
 
 #[test]
@@ -819,15 +819,15 @@ fn test_disk_hash_map_insert_existing() {
 fn test_disk_hash_map_path() {
     assert_eq!(
         DiskTstMap::<u32, 4>::path(),
-        PathBuf::from("/tmp/DiskTstMap-4")
+        PathBuf::from("/tmp/diskhashmap-4")
     );
     assert_eq!(
         DiskTstMap::<u32, 5>::path(),
-        PathBuf::from("/tmp/DiskTstMap-5")
+        PathBuf::from("/tmp/diskhashmap-5")
     );
     assert_eq!(
         DiskTstMap::<u32, 6>::path(),
-        PathBuf::from("/tmp/DiskTstMap-6")
+        PathBuf::from("/tmp/diskhashmap-6")
     );
 }
 
@@ -854,7 +854,6 @@ fn test_disk_hash_map_clean_cache_cache_pop() {
     assert_eq!(d.cache_population(), 4);
     assert_eq!(d.clean_cache(), 0);
     assert_eq!(d.cache_population(), 0);
-
 }
 
 // #[test]
@@ -874,8 +873,6 @@ fn test_disk_hash_map_clean_cache_cache_pop() {
 //     assert_eq!(*d.entry(&1).unwrap().lock().get().unwrap(),2);
 //     assert_eq!(*d.entry(&2).unwrap().lock().get().unwrap(),1);
 // }
-
-
 
 #[test]
 fn test_disk_hash_map_multiple_uses() {
