@@ -11,6 +11,7 @@ pub const CORRECTION_TRIES: u8 = 2; // Number of tries to attempt spell checking
 pub const CORRECTION_KEY_DISTANCE: u8 = 1; //Starting distance of current token that is being spell checked to closest words/neighbours in the tree. In orher words, how far do we look in the tree by the difference of characters
 pub const CORRECTION_KEY_DISTANCE_ADD_PER_TRY: u8 = 1; //Increase in distance key per try iteration
 
+///main function to be called to spell check query
 pub fn correct_query<'a>(query: &Query, index: &'a Index) -> String {
     //Define parameters
     let token_correction_threshold: u32 = std::env::var("TOKEN_CORRECTION_THRESHOLD")
@@ -45,6 +46,7 @@ pub fn correct_query<'a>(query: &Query, index: &'a Index) -> String {
     return suggestion;
 }
 
+/// helper recursive function to perform spell checking
 pub fn correct_query_sub<'a>(
     query: &Query,
     index: &'a Index,
@@ -120,6 +122,8 @@ pub fn correct_query_sub<'a>(
     }
 }
 
+/// helper function to mark the tokens that have number of postings below threshold.
+/// At the end, returns a vector of the tokens corrected
 fn mark_tokens_to_correct<'a>(
     tokens: &Vec<String>,
     index: &'a Index,
@@ -134,9 +138,10 @@ fn mark_tokens_to_correct<'a>(
         .map(|token| {
             let len_posting = index
                 .get_postings(token)
-                .map(|v| v.lock().get().unwrap().df);
-            info!("len_posting {:?}", len_posting.unwrap_or(0));
-            let spell_correct_flag = len_posting.unwrap_or(0) < token_threshold;
+                .map(|v| v.lock().get().unwrap().postings_count);
+            //Retrieve the condition by checking length of posting against threshold.
+            //spell correct flag == true indicates that we will perform spell checking on this token. if false, we essentially dont correct it
+            let spell_correct_flag: bool = len_posting.unwrap_or(0) < token_threshold;
             (token, spell_correct_flag)
         })
         .collect::<Vec<(&String, bool)>>();
@@ -157,7 +162,9 @@ fn mark_tokens_to_correct<'a>(
     }
     new_tokens
 }
-// Naive way of doing spell correction.
+/// Naive way of doing spell correction,
+/// Finds tokens closest to the current passed token (key) in the ternary index tree
+/// Returns either the current passed key (if nothing close to it was found), or returns the closest key to it
 pub fn investigate_query_naive_correction<'a>(
     token: &'a String,
     index: &'a Index,
@@ -172,25 +179,17 @@ pub fn investigate_query_naive_correction<'a>(
             let mut closest_keys = index
                 .posting_nodes
                 .find_nearest_neighbour_keys(&token, key_distance.into());
-            info!("First key {:?}", closest_keys.get(0));
-            info!("Second key {:?}", closest_keys.get(1));
-            info!("Third key {:?}", closest_keys.get(2));
-            info!("Fourth key {:?}", closest_keys.get(3));
-            info!("SecoFifthnd key {:?}", closest_keys.get(4));
-            //If the next functions panic, the token is huge
 
+            //sort by length closest to the token.
+            //Performs subtraction, but if something goes wrong, unwrap to default of substitution
+            //TODO: maybe check to see what happens when subtraction results in integer overflows
             closest_keys.sort_by_key(|s| {
-                i16::abs(
-                    (s.len() as i16)
-                        .checked_sub(token.len() as i16)
+                i8::abs(
+                    (s.len() as i8)
+                        .checked_sub(token.len() as i8)
                         .unwrap_or_default(),
                 )
             });
-            info!("First key {:?}", closest_keys.get(0));
-            info!("Second key {:?}", closest_keys.get(1));
-            info!("Third key {:?}", closest_keys.get(2));
-            info!("Fourth key {:?}", closest_keys.get(3));
-            info!("Fifth key {:?}", closest_keys.get(4));
 
             if !closest_keys.is_empty() {
                 return closest_keys.get(0).unwrap_or(token).to_string();
