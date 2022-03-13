@@ -23,7 +23,7 @@ impl Default for PreIndex {
     fn default() -> Self {
         Self {
             dump_id: Default::default(),
-            posting_nodes: DiskTstMap::new(1000000),
+            posting_nodes: DiskTstMap::new(1),
             links: Default::default(),
             extent: Default::default(),
             id_title_map: Default::default(),
@@ -46,7 +46,7 @@ impl PreIndex {
         }
     }
 
-    pub fn clean_cache(&self){
+    pub fn clean_cache(&self) {
         self.posting_nodes.clean_cache_all();
     }
 

@@ -27,7 +27,7 @@ impl Default for Index {
     fn default() -> Index {
         Index {
             dump_id: 0,
-            posting_nodes: DiskTstMap::new(10000),
+            posting_nodes: DiskTstMap::new(1),
             links: HashMap::new(),
             incoming_links: HashMap::new(),
             extent: HashMap::new(),
@@ -214,20 +214,23 @@ impl Index {
                 .into_inner()
                 .unwrap();
 
-            let encoded_node = EncodedPostingNode::from(unwrapped);
-            index.posting_nodes.insert(&k,encoded_node);
+                let encoded_node = EncodedPostingNode::from(unwrapped);
+                index.posting_nodes.insert(&k, encoded_node);
             } // for dropping lock on v in case we want to evict it
 
             // every R records, clean cache, and report progress
             if idx % index.posting_nodes.capacity() as usize == 0 {
                 index.posting_nodes.clean_cache_all();
-                info!("Sorted {}% ({}s)", (idx as f32 / total_posting_lists as f32) * 100.0,timer.elapsed().as_secs());
+                info!(
+                    "Sorted {}% ({}s)",
+                    (idx as f32 / total_posting_lists as f32) * 100.0,
+                    timer.elapsed().as_secs()
+                );
                 timer = Instant::now();
             }
         });
 
         index.posting_nodes.clean_cache_all();
-        
 
         // convert strings in the links to u32's
         // sort all links
