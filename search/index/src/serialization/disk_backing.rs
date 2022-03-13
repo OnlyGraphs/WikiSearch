@@ -107,7 +107,7 @@ impl<V: Serializable + Debug, const ID: u32> Entry<V, ID> {
                 let new = Self::fetch(PathBuf::from(format!(
                     "{}/{}-{}/{}",
                     default_env!("TMP_PATH", "/tmp"),
-                    "DiskTstMap",
+                    "DiskHashMap",
                     ID,
                     id
                 )))?; // TODO: env variable
@@ -129,7 +129,7 @@ impl<V: Serializable + Debug, const ID: u32> Entry<V, ID> {
                     PathBuf::from(format!(
                         "{}/{}-{}/{}",
                         default_env!("TMP_PATH", "/tmp"),
-                        "DiskTstMap",
+                        "DiskHashMap",
                         ID,
                         id
                     )),
@@ -152,7 +152,7 @@ impl<V: Serializable + Debug, const ID: u32> Entry<V, ID> {
                     Self::fetch(PathBuf::from(format!(
                         "{}/{}-{}/{}",
                         default_env!("TMP_PATH", "/tmp"),
-                        "DiskTstMap",
+                        "DiskHashMap",
                         ID,
                         id
                     )))?, // TODO: env variable
@@ -172,7 +172,7 @@ impl<V: Serializable + Debug, const ID: u32> Entry<V, ID> {
                     Self::fetch(PathBuf::from(format!(
                         "{}/{}-{}/{}",
                         default_env!("TMP_PATH", "/tmp"),
-                        "DiskTstMap",
+                        "DiskHashMap",
                         ID,
                         id
                     )))?, // TODO: env variable
@@ -354,7 +354,7 @@ where
         PathBuf::from(format!(
             "{}/{}-{}",
             default_env!("TMP_PATH", "/tmp"),
-            "DiskTstMap",
+            "DiskHashMap",
             ID
         ))
     }
