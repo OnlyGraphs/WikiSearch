@@ -175,10 +175,7 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
                 },
             }
         },
-        Query::WildcardQuery {
-            prefix: _,
-            postfix: _,
-        } => todo!(),// TODO: needs index support
+        Query::WildcardQuery {..} => todo!(),// TODO: needs index support
         Query::StructureQuery { ref elem, ref sub } => 
             PostingIterator::new(
                 execute_query(sub, index)
@@ -277,7 +274,7 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
                             .filter_map(move |c| {
                                 if subset.contains_key(&c.document_id){
                                     Some(ScoredRelationDocument{
-                                        score: 0.0, // PAGE RANK
+                                        score: *index.page_rank.get(&c.document_id).unwrap_or(&0.0), // PAGE RANK
                                         doc_id: c.document_id,
                                         hops: *subset.get(&c.document_id).unwrap()
                                     })
@@ -290,7 +287,7 @@ pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> 
                     subset
                         .into_iter()
                         .map(move |(id,hops)| ScoredRelationDocument {
-                            score: 0.0, // PAGE RANK
+                            score: *index.page_rank.get(&id).unwrap_or(&0.0), // PAGE RANK
                             doc_id: id,
                             hops: hops, // magic number, choose whatever you want
                         })
@@ -345,9 +342,6 @@ pub fn get_docs_within_hops(docid: u32, hops: u8, out: &mut HashMap<u32,u8>, ind
                     depth_increasing_nodes.push_back(*v);
                 }
             }
-
-
-
 
         } else {
             return;

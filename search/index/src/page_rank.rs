@@ -1,4 +1,6 @@
-use std::{collections::HashMap, cmp::max};
+use std::{collections::HashMap, cmp::max, time::Instant};
+
+use log::info;
 
 pub fn init_page_rank(ids: &HashMap<u32, Vec<u32>>, init_value: f64) -> HashMap<u32, f64> {
     // Initialize all page rank value to the same initial value (usually 1.0)
@@ -32,15 +34,11 @@ pub fn update_page_rank(page: u32, d: f64, in_links: &Vec<u32>,old_page_ranks: &
                 .map(|v| v.len()).unwrap_or(1)
             ,1) as f64;
 
-        println!("pr:{},ca_len:{}",pr,ca_len);
-
         summed = summed + (pr/ca_len);
     }
-    println!("pr:{},d:{},summed:{}",page_rank,d,summed);
     page_rank = page_rank + d*(summed as f64);
     page_ranks.insert(page,page_rank); // should always replace an old key
 
-    println!("page: {}, new_pr: {}",page,page_rank);
 
     return previous_page_rank - page_rank
 }
@@ -67,10 +65,19 @@ pub fn compute_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_link
     let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
     update_all_page_ranks(outgoing_links, incoming_links, &mut page_rank, d);
 
+    let mut max_iters = std::env::var("PAGE_RANK_ITERS").unwrap_or("20".to_string())
+        .parse::<u32>()
+        .unwrap_or(20);
+
+    let mut timer = Instant::now(); 
     loop {
-        if update_all_page_ranks(outgoing_links, incoming_links,&mut page_rank, d){
+        if max_iters <= 0 || update_all_page_ranks(outgoing_links, incoming_links,&mut page_rank, d){
             break;
+        } else {
+            max_iters -= 1;
         }
+        info!("Page rank iterations left: {}, ({}s)",max_iters,timer.elapsed().as_secs());
+        timer = Instant::now();
     }
 
     return page_rank;
