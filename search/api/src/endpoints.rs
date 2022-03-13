@@ -20,6 +20,7 @@ use log::{debug, info};
 use parser::parser::parse_query;
 use retrieval::correct_query;
 use retrieval::execute_relational_query;
+use retrieval::query_correction::TOTAL_POSTING_CORRECTION_THRESHOLD;
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
 use serde::Serialize;
 use sqlx::postgres::PgPoolOptions;
@@ -28,7 +29,6 @@ use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display};
 use std::time::Instant;
-
 #[derive(Serialize)]
 pub struct APIResults {
     documents: Vec<Document>,
@@ -103,6 +103,11 @@ pub async fn search(
     data: Data<RESTSearchData>,
     q: Query<SearchParameters>,
 ) -> Result<impl Responder, APIError> {
+    let correction_threshold: u16 = std::env::var("TOTAL_POSTING_CORRECTION_THRESHOLD")
+        .unwrap_or(TOTAL_POSTING_CORRECTION_THRESHOLD.to_string())
+        .parse()
+        .unwrap();
+
     info!("received query: {}", q.query);
 
     let timer = Instant::now();
@@ -132,7 +137,11 @@ pub async fn search(
     info!("collecting query: {}", q.query);
     let mut postings = postings_query.collect::<Vec<Posting>>();
 
-    //Spell correction
+    // ---- Spell correction ----
+    // if postings.len() < correction_threshold{
+    //     let suggested_query = correct_query(query, &idx);
+    //     info!("{}", format!("Suggested Query:\n {}", suggested_query));
+    // }
     let suggested_query = correct_query(query, &idx);
     info!("{}", format!("Suggested Query:\n {}", suggested_query));
 
