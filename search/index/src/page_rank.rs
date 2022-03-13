@@ -19,21 +19,21 @@ pub fn init_page_rank(ids: &HashMap<u32, Vec<u32>>, init_value: f64) -> HashMap<
 /// Returns the change in page rank from previous iteration
 pub fn update_page_rank(page: u32, d: f64, in_links: &Vec<u32>, page_ranks: &mut HashMap<u32, f64>, out_links: &HashMap<u32, Vec<u32>>) -> f64{
 
-    let pr = *page_ranks.get(&page).unwrap(); // guaranteed to exist
+    let previous_page_rank = *page_ranks.get(&page).unwrap(); // guaranteed to exist
     let mut page_rank = 1.0-d;
     let mut summed = 0.0;
     for page in in_links {
-
+        let pr = *page_ranks.get(&page).unwrap();
         // the number of outgoing links for any page in the list should be at least one, so set it to that by default
         // however some pages might not satisfy this, force this number to avoid div by zero
-        let ca_len = max(out_links.get(&page).map(|v| v.len()).unwrap_or(1),1) as f64;
+        let ca_len = max(out_links.get(&page).map(|v| v.len()).unwrap_or(1),0) as f64;
         
         summed = summed + (pr/ca_len);
     }
     page_rank = page_rank + d*(summed as f64);
     page_ranks.insert(page,page_rank).unwrap(); // should always replace an old key
 
-    return pr - page_rank 
+    return previous_page_rank - page_rank
 }
 
 /// Performs an iteration of page rank
@@ -44,7 +44,7 @@ pub fn update_all_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_l
     for (page, in_links) in incoming_links {
         let delta = update_page_rank(*page, d, in_links, current_pr, outgoing_links);
 
-        if (delta).abs() > 0.000001 {
+        if delta.abs() > 0.000001 {
             converged = false;
         }    
     }

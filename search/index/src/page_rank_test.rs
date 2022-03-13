@@ -156,7 +156,7 @@ pub fn test_update_page_rank_for_all_simple_step1() {
     current_pr.insert(0, 0.0);
     current_pr.insert(2, 0.0);
 
-    let converged = update_all_page_ranks(&outgoing_links, &incoming_links, &mut current_pr, 0.85);
+    update_all_page_ranks(&outgoing_links, &incoming_links, &mut current_pr, 0.85);
 
     let mut expected_pr = HashMap::new();
     expected_pr.insert(1, 0.15);
