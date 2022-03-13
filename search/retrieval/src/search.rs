@@ -205,7 +205,7 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
             let init = PostingIterator::new(empty::<Posting>());
             let mut wild_token: String = "".to_string();
             wild_token.push_str(prefix);
-            wild_token.push_str("*");
+            wild_token.push_str(".");
             wild_token.push_str(suffix);
             let vec_encoded_postings = index.posting_nodes.entry_wild_card(&wild_token);
             vec_encoded_postings.iter().fold(init, |a, iter| {
@@ -324,30 +324,34 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
 }
 
 /// own endpoint for relational query, scoring for it should happen here (i.e. Page Rank)
-pub fn execute_relational_query<'a>(query: &'a Box<Query>, index: &'a Index) -> Vec<ScoredRelationDocument> {
-    if let Query::RelationQuery{root, hops, sub} = &**query {
+pub fn execute_relational_query<'a>(
+    query: &'a Box<Query>,
+    index: &'a Index,
+) -> Vec<ScoredRelationDocument> {
+    if let Query::RelationQuery { root, hops, sub } = &**query {
         let mut subset = HashMap::default();
         get_docs_within_hops(*root, *hops, &mut subset, index);
 
         match sub {
             Some(v) => {
                 execute_query(&v, index)
-                        .filter_map(move |c| {
-                            if subset.contains_key(&c.document_id){
-                                Some(ScoredRelationDocument{
-                                    score: 0.0, // PAGE RANK
-                                    doc_id: c.document_id,
-                                    hops: *subset.get(&c.document_id).unwrap()
-                                })
-                            } else {
-                                None
-                            }
-                        }).collect()
+                    .filter_map(move |c| {
+                        if subset.contains_key(&c.document_id) {
+                            Some(ScoredRelationDocument {
+                                score: 0.0, // PAGE RANK
+                                doc_id: c.document_id,
+                                hops: *subset.get(&c.document_id).unwrap(),
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
             }
             None => {
                 subset
                     .into_iter()
-                    .map(move |(id,hops)| ScoredRelationDocument {
+                    .map(move |(id, hops)| ScoredRelationDocument {
                         score: 0.0, // PAGE RANK
                         doc_id: id,
                         hops: hops, // magic number, choose whatever you want

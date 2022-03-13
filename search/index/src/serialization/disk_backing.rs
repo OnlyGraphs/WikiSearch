@@ -331,7 +331,10 @@ where
 
         // self.map
         //     .visit_crossword_values(k, '*', |s| v.push(s.clone()));
-        // let ( _, v) = self.map.wildcard_iter(k).unzip();
+        for (s, m) in self.map.wildcard_iter(k) {
+            v.push(m.to_owned());
+        }
+
         return v;
     }
     pub fn find_nearest_neighbour_keys(&self, k: &str, distance_to_key: usize) -> Vec<String> {
