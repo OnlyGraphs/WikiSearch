@@ -102,9 +102,56 @@ pub fn correct_query_sub<'a>(
             let new_query = Query::PhraseQuery { tks: new_tokens };
             return new_query;
         }
-        Query::DistanceQuery { dst, lhs, rhs } => query.clone(),
+        Query::DistanceQuery { dst, ref lhs, rhs } => {
+            let new_lhs = mark_tokens_to_correct(
+                &vec![lhs.clone()],
+                index,
+                token_threshold,
+                number_of_tries,
+                key_distance,
+                key_distance_append_amount,
+            )
+            .pop()
+            .unwrap_or(lhs.clone());
+            let new_rhs = mark_tokens_to_correct(
+                &vec![rhs.clone()],
+                index,
+                token_threshold,
+                number_of_tries,
+                key_distance,
+                key_distance_append_amount,
+            )
+            .pop()
+            .unwrap_or(rhs.clone());
+
+            let new_query = Query::DistanceQuery {
+                dst: *dst,
+                lhs: new_lhs,
+                rhs: new_rhs,
+            };
+            return new_query;
+        }
         Query::StructureQuery { elem, sub } => query.clone(),
-        Query::RelationQuery { root, hops, sub } => query.clone(),
+        Query::RelationQuery { root, hops, sub } => {
+            let mut new_sub = sub.clone();
+            if let Some(sub_query) = sub {
+                new_sub = Some(Box::new(correct_query_sub(
+                    sub_query,
+                    index,
+                    token_threshold,
+                    number_of_tries,
+                    key_distance,
+                    key_distance_append_amount,
+                )));
+            }
+
+            let new_query = Query::RelationQuery {
+                root: root.clone(),
+                hops: hops.clone(),
+                sub: new_sub,
+            };
+            return new_query;
+        }
         Query::WildcardQuery { prefix, suffix } => query.clone(),
         Query::FreetextQuery { tokens } => {
             let new_tokens = mark_tokens_to_correct(

@@ -1,7 +1,7 @@
 use crate::structs::SortType;
 use crate::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
-    SearchParameters, UserFeedback,
+    SearchOutput, SearchParameters, UserFeedback,
 };
 use actix_web::http::header::ContentType;
 use actix_web::ResponseError;
@@ -29,11 +29,6 @@ use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display};
 use std::time::Instant;
-#[derive(Serialize)]
-pub struct APIResults {
-    documents: Vec<Document>,
-    suggested_query: String,
-}
 
 pub struct APIError {
     pub code: StatusCode,
@@ -217,7 +212,7 @@ pub async fn search(
 
     info!("Query: {} took: {}s", &q.query, timer.elapsed().as_secs());
 
-    Ok(Json(APIResults {
+    Ok(Json(SearchOutput {
         documents: future_documents,
         suggested_query: suggested_query,
     }))
@@ -287,6 +282,10 @@ pub async fn relational(
         .into_iter()
         .take(capped_max_results)
         .collect::<Vec<ScoredDocument>>();
+
+    ///TODO: Spelling correction -- need to implement Display for that properly
+    // let suggested_query = correct_query(query, &idx);
+    // info!("{}", format!("Suggested Query:\n {}", suggested_query));
 
     // keep track of the translations between titles and ids
     // as well as the documents present in the query for later

@@ -108,7 +108,7 @@ impl Display for Query {
             }
             Query::StructureQuery { elem, sub } => write!(f, "{}: {}", elem, sub),
             Query::RelationQuery { root, hops, sub } => {
-                write!(f, "root:{}\n hops:{}\n query:{:?}", root, hops, sub)
+                write!(f, "root:{}\n hops:{}\n query:{:?}", root, hops, sub) //TODO: Probably need to do this in a better way
             }
             Query::WildcardQuery { prefix, suffix } => write!(f, "{}*{}", prefix, suffix),
             Query::FreetextQuery { tokens } => {
