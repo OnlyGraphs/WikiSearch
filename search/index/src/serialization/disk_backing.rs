@@ -10,16 +10,16 @@ use std::{
     sync::Arc,
 };
 
+use crate::EncodedPostingNode;
 use crate::Serializable;
+use crate::VbyteEncoder;
 use default_env::default_env;
 use indexmap::IndexMap;
 use log::info;
 use parking_lot::Mutex;
 use ternary_tree::{Tst, TstCrosswordIterator, TstIterator, TstNeighborIterator};
+use tst::TSTMap;
 use utils::MemFootprintCalculator;
-
-use crate::EncodedPostingNode;
-use crate::VbyteEncoder;
 
 pub struct Iter {
     max_len: usize,
@@ -227,7 +227,7 @@ where
     // K: Serializable + Hash + Eq + Clone,
     V: Serializable + Debug,
 {
-    map: Tst<Arc<Mutex<Entry<V, ID>>>>,
+    map: TSTMap<Arc<Mutex<Entry<V, ID>>>>,
     capacity: u32,
 }
 
@@ -247,7 +247,7 @@ where
     pub fn cache_population(&self) -> u32 {
         self.map.iter().fold(
             0 as u32,
-            |a, v| {
+            |a, (_, v)| {
                 if v.lock().is_loaded() {
                     a + 1
                 } else {
@@ -268,7 +268,7 @@ where
             self.map
                 .iter()
                 .enumerate()
-                .take_while(|(i, v)| {
+                .take_while(|(i, (_, v))| {
                     if !v.is_locked() && v.lock().is_loaded() {
                         // we are only ones using it
                         // evict candidate
@@ -290,16 +290,18 @@ where
         info!("Cleaning cache fully");
 
         // reduce this number if needed
-        self.map.iter().enumerate().for_each(|(i,v)| {
-            if !v.is_locked() && v.lock().is_loaded(){
-                // we are only ones using it 
+        self.map.iter().enumerate().for_each(|(i, (_, v))| {
+            if !v.is_locked() && v.lock().is_loaded() {
+                // we are only ones using it
                 // evict candidate
                 v.lock().unload(i as u32).unwrap();
             };
         });
 
-        info!("Cache cleaned, now contains: {} entries", self.cache_population());
-
+        info!(
+            "Cache cleaned, now contains: {} entries",
+            self.cache_population()
+        );
     }
 
     pub fn entry(&self, k: &str) -> Option<Arc<Mutex<Entry<V, ID>>>>
@@ -327,18 +329,21 @@ where
     pub fn entry_wild_card(&self, k: &str) -> Vec<Arc<Mutex<Entry<V, ID>>>> {
         let mut v = Vec::new();
 
-        self.map
-            .visit_crossword_values(k, '*', |s| v.push(s.clone()));
-        v
+        // self.map
+        //     .visit_crossword_values(k, '*', |s| v.push(s.clone()));
+        // let ( _, v) = self.map.wildcard_iter(k).unzip();
+        return v;
     }
     pub fn find_nearest_neighbour_keys(&self, k: &str, distance_to_key: usize) -> Vec<String> {
         let mut closest_neighbour_keys: Vec<String> = Vec::new();
-        let mut it = self.map.iter_neighbor(k, distance_to_key);
+        let mut it = self.map.prefix_iter(k);
 
-        while let Some(_) = it.next() {
-            closest_neighbour_keys.push(it.current_key());
-        }
+        // while let Some(_) = it.next() {
+        //     closest_neighbour_keys.push(it.current_key());
+        // }
 
+        // closest_neighbour_keys
+        // return self.map.prefix_iter(k).unzip();
         closest_neighbour_keys
     }
 
@@ -351,21 +356,20 @@ where
         ))
     }
 
-    pub fn insert(&mut self, k: &str, v: V) -> Option<Arc<Mutex<Entry<V, ID>>>>
-    {
+    pub fn insert(&mut self, k: &str, v: V) -> Option<Arc<Mutex<Entry<V, ID>>>> {
         self.map.insert(k, Arc::new(Mutex::new(Entry::Memory(v))))
     }
 
     pub fn pop(&mut self) -> (String, Option<Arc<Mutex<Entry<V, ID>>>>) {
         let mut it = self.map.iter();
-        let first_value = it.next();
-        let mut first_key = it.current_key();
+        let (first_key, _) = it.next().unwrap();
+        // let mut first_key = it.current_key();
         // let mut v = Vec::new();
         // self.map.visit_values(|s| v.push(s.clone()));
         // let first_key = it.current_key();
         // let last_key = it.current_key_back();
         let value_removed = self.map.remove(&first_key);
-        (first_key, value_removed)
+        (first_key.to_string(), value_removed)
     }
 
     pub fn new(capacity: u32) -> Self {
@@ -379,14 +383,14 @@ where
         create_dir_all(&path);
 
         Self {
-            map: Tst::new(),
+            map: TSTMap::new(),
             capacity: capacity,
         }
     }
 
-    pub fn num_total_nodes(&self) -> u32 {
-        self.map.stat().count.nodes as u32
-    }
+    // pub fn num_total_nodes(&self) -> u32 {
+    //     // self.map.stat().count.nodes as u32
+    // }
 }
 
 impl<V, const ID: u32> MemFootprintCalculator for DiskTstMap<V, ID>
@@ -395,7 +399,8 @@ where
     V: Serializable + MemFootprintCalculator + Debug,
 {
     fn real_mem(&self) -> u64 {
-        self.map.stat().bytes.total as u64
+        // self.map.stat().bytes.total as u64
+        0
     }
 }
 
