@@ -125,7 +125,7 @@ impl Index {
     pub fn tf(&self, token: &str, docid: u32) -> u32 {
         match self.posting_nodes.entry(token) {
             Some(v) => v.deref().lock().get().unwrap().tf
-                                                                    .get(&docid).cloned().unwrap_or(0),
+                .get(&docid).cloned().unwrap_or(0),
             None => 0,
         }
     }
@@ -175,11 +175,11 @@ impl Index {
         let mut index = Self {
             dump_id: p.dump_id,
             posting_nodes: DiskHashMap::new(p.posting_nodes.capacity()),
-            links: HashMap::with_capacity(p.links.len()),
             incoming_links: HashMap::with_capacity(p.links.len()),
+            page_rank: HashMap::with_capacity(p.links.len()),
+            links: p.links,
             extent: p.extent,
             last_updated_docs: p.last_updated_docs,
-            page_rank: HashMap::with_capacity(p.links.len()),
         };
 
         let total_posting_lists = p.posting_nodes.len();
@@ -215,19 +215,19 @@ impl Index {
 
         // convert strings in the links to u32's
         // sort all links
-        info!("Reconciling links with IDs");
-        timer = Instant::now();
-        p.links.iter().for_each(|(from, to)| {
-            let mut targets: Vec<u32> = Vec::with_capacity(index.links.len());
-            to.iter().for_each(|l| {
-                p.id_title_map.get_by_right(l).map(|v| {
-                    targets.push(*v);
-                });
-            });
-            targets.sort();
-            let _ = index.links.insert(*from, targets);
-        });
-        info!("Took {}s", timer.elapsed().as_secs());
+        // info!("Reconciling links with IDs");
+        // timer = Instant::now();
+        // p.links.iter().for_each(|(from, to)| {
+        //     let mut targets: Vec<u32> = Vec::with_capacity(index.links.len());
+        //     to.iter().for_each(|l| {
+        //         p.id_title_map.get_by_right(l).map(|v| {
+        //             targets.push(*v);
+        //         });
+        //     });
+        //     targets.sort();
+        //     let _ = index.links.insert(*from, targets);
+        // });
+        // info!("Took {}s", timer.elapsed().as_secs());
 
         // back links
         info!("Generating back links");

@@ -4,6 +4,7 @@ use crate::{
 };
 use bimap::BiMap;
 use chrono::NaiveDateTime;
+use itertools::Itertools;
 use parser::StructureElem;
 use std::collections::{HashMap, HashSet};
 
@@ -11,9 +12,9 @@ use std::collections::{HashMap, HashSet};
 pub struct PreIndex{
     pub dump_id: u32,
     pub posting_nodes: DiskHashMap<String, PostingNode, 0>,
-    pub links: HashMap<u32, Vec<String>>,
+    pub links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
-    pub id_title_map: BiMap<u32, String>,
+    // pub id_title_map: BiMap<u32, String>,
     pub last_updated_docs: HashMap<u32, NaiveDateTime>,
     // for keeping track of unique token appearances in the current document
     curr_doc_appearances: HashSet<String>,
@@ -25,7 +26,7 @@ impl Default for PreIndex {
             dump_id: Default::default(),
             posting_nodes: DiskHashMap::new(1000000),
             links: Default::default(), extent: Default::default(), 
-            id_title_map: Default::default(), 
+            // id_title_map: Default::default(), 
             last_updated_docs: Default::default(), 
             curr_doc_appearances: Default::default() }
     }
@@ -38,7 +39,7 @@ impl PreIndex {
             dump_id: Default::default(),
             posting_nodes: DiskHashMap::new(cap),
             links: Default::default(), extent: Default::default(), 
-            id_title_map: Default::default(), 
+            // id_title_map: Default::default(), 
             last_updated_docs: Default::default(), 
             curr_doc_appearances: Default::default() }
     }
@@ -58,13 +59,13 @@ impl PreIndex {
                 .unwrap_or(NaiveDateTime::from_timestamp(0, 0)),
         );
 
-        // titles
-        self.id_title_map
-            .insert_no_overwrite(document.doc_id, document.title.clone())
-            .map_err(|_c| IndexError {
-                msg: "Attempted to insert document into index which already exists.".to_string(),
-                kind: IndexErrorKind::InvalidOperation,
-            })?;
+        // // titles
+        // self.id_title_map
+        //     .insert_no_overwrite(document.doc_id, document.title.clone())
+        //     .map_err(|_c| IndexError {
+        //         msg: "Attempted to insert document into index which already exists.".to_string(),
+        //         kind: IndexErrorKind::InvalidOperation,
+        //     })?;
 
         //Infoboxes
         word_pos = document.infoboxes.iter().fold(word_pos, |a, i| {
@@ -131,9 +132,9 @@ impl PreIndex {
 
     fn add_links(&mut self, doc_id: u32, article_links: &str) -> Result<(), IndexError> {
         // out links
-        let link_titles: Vec<String> = article_links
+        let link_titles: Vec<u32> = article_links
             .split("\t")
-            .map(|c| c.trim().to_string())
+            .filter_map(|c| c.trim().to_string().parse::<u32>().ok())
             .collect();
 
         // in links
