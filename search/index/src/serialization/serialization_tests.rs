@@ -8,20 +8,34 @@ use crate::{
 };
 
 
+#[macro_export]
+macro_rules! test_serialize_deserialize {
+    ($name:ident ,$type:ty,$target:expr ) => {
+        #[test]
+        fn $name() {
 
+            let target = $target;
 
-
-#[test]
-#[cfg(target_endian = "little")]
-fn test_serialize_string() {
-    let a = "0123".to_string();
-
-    let mut out = Vec::default();
-
-    a.serialize(&mut out);
-
-    assert_eq!(out, b"\x04\0\0\00123") // ascii codes
+            let mut buffer = Vec::default();
+        
+            let serialize_bytes = target.serialize(&mut buffer);
+        
+            assert_eq!(serialize_bytes,buffer.len());
+        
+            let mut deserialized = <$type>::default();
+            let deserialize_bytes = deserialized.deserialize(&mut buffer.as_slice());
+        
+            assert_eq!(serialize_bytes,deserialize_bytes);
+        }
+    };
 }
+
+test_serialize_deserialize!(test_serialize_string,String,"123".to_string());
+test_serialize_deserialize!(test_serialize_int,u32,69);
+
+test_serialize_deserialize!(test_serialize_vec,Vec<u32>,vec![1,2,3,4,5,6]);
+test_serialize_deserialize!(test_serialize_map,HashMap<String,u32>,HashMap::from([("asd".to_string(),2),("aadasdasd".to_string(),69)]));
+
 
 #[test]
 #[cfg(target_endian = "little")]

@@ -156,9 +156,8 @@ impl IndexBuilder for SqlIndexBuilder {
             info!("Building pre-index: {}% ({}s) - processed {} docs, cache size {}",(processed_docs as f32 / num_docs as f32) * 100.0,timer.elapsed().as_secs(),processed_docs,pre_index.cache_size());
         }
 
-        // to make sure we don't exhaust RAM
         pre_index.clean_cache();
-
+        
         pool.close().await;
 
         let idx = Index::from_pre_index(pre_index);

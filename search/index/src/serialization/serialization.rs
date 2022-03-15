@@ -319,7 +319,7 @@ impl Serializable for String {
         let mut bytes = self.as_bytes();
         buf.write_u32::<NativeEndian>(bytes.len() as u32).unwrap();
         buf.write_all(&mut bytes).unwrap();
-        bytes.len()
+        bytes.len() + 4
     }
 
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
@@ -327,7 +327,7 @@ impl Serializable for String {
         for _ in 0..len {
             self.push(buf.read_u8().unwrap() as char);
         }
-        len as usize
+        len as usize + 4
     }
 }
 

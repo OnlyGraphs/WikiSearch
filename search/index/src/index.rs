@@ -212,8 +212,7 @@ impl Index {
             }
         });
         
-        // clean the cache to make space for cool records
-        index.posting_nodes.clean_cache();
+        // finalize the hashmap, to enable normal caching mode
         index.posting_nodes.set_runtime_mode();
 
         // back links

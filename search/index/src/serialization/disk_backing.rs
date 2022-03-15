@@ -295,7 +295,11 @@ where
         return self.capacity;
     }
 
+    /// finalizes the hashmap, cache evictions now happen per single request
+    /// versus batched
     pub fn set_runtime_mode(&mut self){
+        info!("Finalizing diskhashmap-{} construction",ID);
+        self.clean_cache();
         self.build_mode = false;
     }
 
@@ -303,7 +307,6 @@ where
     pub fn cache_population(&self) -> u32 {
         *IN_MEM_RECORDS.lock().get(&ID).unwrap()
     }
-
 
     /// picks a victim to evict according to eviction policy and unloads it 
     fn evict_victim(&self) -> Option<&Arc<Mutex<Entry<V,ID>>>>{
@@ -333,19 +336,28 @@ where
         info!("Cleaned cache, current records: {:?}", IN_MEM_RECORDS.lock().get(&ID));
     }
 
+    /// evicts untill invariant is satisfied,
+    /// in build mode cache is cleared in batches to save io
     fn evict_invariant(&self){
         let mut ram_usage = *IN_MEM_RECORDS.lock().get(&ID).unwrap();
-        loop {
+        if self.build_mode{
             if ram_usage > self.capacity {
-                let victim = self.evict_victim();
-                if victim.is_none(){
+                self.clean_cache();
+            }
+        } else {
+            loop {
+                if ram_usage > self.capacity {
+                    let victim = self.evict_victim();
+                    if victim.is_none(){
+                        break;
+                    }
+                    ram_usage = *IN_MEM_RECORDS.lock().get(&ID).unwrap();
+                } else {
                     break;
                 }
-                ram_usage = *IN_MEM_RECORDS.lock().get(&ID).unwrap();
-            } else {
-                break;
             }
         }
+
     }
 
     pub fn entry<Q : ?Sized>(&self, k:&Q) -> Option<Arc<Mutex<Entry<V,ID>>>>
@@ -355,17 +367,13 @@ where
     {
 
         let o =self.map.get(k).map(|v|{
-            if !self.build_mode{
-                v.lock().load().unwrap(); // force a load, users can't unload so this preserves RAM invariant within this function
-            }
+            v.lock().load().unwrap(); // force a load, users can't unload so this preserves RAM invariant within this function
             Arc::clone(v)
         });
         // check invariant, evicts less used / freshest elements first idealy
         // the eviction might evict the same element which is when the invariant exceeds RAM capacity by up to one elements size
         // which could be the largest one
-        if !self.build_mode{
-            self.evict_invariant();
-        }
+        self.evict_invariant();
         o
 
     }
@@ -375,6 +383,7 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ToOwned<Owned = K>
     {
+
         let v = self.map.get(k);
         match v {
             Some(s) => Arc::clone(s),
@@ -392,15 +401,14 @@ where
     pub fn insert(&mut self, k:K, v: V) -> Option<Arc<Mutex<Entry<V,ID>>>>
     where 
     {
+
         let o = self.map.insert(k,Arc::new(Mutex::new(Entry::Memory(v))));
         // if the value is nothing, we need to make sure to remove its record
         if let None = o{
             *IN_MEM_RECORDS.lock().get_mut(&ID).unwrap() += 1;
         }
 
-        if !self.build_mode{
-            self.evict_invariant();
-        }
+        self.evict_invariant();
 
         o
     }
@@ -409,6 +417,7 @@ where
     /// will still affect the RAM statistics of this hashmap
     /// only use if you know what you are doing
     pub fn pop(&mut self) -> Option<(K,Arc<Mutex<Entry<V,ID>>>)>{
+
         let o = self.map.pop();
 
         if let Some((_,v)) = &o {
