@@ -58,8 +58,8 @@ impl IndexBuilder for SqlIndexBuilder {
         let cap = cap_str.parse::<u32>().unwrap();
         let batch_size = batch_str.parse::<u32>().unwrap();
 
-        info!("CACHE_SIZE size found/default: {}", cap_str);
-        info!("BATCH_SIZE size found/default: {}", batch_size);
+        info!("CACHE_SIZE size found/default: {} records", cap);
+        info!("BATCH_SIZE size found/default: {} documents", batch_size);
 
         let mut pre_index = PreIndex::with_capacity(cap);
         pre_index.dump_id = highest_dump_id;
@@ -149,15 +149,15 @@ impl IndexBuilder for SqlIndexBuilder {
                     error!("Error in adding document with {{id: {}, title: {}}}:{}",doc_id,title,e);
                 }
 
-                if processed_docs % cap == 0 {
-                    pre_index.clean_cache();
-                }
-
-
             });
 
-            info!("Building pre-index: {}% ({}s) - processed {} docs",(processed_docs as f32 / num_docs as f32) * 100.0,timer.elapsed().as_secs(),processed_docs);
+
+
+            info!("Building pre-index: {}% ({}s) - processed {} docs, cache size {}",(processed_docs as f32 / num_docs as f32) * 100.0,timer.elapsed().as_secs(),processed_docs,pre_index.cache_size());
         }
+
+        // to make sure we don't exhaust RAM
+        pre_index.clean_cache();
 
         pool.close().await;
 

@@ -24,7 +24,7 @@ impl Default for PreIndex {
     fn default() -> Self {
         Self { 
             dump_id: Default::default(),
-            posting_nodes: DiskHashMap::new(1000000),
+            posting_nodes: DiskHashMap::new(10000,true),
             links: Default::default(), extent: Default::default(), 
             // id_title_map: Default::default(), 
             last_updated_docs: Default::default(), 
@@ -37,15 +37,19 @@ impl PreIndex {
     pub fn with_capacity(cap : u32) -> Self {
         Self { 
             dump_id: Default::default(),
-            posting_nodes: DiskHashMap::new(cap),
+            posting_nodes: DiskHashMap::new(cap,true),
             links: Default::default(), extent: Default::default(), 
             // id_title_map: Default::default(), 
             last_updated_docs: Default::default(), 
             curr_doc_appearances: Default::default() }
     }
 
+    pub fn cache_size(&self) -> u32{
+        self.posting_nodes.cache_population()
+    }
+
     pub fn clean_cache(&self){
-        self.posting_nodes.clean_cache_all();
+        self.posting_nodes.clean_cache();
     }
 
 

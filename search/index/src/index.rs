@@ -72,8 +72,8 @@ impl Debug for Index {
             "BasicIndex{{\n\
             \tDump ID={:?}\n\
             \tPostingLists={:?}\n\
-            \tPostingInRAM={:?}\n\
-            \tPostingRamCapacity={:?}\n\
+            \tPostingLists(RAM)={:?}\n\
+            \tPostingRAMCapacity={:?}\n\
             \tDocs={:.3}\n\
             \tRAM={:.3}MB\n\
             \tRAM/Docs={:.3}GB/1Million\n\
@@ -159,7 +159,7 @@ impl Index {
     ) -> Self {
         Self {
             dump_id: 0,
-            posting_nodes: DiskHashMap::new(posting_list_mem_limit),
+            posting_nodes: DiskHashMap::new(posting_list_mem_limit,true),
             links: HashMap::with_capacity(articles as usize),
             incoming_links: HashMap::with_capacity(articles as usize),
             extent: HashMap::with_capacity(256),
@@ -177,7 +177,7 @@ impl Index {
 
         let mut index = Self {
             dump_id: p.dump_id,
-            posting_nodes: DiskHashMap::new(p.posting_nodes.capacity()),
+            posting_nodes: DiskHashMap::new(p.posting_nodes.capacity(),true),
             incoming_links: HashMap::with_capacity(p.links.len()),
             page_rank: HashMap::with_capacity(p.links.len()),
             links: p.links,
@@ -204,33 +204,17 @@ impl Index {
             index.posting_nodes.insert(k,encoded_node);
             } // for dropping lock on v in case we want to evict it
 
-            // every R records, clean cache, and report progress
-            if idx % index.posting_nodes.capacity() as usize == 0 {
-                index.posting_nodes.clean_cache_all();
+            // every R records report progress
+            if idx % 10000 as usize == 0 {
                 info!("Sorted {}% ({}s)", (idx as f32 / total_posting_lists as f32) * 100.0,timer.elapsed().as_secs());
                 timer = Instant::now();
                 
             }
         });
-
-        index.posting_nodes.clean_cache_all();
         
-
-        // convert strings in the links to u32's
-        // sort all links
-        // info!("Reconciling links with IDs");
-        // timer = Instant::now();
-        // p.links.iter().for_each(|(from, to)| {
-        //     let mut targets: Vec<u32> = Vec::with_capacity(index.links.len());
-        //     to.iter().for_each(|l| {
-        //         p.id_title_map.get_by_right(l).map(|v| {
-        //             targets.push(*v);
-        //         });
-        //     });
-        //     targets.sort();
-        //     let _ = index.links.insert(*from, targets);
-        // });
-        // info!("Took {}s", timer.elapsed().as_secs());
+        // clean the cache to make space for cool records
+        index.posting_nodes.clean_cache();
+        index.posting_nodes.set_runtime_mode();
 
         // back links
         info!("Generating back links");
@@ -248,6 +232,7 @@ impl Index {
         index.page_rank = compute_page_ranks(&index.links, &index.incoming_links, 0.85);
         info!("Took {}s", timer.elapsed().as_secs());
 
+        
         return index;
     }
 }

@@ -4,12 +4,12 @@ use std::{
     fmt::Debug,
     fs::{remove_dir_all, File, remove_file, create_dir_all},
     hash::Hash,
-    path::{PathBuf, Path}, error::Error, io::{Read, Seek, Write}, sync::{Arc}, collections::{HashMap, BTreeMap},
+    path::{PathBuf, Path}, error::Error, io::{Read, Seek, Write}, sync::{Arc}, collections::{HashMap, BTreeMap}, ops::Deref,
 };
 
 use crate::{Serializable};
 use indexmap::{IndexMap};
-use itertools::Itertools;
+use itertools::{Itertools, FoldWhile};
 use log::info;
 use utils::MemFootprintCalculator;
 use parking_lot::{Mutex};
@@ -20,13 +20,15 @@ use once_cell::sync::Lazy; // 1.3.1
 
 /// a hashmap from DiskHashMap id's to their file handles
 static FILE_HANDLES: Lazy<Mutex<HashMap<u32,File>>> = Lazy::new(|| Mutex::default());
-static FREE_SPACE: Lazy<Mutex<HashMap<u32,BTreeMap<u64,Vec<u64>>>>> = Lazy::new(|| Mutex::default());
+static FREE_SPACE_BLOCKS: Lazy<Mutex<HashMap<u32,BTreeMap<u64,Vec<u64>>>>> = Lazy::new(|| Mutex::default());
+static IN_MEM_RECORDS: Lazy<Mutex<HashMap<u32, u32>>> = Lazy::new(|| Mutex::default());
 
 #[derive(Debug)]
 pub enum Entry<V : Serializable, const ID : u32> {
     Memory(V),
     Disk(u64),
 }
+
 
 
 
@@ -61,7 +63,7 @@ impl <V : Serializable + MemFootprintCalculator, const ID : u32>MemFootprintCalc
     }
 }
 
-impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
+impl<V : Serializable, const ID : u32> Entry<V, ID>{
 
     pub fn into_inner(self) -> Result<V, Box<dyn Error>>{
         match self {
@@ -167,16 +169,18 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
         // deserialize
         let mut v = V::default();
         let free_space = v.deserialize(f);
-        FREE_SPACE.lock().get_mut(&ID).unwrap()
+        FREE_SPACE_BLOCKS.lock().get_mut(&ID).unwrap()
             .entry(free_space as u64)
             .or_default()
             .push(offset);
+
+        IN_MEM_RECORDS.lock().entry(ID).and_modify(|v| *v += 1);
 
         Ok(v)
     }
 
     /// evicts the entry into the backing store either at the first hole of smallest size or at the end of the store
-    /// returns the offset into the backing store
+    /// returns the offset into the backing store 
     fn evict(f: &mut File, v: V) -> Result<u64, Box<dyn Error>>{
         // serialize into buffer to find out how many bytes necessary
         let mut buf = Vec::default();
@@ -185,7 +189,7 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
         // find space
         let offset : std::io::SeekFrom;
 
-        let mut lock = FREE_SPACE.lock();
+        let mut lock = FREE_SPACE_BLOCKS.lock();
 
         let space_map = lock.get_mut(&ID)
             .expect(&format!("No free space record for id {}",ID));
@@ -194,23 +198,45 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
             offset = std::io::SeekFrom::End(0);
         }
         else{
-            let (k,_) = space_map.iter().last()
+            let k = space_map.iter().last().map(|(k,_)| *k)
                 .expect("Impossible to reach, in theory");
 
-            if *k < space_needed{
+            if k < space_needed {
                 offset = std::io::SeekFrom::End(0);
             } else {
-                let (space,offsets) = space_map.iter_mut()
-                    .take_while(|(space,_)| **space < space_needed)
-                    .last()
+
+                let mut smallest_space = k;
+                // find smallest fitting hole
+                for k in space_map.keys().rev(){
+                    if *k < space_needed {
+                        break;
+                    } else {
+                        smallest_space = *k;
+                    }
+                }
+
+                let last_available_offset;
+                let empty;
+                {
+
+                let offsets = space_map.get_mut(&smallest_space)
                     .unwrap();
-                
+
                 // change space map
-                let last_available_offset = offsets.pop().unwrap();
+                last_available_offset = offsets.pop().unwrap();
+                empty = offsets.is_empty();
+                
+                }
+                
+                if empty {
+                    space_map.remove(&smallest_space).unwrap();
+                } 
+
+
                 offset = std::io::SeekFrom::Start(last_available_offset);
 
                 let leftover_offset = last_available_offset + space_needed;
-                let leftover_space = space - space_needed;
+                let leftover_space = smallest_space - space_needed;
                 if leftover_space > 0 {
                     space_map.entry(leftover_space)
                         .or_default()
@@ -230,6 +256,11 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
         // make sure to flush
         f.flush()?;
 
+
+        let mut lock =IN_MEM_RECORDS.lock(); 
+        *lock.get_mut(&ID).unwrap() -= 1;
+
+
         Ok(abs_offset)
     }
 }
@@ -238,6 +269,8 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
 /// A hashmap which holds a limited number of records in main memory with the rest
 /// of the records held on disk
 /// records are swapped as necessary
+/// INVARIANT: The number of bytes of all values in the cache (as per their serialization)
+/// will never exceed the capacity + largest value in the cache (due to the way bookkeping has to be done in entries)
 pub struct DiskHashMap<K, V, const ID : u32>
 where
     K: Serializable + Hash + Eq + Clone,
@@ -245,6 +278,7 @@ where
 {
     map: IndexMap<K, Arc<Mutex<Entry<V,ID>>>>,
     capacity: u32,
+    build_mode: bool,
 }
 
 impl<K, V, const ID : u32> DiskHashMap<K, V, ID>
@@ -261,62 +295,79 @@ where
         return self.capacity;
     }
 
+    pub fn set_runtime_mode(&mut self){
+        self.build_mode = false;
+    }
+
 
     pub fn cache_population(&self) -> u32 {
-        self.map.values().fold(0 as u32,|a,v| {
-            if v.lock().is_loaded(){
-                a + 1
-            } else {
-                a
-            }
-        })
+        *IN_MEM_RECORDS.lock().get(&ID).unwrap()
     }
 
 
-    fn clean_cache_untill(&self,mut curr_size : u32, target_size : u32) -> u32{
+    /// picks a victim to evict according to eviction policy and unloads it 
+    fn evict_victim(&self) -> Option<&Arc<Mutex<Entry<V,ID>>>>{
+        self.map.iter()
+            .find(|(_,v)| v.lock().is_loaded())
+            .map(|(_,v)| {
+                assert!(v.lock().is_loaded());
+                v.lock().unload().unwrap();
+                v
+            })
+        
+    }
+
+    pub fn clean_cache(&self){
+        // figure out how many records are in memory
 
         // reduce this number if needed
-        if curr_size > target_size {
-            self.map.values().take_while(|v| {
-                if !v.is_locked() && v.lock().is_loaded(){
-                    // we are only ones using it 
-                    // evict candidate
-                    v.lock().unload().unwrap();
-                    curr_size -= 1;
-                };
-                curr_size > target_size
-            }).for_each(drop);
-        }
+        info!("Cleaning cache, current records: {:?}", IN_MEM_RECORDS.lock().get(&ID));
 
-
-        curr_size
+        self.map.values().for_each(|v| {
+            if !v.is_locked() && v.lock().is_loaded(){
+                // we are only ones using it 
+                // evict candidate
+                v.lock().unload().unwrap();
+            };
+        });
+        info!("Cleaned cache, current records: {:?}", IN_MEM_RECORDS.lock().get(&ID));
     }
 
-    /// evicts unused records untill all records are checked or record limit is satisfied
-    pub fn clean_cache(&self) -> u32 {
-        // figure out how many records are in memory
-        let records = self.cache_population();
-        info!("Cleaning cache, containing: {} entries",records);
-
-        self.clean_cache_untill(records,self.capacity())
-    }
-
-        /// evicts unused records untill all available records are evicted
-        pub fn clean_cache_all(&self) {
-            // figure out how many records are in memory
-            info!("Cleaning cache fully");
-    
-            self.clean_cache_untill(self.len() as u32,0);
+    fn evict_invariant(&self){
+        let mut ram_usage = *IN_MEM_RECORDS.lock().get(&ID).unwrap();
+        loop {
+            if ram_usage > self.capacity {
+                let victim = self.evict_victim();
+                if victim.is_none(){
+                    break;
+                }
+                ram_usage = *IN_MEM_RECORDS.lock().get(&ID).unwrap();
+            } else {
+                break;
+            }
         }
+    }
 
     pub fn entry<Q : ?Sized>(&self, k:&Q) -> Option<Arc<Mutex<Entry<V,ID>>>>
     where 
         K: Borrow<Q>,
         Q: Hash + Eq
     {
-        self.map.get(k).map(|v|{
+
+        let o =self.map.get(k).map(|v|{
+            if !self.build_mode{
+                v.lock().load().unwrap(); // force a load, users can't unload so this preserves RAM invariant within this function
+            }
             Arc::clone(v)
-        })
+        });
+        // check invariant, evicts less used / freshest elements first idealy
+        // the eviction might evict the same element which is when the invariant exceeds RAM capacity by up to one elements size
+        // which could be the largest one
+        if !self.build_mode{
+            self.evict_invariant();
+        }
+        o
+
     }
 
     pub fn entry_or_default<Q : ?Sized>(&mut self, k:&Q) -> Arc<Mutex<Entry<V,ID>>>
@@ -341,14 +392,35 @@ where
     pub fn insert(&mut self, k:K, v: V) -> Option<Arc<Mutex<Entry<V,ID>>>>
     where 
     {
-       self.map.insert(k,Arc::new(Mutex::new(Entry::Memory(v))))
+        let o = self.map.insert(k,Arc::new(Mutex::new(Entry::Memory(v))));
+        // if the value is nothing, we need to make sure to remove its record
+        if let None = o{
+            *IN_MEM_RECORDS.lock().get_mut(&ID).unwrap() += 1;
+        }
+
+        if !self.build_mode{
+            self.evict_invariant();
+        }
+
+        o
     }
 
+    /// removes some less used value, NOTE: this entry
+    /// will still affect the RAM statistics of this hashmap
+    /// only use if you know what you are doing
     pub fn pop(&mut self) -> Option<(K,Arc<Mutex<Entry<V,ID>>>)>{
-        self.map.pop()
+        let o = self.map.pop();
+
+        if let Some((_,v)) = &o {
+            if v.lock().is_loaded(){
+                *IN_MEM_RECORDS.lock().get_mut(&ID).unwrap() -= 1;
+            }
+        }
+
+        o
     }
 
-    pub fn new(capacity: u32) -> Self {
+    pub fn new(capacity: u32, build_mode : bool) -> Self {
 
         // create and open new file handle, store it in static var for entries
         let path = Self::path();
@@ -361,8 +433,9 @@ where
 
         
         FILE_HANDLES.lock().insert(ID,fh);
-        FREE_SPACE.lock().insert(ID,BTreeMap::default());
-        
+        FREE_SPACE_BLOCKS.lock().insert(ID,BTreeMap::default());
+        IN_MEM_RECORDS.lock().insert(ID,0);
+
         // better safe than sorry
         if path == Path::new("/") ||
             path.as_os_str().len() == 0 {
@@ -371,7 +444,8 @@ where
 
         Self {
             map: IndexMap::new(),
-            capacity: capacity
+            capacity: capacity,
+            build_mode
         }
     }
 }
@@ -387,24 +461,12 @@ where
     }
 }
 
-// this doesn't work as i thought it would
-// impl<K, V, const ID : u32> Drop for DiskHashMap<K, V, ID>
-// where
-//     K: Serializable + Hash + Eq + Clone,
-//     V: Serializable + Debug,
-// {
-//     fn drop(&mut self) {
-//         info!("Dropping cache for DiskHashMap-{}",ID);
-//         remove_dir_all(Self::path()).unwrap_or(());
-//     }
-// }
-
 impl<K, V, const ID : u32> Default for DiskHashMap<K, V, ID>
 where
     K: Serializable + Hash + Eq + Clone,
     V: Serializable + Debug,
 {
     fn default() -> Self {
-        Self::new(0)
+        Self::new(0,false)
     }
 }
