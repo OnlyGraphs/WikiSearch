@@ -65,9 +65,9 @@ pub fn compute_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_link
     let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
     update_all_page_ranks(outgoing_links, incoming_links, &mut page_rank, d);
 
-    let mut max_iters = std::env::var("PAGE_RANK_ITERS").unwrap_or("50".to_string())
+    let mut max_iters = std::env::var("PAGE_RANK_ITERS").unwrap_or("70".to_string())
         .parse::<u32>()
-        .unwrap_or(50);
+        .unwrap_or(70);
 
     let mut timer = Instant::now(); 
     loop {

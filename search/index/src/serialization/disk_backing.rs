@@ -433,6 +433,7 @@ where
 
         // create and open new file handle, store it in static var for entries
         let path = Self::path();
+        remove_file(&path);
         let fh = File::options()
                                 .create(true)
                                 .read(true)
@@ -444,6 +445,7 @@ where
         FILE_HANDLES.lock().insert(ID,fh);
         FREE_SPACE_BLOCKS.lock().insert(ID,BTreeMap::default());
         IN_MEM_RECORDS.lock().insert(ID,0);
+
 
         // better safe than sorry
         if path == Path::new("/") ||

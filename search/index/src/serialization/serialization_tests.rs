@@ -4,7 +4,7 @@ use utils::MemFootprintCalculator;
 
 use crate::{
     DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting,
-    SequentialEncoder, Serializable, VbyteEncoder,
+    SequentialEncoder, Serializable, VbyteEncoder, PostingNode,
 };
 
 
@@ -35,6 +35,16 @@ test_serialize_deserialize!(test_serialize_int,u32,69);
 
 test_serialize_deserialize!(test_serialize_vec,Vec<u32>,vec![1,2,3,4,5,6]);
 test_serialize_deserialize!(test_serialize_map,HashMap<String,u32>,HashMap::from([("asd".to_string(),2),("aadasdasd".to_string(),69)]));
+test_serialize_deserialize!(test_serialize_posting_node,PostingNode,
+    PostingNode{ 
+        postings: vec![
+            Posting{ document_id: 2, position: 1 },
+            Posting{ document_id: 69, position: 69 },
+            Posting{ document_id: 42, position: 42 },
+            ], 
+        df: 0, 
+        tf: HashMap::from([(0,1),(69,42)]) 
+    });
 
 
 #[test]

@@ -96,7 +96,7 @@ pub async fn search(
     q: Query<SearchParameters>,
 ) -> Result<impl Responder, APIError> {
 
-    let mut timer_whole = Instant::now();
+    let timer_whole = Instant::now();
 
     info!("received query: {}", q.query);
 
