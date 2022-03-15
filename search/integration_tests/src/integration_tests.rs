@@ -232,10 +232,10 @@ macro_rules! map {
 fn test_docs_within_hops_line() {
     let mut pre_idx= PreIndex::default();
 
-    pre_idx.add_document(get_document_with_links(0, "A", "B")) .unwrap();
-    pre_idx.add_document(get_document_with_links(1, "B", "C")).unwrap();
-    pre_idx.add_document(get_document_with_links(2, "C", "D")).unwrap();
-    pre_idx.add_document(get_document_with_links(3, "D", "E")).unwrap();
+    pre_idx.add_document(get_document_with_links(0, "A", "1")) .unwrap();
+    pre_idx.add_document(get_document_with_links(1, "B", "2")).unwrap();
+    pre_idx.add_document(get_document_with_links(2, "C", "3")).unwrap();
+    pre_idx.add_document(get_document_with_links(3, "D", "4")).unwrap();
     pre_idx.add_document(get_document_with_links(4, "E", "")).unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
@@ -267,10 +267,10 @@ fn test_docs_within_hops_inverse_line() {
     let mut pre_idx= PreIndex::default();
 
     pre_idx.add_document(get_document_with_links(0, "A", "")) .unwrap();
-    pre_idx.add_document(get_document_with_links(1, "B", "A")).unwrap();
-    pre_idx.add_document(get_document_with_links(2, "C", "B")).unwrap();
-    pre_idx.add_document(get_document_with_links(3, "D", "C")).unwrap();
-    pre_idx.add_document(get_document_with_links(4, "E", "D")).unwrap();
+    pre_idx.add_document(get_document_with_links(1, "B", "0")).unwrap();
+    pre_idx.add_document(get_document_with_links(2, "C", "1")).unwrap();
+    pre_idx.add_document(get_document_with_links(3, "D", "2")).unwrap();
+    pre_idx.add_document(get_document_with_links(4, "E", "3")).unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -307,8 +307,8 @@ fn test_docs_within_hops_complex() {
     //               E 4
 
     pre_idx.add_document(get_document_with_links(0, "A", "")) .unwrap();
-    pre_idx.add_document(get_document_with_links(1, "B", "A\tE")).unwrap();
-    pre_idx.add_document(get_document_with_links(2, "C", "B\tD")).unwrap();
+    pre_idx.add_document(get_document_with_links(1, "B", "0\t4")).unwrap();
+    pre_idx.add_document(get_document_with_links(2, "C", "1\t3")).unwrap();
     pre_idx.add_document(get_document_with_links(3, "D", "")).unwrap();
     pre_idx.add_document(get_document_with_links(4, "E", "")).unwrap();
 
@@ -913,7 +913,7 @@ fn test_relational_search() {
         vec!["asd world"],
         "ggg hhh",
 
-        "B"
+        "1"
     ))
     .unwrap();
 
@@ -936,7 +936,7 @@ fn test_relational_search() {
         "asd world",
         vec!["ddd ddd"],
         "ooo ppp",
-        "B\tD"
+        "1\t3"
     ))
     .unwrap();
 

@@ -171,6 +171,9 @@ impl Index {
     pub fn from_pre_index(mut p: PreIndex) -> Self {
         // extract postings and sort
         let mut timer = Instant::now();
+        
+        // sort links before moving
+        p.links.values_mut().for_each(|v| v.sort());
 
         let mut index = Self {
             dump_id: p.dump_id,

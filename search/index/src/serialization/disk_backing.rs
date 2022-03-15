@@ -1,42 +1,31 @@
+
 use std::{
     borrow::Borrow,
     fmt::Debug,
     fs::{remove_dir_all, File, remove_file, create_dir_all},
     hash::Hash,
-    path::{PathBuf, Path}, error::Error, io::Read, sync::{Arc},
+    path::{PathBuf, Path}, error::Error, io::{Read, Seek, Write}, sync::{Arc}, collections::{HashMap, BTreeMap},
 };
 
 use crate::{Serializable};
 use indexmap::{IndexMap};
+use itertools::Itertools;
 use log::info;
 use utils::MemFootprintCalculator;
 use parking_lot::{Mutex};
 use default_env::default_env;
+use once_cell::sync::Lazy; // 1.3.1
 
-pub struct Iter {
-    max_len: usize,
-    curr_idx: usize,
-}
 
-impl Iterator for Iter {
-    type Item = usize;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let o = if self.curr_idx < self.max_len {
-            Some(self.curr_idx)
-        } else {
-            None
-        };
-
-        self.curr_idx += 1;
-        return o;
-    }
-}
+/// a hashmap from DiskHashMap id's to their file handles
+static FILE_HANDLES: Lazy<Mutex<HashMap<u32,File>>> = Lazy::new(|| Mutex::default());
+static FREE_SPACE: Lazy<Mutex<HashMap<u32,BTreeMap<u64,Vec<u64>>>>> = Lazy::new(|| Mutex::default());
 
 #[derive(Debug)]
 pub enum Entry<V : Serializable, const ID : u32> {
     Memory(V),
-    Disk(u32),
+    Disk(u64),
 }
 
 
@@ -95,8 +84,8 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
     pub fn get(&mut self) -> Result<&V, Box<dyn Error>>{
         match self {
             Entry::Memory(ref mut v) => Ok(v),
-            Entry::Disk(id) => {
-                let new = Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))?; // TODO: env variable
+            Entry::Disk(offset) => {
+                let new = Self::fetch(*offset,FILE_HANDLES.lock().get_mut(&ID).unwrap())?; 
                 *self = Entry::Memory(new);
                 
                 match self {
@@ -109,15 +98,19 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
 
 
     // ensures the entry is not in memory
-    pub fn unload(&mut self,id : u32) -> Result<(), Box<dyn Error>>{
-        match self {
+    fn unload(&mut self) -> Result<(), Box<dyn Error>>{
+        let offset = match self {
             Entry::Memory(v) => {
                 let prev = std::mem::take(v);
-                Self::evict(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)),prev)?;
+                Self::evict(
+                    FILE_HANDLES.lock().get_mut(&ID).unwrap() 
+                    ,prev
+                )?
             },
             Entry::Disk(_) => return Ok(()),
         };
-        *self = Entry::Disk(id);
+
+        *self = Entry::Disk(offset);
 
         Ok(())
     }
@@ -126,9 +119,9 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
     pub fn load(&mut self) -> Result<(), Box<dyn Error>>{
         match self {
             Entry::Memory(_v) => Ok(()),
-            Entry::Disk(id) => {
+            Entry::Disk(offset) => {
                 *self = Entry::Memory(
-                    Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))? // TODO: env variable
+                    Self::fetch(*offset,FILE_HANDLES.lock().get_mut(&ID).unwrap())? // TODO: env variable
                 );
                 Ok(())
             },
@@ -141,9 +134,9 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
     pub fn get_mut(&mut self) -> Result<&mut V, Box<dyn Error>>{
         match self {
             Entry::Memory(ref mut v) => Ok(v),
-            Entry::Disk(id) => {
+            Entry::Disk(offset) => {
                 *self = Entry::Memory(
-                    Self::fetch(PathBuf::from(format!("{}/{}-{}/{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID,id)))? // TODO: env variable
+                    Self::fetch(*offset,FILE_HANDLES.lock().get_mut(&ID).unwrap())? // TODO: env variable
                 );
 
                 match self {
@@ -165,25 +158,79 @@ impl<V : Serializable + Debug, const ID : u32> Entry<V, ID>{
     }
 
 
-    fn fetch(p : PathBuf) -> Result<V, Box<dyn Error>>{
+    /// fetches the entry from the backing store at the given offset and records the free space gap left over for the hash map to make use of 
+    /// later if needed
+    fn fetch(offset : u64, f : &mut File) -> Result<V, Box<dyn Error>>{
         // open file and fill buffer
-        let mut f = File::open(&p).expect("no file found");
-        let mut buffer = vec![0; f.metadata()?.len() as usize];
-        f.read(&mut buffer)?;
+        f.seek(std::io::SeekFrom::Start(offset))?;
 
         // deserialize
         let mut v = V::default();
-        v.deserialize(&mut buffer.as_slice());
+        let free_space = v.deserialize(f);
+        FREE_SPACE.lock().get_mut(&ID).unwrap()
+            .entry(free_space as u64)
+            .or_default()
+            .push(offset);
 
-        // clean up 
-        remove_file(&p)?;
         Ok(v)
     }
 
-    fn evict(p : PathBuf, v: V) -> Result<(), Box<dyn Error>>{
-        let mut f = File::create(p)?;
-        v.serialize(&mut f);
-        Ok(())
+    /// evicts the entry into the backing store either at the first hole of smallest size or at the end of the store
+    /// returns the offset into the backing store
+    fn evict(f: &mut File, v: V) -> Result<u64, Box<dyn Error>>{
+        // serialize into buffer to find out how many bytes necessary
+        let mut buf = Vec::default();
+        let space_needed = v.serialize(&mut buf) as u64;
+        
+        // find space
+        let offset : std::io::SeekFrom;
+
+        let mut lock = FREE_SPACE.lock();
+
+        let space_map = lock.get_mut(&ID)
+            .expect(&format!("No free space record for id {}",ID));
+
+        if space_map.is_empty(){
+            offset = std::io::SeekFrom::End(0);
+        }
+        else{
+            let (k,_) = space_map.iter().last()
+                .expect("Impossible to reach, in theory");
+
+            if *k < space_needed{
+                offset = std::io::SeekFrom::End(0);
+            } else {
+                let (space,offsets) = space_map.iter_mut()
+                    .take_while(|(space,_)| **space < space_needed)
+                    .last()
+                    .unwrap();
+                
+                // change space map
+                let last_available_offset = offsets.pop().unwrap();
+                offset = std::io::SeekFrom::Start(last_available_offset);
+
+                let leftover_offset = last_available_offset + space_needed;
+                let leftover_space = space - space_needed;
+                if leftover_space > 0 {
+                    space_map.entry(leftover_space)
+                        .or_default()
+                        .push(leftover_offset);
+                }
+
+            }
+        
+        }
+
+        // serialize to it, record stream position first
+        f.seek(offset)?;
+        let abs_offset = f.stream_position()
+            .expect("Could not get stream position in file");
+
+        f.write(&buf)?;
+        // make sure to flush
+        f.flush()?;
+
+        Ok(abs_offset)
     }
 }
 
@@ -225,29 +272,33 @@ where
         })
     }
 
-    /// evicts unused records untill all records are checked or record limit is satisfied
-    pub fn clean_cache(&self) -> u32 {
-        // figure out how many records are in memory
-        let mut records = self.cache_population();
-        info!("Cleaning cache, containing: {} entries",records);
 
+    fn clean_cache_untill(&self,mut curr_size : u32, target_size : u32) -> u32{
 
         // reduce this number if needed
-        if records > self.capacity {
-            self.map.values().enumerate().take_while(|(i,v)| {
+        if curr_size > target_size {
+            self.map.values().take_while(|v| {
                 if !v.is_locked() && v.lock().is_loaded(){
                     // we are only ones using it 
                     // evict candidate
-                    v.lock().unload(*i as u32).unwrap();
-                    records -= 1;
+                    v.lock().unload().unwrap();
+                    curr_size -= 1;
                 };
-                records > self.capacity
+                curr_size > target_size
             }).for_each(drop);
         }
 
-        info!("Cache cleaned, now contains: {} entries", records);
 
-        records
+        curr_size
+    }
+
+    /// evicts unused records untill all records are checked or record limit is satisfied
+    pub fn clean_cache(&self) -> u32 {
+        // figure out how many records are in memory
+        let records = self.cache_population();
+        info!("Cleaning cache, containing: {} entries",records);
+
+        self.clean_cache_untill(records,self.capacity())
     }
 
         /// evicts unused records untill all available records are evicted
@@ -255,17 +306,7 @@ where
             // figure out how many records are in memory
             info!("Cleaning cache fully");
     
-            // reduce this number if needed
-            self.map.values().enumerate().for_each(|(i,v)| {
-                if !v.is_locked() && v.lock().is_loaded(){
-                    // we are only ones using it 
-                    // evict candidate
-                    v.lock().unload(i as u32).unwrap();
-                };
-            });
-    
-            info!("Cache cleaned, now contains: {} entries", self.cache_population());
-    
+            self.clean_cache_untill(self.len() as u32,0);
         }
 
     pub fn entry<Q : ?Sized>(&self, k:&Q) -> Option<Arc<Mutex<Entry<V,ID>>>>
@@ -294,7 +335,7 @@ where
     }
 
     pub fn path() -> PathBuf{
-        PathBuf::from(format!("{}/{}-{}",default_env!("TMP_PATH","/tmp"),"diskhashmap",ID))
+        PathBuf::from(format!("{}/diskhashmap-{}",default_env!("TMP_PATH","/tmp"),ID))
     }
 
     pub fn insert(&mut self, k:K, v: V) -> Option<Arc<Mutex<Entry<V,ID>>>>
@@ -308,15 +349,25 @@ where
     }
 
     pub fn new(capacity: u32) -> Self {
+
+        // create and open new file handle, store it in static var for entries
         let path = Self::path();
+        let fh = File::options()
+                                .create(true)
+                                .read(true)
+                                .write(true)
+                                .open(Self::path())
+                                .expect(&format!("Could not allocate file for DiskHashMap-{}",ID));
+
         
+        FILE_HANDLES.lock().insert(ID,fh);
+        FREE_SPACE.lock().insert(ID,BTreeMap::default());
+        
+        // better safe than sorry
         if path == Path::new("/") ||
             path.as_os_str().len() == 0 {
             panic!();
         };
-
-        remove_dir_all(&path);
-        create_dir_all(&path);
 
         Self {
             map: IndexMap::new(),

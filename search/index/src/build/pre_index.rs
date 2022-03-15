@@ -50,6 +50,14 @@ impl PreIndex {
 
 
     pub fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError> {
+        
+        if self.links.contains_key(&document.doc_id){
+            return Err(IndexError {
+                msg: "Attempted to insert document into index which already exists.".to_string(),
+                kind: IndexErrorKind::InvalidOperation,
+            })
+        }
+
         let mut word_pos = 0;
 
         // metadata
@@ -66,6 +74,7 @@ impl PreIndex {
         //         msg: "Attempted to insert document into index which already exists.".to_string(),
         //         kind: IndexErrorKind::InvalidOperation,
         //     })?;
+
 
         //Infoboxes
         word_pos = document.infoboxes.iter().fold(word_pos, |a, i| {
