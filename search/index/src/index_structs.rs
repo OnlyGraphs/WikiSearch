@@ -1,8 +1,11 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use crate::{EncodedPostingList, SequentialEncoder};
+use fxhash::{FxBuildHasher, FxHashMap};
+use std::collections::hash_map::RandomState;
+use std::collections::HashMap;
+use std::hash::{BuildHasher, Hasher};
 use utils::MemFootprintCalculator;
 pub const DATE_TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -17,7 +20,7 @@ pub struct Posting {
 pub struct PostingNode {
     pub postings: Vec<Posting>,
     pub df: u32,
-    pub tf: HashMap<u32, u32>,
+    pub tf: IndexMap<u32, u32, FxBuildHasher>,
 }
 
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
@@ -27,7 +30,7 @@ where
 {
     pub postings: EncodedPostingList<E>,
     pub df: u32,
-    pub tf: HashMap<u32, u32>,
+    pub tf: IndexMap<u32, u32, FxBuildHasher>,
 }
 
 impl<E: SequentialEncoder<Posting>> From<PostingNode> for EncodedPostingNode<E> {

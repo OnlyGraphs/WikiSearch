@@ -189,6 +189,7 @@ impl Index {
             {
                 let (k, v) = p.posting_nodes.pop().unwrap();
                 v.lock().get_mut().unwrap().postings.sort();
+                v.lock().get_mut().unwrap().tf.sort_keys();
 
                 let unwrapped = match Arc::try_unwrap(v) {
                     Ok(v) => v,

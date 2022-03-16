@@ -3,10 +3,12 @@ use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use core::fmt::Debug;
 use core::hash::Hash;
+use indexmap::IndexMap;
 
 use std::{
     cell::RefCell,
     collections::HashMap,
+    hash::BuildHasher,
     io::{Read, Write},
     marker::PhantomData,
 };
@@ -158,26 +160,23 @@ impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
 pub struct DeltaEncoder {}
 
 impl DeltaEncoder {
-    // #[inline(always)]
-    fn compress(_prev: &Option<Posting>, curr: &Posting) -> Posting {
-        let mut diff = Posting {
-            document_id: curr.document_id,
-            position: curr.position,
-        };
-        if let Some(previous_posting) = *_prev {
-            diff.document_id = curr.document_id - previous_posting.document_id;
-            if curr.document_id == previous_posting.document_id {
-                diff.position = curr.position - previous_posting.position;
+    #[inline(always)]
+    fn compress(_prev_tuple: &Option<(u32, u32)>, curr: (u32, u32)) -> (u32, u32) {
+        let mut diff: (u32, u32) = (curr.0, curr.1);
+        if let Some(prev_element) = *_prev_tuple {
+            diff.0 = curr.0 - prev_element.0;
+            if curr.0 == prev_element.0 {
+                diff.1 = curr.1 - prev_element.1;
             }
         }
         return diff;
     }
-    // #[inline(always)]
-    fn decompress(_prev: &Option<Posting>, diff: &mut Posting) -> Posting {
-        if let Some(previous_posting) = *_prev {
-            diff.document_id = diff.document_id + previous_posting.document_id;
-            if diff.document_id == previous_posting.document_id {
-                diff.position = diff.position + previous_posting.position;
+
+    fn decompress(_prev_tuple: &Option<(u32, u32)>, diff: &mut (u32, u32)) -> (u32, u32) {
+        if let Some(previous) = *_prev_tuple {
+            diff.0 = diff.0 + previous.0;
+            if diff.0 == previous.0 {
+                diff.1 = diff.1 + previous.1;
             }
         }
         return *diff;
@@ -187,7 +186,19 @@ impl DeltaEncoder {
 impl SequentialEncoder<Posting> for DeltaEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(8);
-        let diff = DeltaEncoder::compress(_prev, curr);
+        let (diff_doc_id, diff_position) = match _prev {
+            Some(x) => DeltaEncoder::compress(
+                &Some((x.document_id, x.position)),
+                (curr.document_id, curr.position),
+            ),
+            None => DeltaEncoder::compress(&None, (curr.document_id, curr.position)),
+        };
+
+        let diff = Posting {
+            document_id: diff_doc_id,
+            position: diff_position,
+        };
+
         let _count = diff.serialize(&mut bytes);
         bytes
     }
@@ -195,8 +206,16 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
     fn decode<R: Read>(_prev: &Option<Posting>, bytes: &mut R) -> (Posting, usize) {
         let mut a = Posting::default();
         let count = a.deserialize(bytes);
+        let (a_doc_id, a_position) = match _prev {
+            Some(x) => DeltaEncoder::decompress(
+                &Some((x.document_id, x.position)),
+                &mut (a.document_id, a.position),
+            ),
+            None => DeltaEncoder::decompress(&None, &mut (a.document_id, a.position)),
+        };
 
-        a = DeltaEncoder::decompress(_prev, &mut a);
+        a.document_id = a_doc_id;
+        a.position = a_position;
 
         (a, count)
     }
@@ -256,13 +275,27 @@ impl SequentialEncoder<Posting> for VbyteEncoder {
     // #[inline(always)]
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
         let mut encoding_bytes = Vec::with_capacity(8);
-        let vdiff = DeltaEncoder::compress(_prev, curr);
+        //Apply delta encoding
+        let (diff_doc_id, diff_position) = match _prev {
+            Some(x) => DeltaEncoder::compress(
+                &Some((x.document_id, x.position)),
+                (curr.document_id, curr.position),
+            ),
+            None => DeltaEncoder::compress(&None, (curr.document_id, curr.position)),
+        };
+
+        let vdiff = Posting {
+            document_id: diff_doc_id,
+            position: diff_position,
+        };
+        //Apply vbyte encoding
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.document_id));
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.position));
         encoding_bytes
     }
     // #[inline(always)]
     fn decode<R: Read>(_prev: &Option<Posting>, bytes: &mut R) -> (Posting, usize) {
+        // Vbyte decode
         let (doc_id, doc_byte_count): (u32, usize) = VbyteEncoder::from_vbyte_deserialise(bytes);
         let (position, position_byte_count): (u32, usize) =
             VbyteEncoder::from_vbyte_deserialise(bytes);
@@ -270,9 +303,19 @@ impl SequentialEncoder<Posting> for VbyteEncoder {
             document_id: doc_id,
             position: position,
         };
+        //delta decode
+        let (a_doc_id, a_position) = match _prev {
+            Some(x) => DeltaEncoder::decompress(
+                &Some((x.document_id, x.position)),
+                &mut (vdiff.document_id, vdiff.position),
+            ),
+            None => DeltaEncoder::decompress(&None, &mut (vdiff.document_id, vdiff.position)),
+        };
 
-        let a: Posting = DeltaEncoder::decompress(_prev, &mut vdiff);
-        (a, doc_byte_count + position_byte_count)
+        vdiff.document_id = a_doc_id;
+        vdiff.position = a_position;
+
+        (vdiff, doc_byte_count + position_byte_count)
     }
 }
 //NOTE: Only end_pos_delta is encoded. start_pos of PosRange is serialised without any encoding
@@ -498,6 +541,39 @@ impl<K, V> Serializable for HashMap<K, V>
 where
     K: Serializable + Hash + Eq,
     V: Serializable,
+{
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        let mut count = 4;
+        buf.write_u32::<NativeEndian>(self.len() as u32).unwrap();
+        count = self
+            .iter()
+            .fold(count, |a, (k, v)| a + k.serialize(buf) + v.serialize(buf));
+
+        count
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        let mut count = 4;
+        let len = buf.read_u32::<NativeEndian>().unwrap();
+        self.reserve(len as usize);
+        (0..len).for_each(|_v| {
+            let mut k = K::default();
+            let mut v = V::default();
+
+            count += k.deserialize(buf);
+            count += v.deserialize(buf);
+            self.insert(k, v);
+        });
+        count
+    }
+}
+
+// Manually encodes
+impl<K, V, S> Serializable for IndexMap<K, V, S>
+where
+    K: Serializable + Hash + Eq,
+    V: Serializable,
+    S: BuildHasher + Default,
 {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         let mut count = 4;

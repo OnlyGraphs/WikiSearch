@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use indexmap::IndexMap;
 use utils::MemFootprintCalculator;
 
 use crate::{
@@ -9,6 +10,7 @@ use crate::{
 use chrono::NaiveDateTime;
 
 use crate::LastUpdatedDate;
+use fxhash::FxBuildHasher;
 
 #[macro_export]
 macro_rules! test_serialize_deserialize {
@@ -55,9 +57,17 @@ test_serialize_deserialize!(
             },
         ],
         df: 0,
-        tf: HashMap::from([(0, 1), (69, 42)])
+        tf: create_tf_for_test_serialize_posting_node()
     }
 );
+
+//Helper function to create an arbitrary tf
+fn create_tf_for_test_serialize_posting_node() -> IndexMap<u32, u32, FxBuildHasher> {
+    let mut x = IndexMap::default();
+    x.insert(0, 1);
+    x.insert(69, 42);
+    return x;
+}
 
 #[test]
 #[cfg(target_endian = "little")]
