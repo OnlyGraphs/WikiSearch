@@ -3,8 +3,8 @@ use std::{collections::HashMap, path::PathBuf};
 use utils::MemFootprintCalculator;
 
 use crate::{
-    DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting, PostingNode,
-    SequentialEncoder, Serializable, VbyteEncoder,
+    DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, PosRange, Posting,
+    PostingNode, SequentialEncoder, Serializable, VbyteEncoder,
 };
 use chrono::NaiveDateTime;
 
@@ -135,6 +135,35 @@ fn test_deserialize_posting() {
         position: 42,
     };
     let mut clean = Posting::default();
+
+    let ref mut out: &mut &[u8] = &mut &b"E\0\0\0*\0\0\0".to_vec()[..];
+    clean.deserialize(out);
+    assert_eq!(clean, target)
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_serialize_posting_range() {
+    let a = PosRange {
+        start_pos: 69,
+        end_pos_delta: 42,
+    };
+
+    let mut out = Vec::default();
+
+    a.serialize(&mut out);
+
+    assert_eq!(out, b"E\0\0\0*\0\0\0") // ascii codes
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_deserialize_posting_range() {
+    let target = PosRange {
+        start_pos: 69,
+        end_pos_delta: 42,
+    };
+    let mut clean = PosRange::default();
 
     let ref mut out: &mut &[u8] = &mut &b"E\0\0\0*\0\0\0".to_vec()[..];
     clean.deserialize(out);
@@ -685,6 +714,40 @@ fn test_v_byte_with_prev_different_document_decode() {
     };
     assert_eq!(encoded, target);
     assert_eq!(size, 4);
+}
+
+///--- Vbyte PosRange ---
+///
+///
+
+#[test]
+fn test_v_byte_encoder_no_prev_posting_range() {
+    let encoded = VbyteEncoder::encode(
+        &None,
+        &PosRange {
+            start_pos: 128,
+            end_pos_delta: 9,
+        },
+    );
+    let target = b"\x80\0\0\0\x09".to_vec(); // 5 bytes (4 for start_pos, because its not encoded), 1 for end_pos, which is in encoding format)
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_v_byte_no_prev_decode_posting_range() {
+    let source = b"\x7F\0\0\0\x81\0".to_vec();
+    let (encoded, size): (PosRange, usize) = VbyteEncoder::decode(
+        &None,
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+    let target = PosRange {
+        start_pos: 127,
+        end_pos_delta: 128,
+    };
+    assert_eq!(encoded, target);
+    assert_eq!(size, 6);
 }
 
 ///// ------------

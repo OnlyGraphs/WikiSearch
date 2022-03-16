@@ -177,9 +177,9 @@ impl PreIndex {
             .entry(doc_id)
             .or_insert(PosRange {
                 start_pos: prev_pos, // if not exists, initialize range
-                end_pos: word_pos,
+                end_pos_delta: 0,
             })
-            .end_pos = word_pos; // if exists, extend it
+            .end_pos_delta += 1; // if exists, extend it
 
         return word_pos;
     }

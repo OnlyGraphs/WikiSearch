@@ -1,4 +1,4 @@
-use crate::{EncodedPostingNode, LastUpdatedDate, Posting, PostingNode};
+use crate::{EncodedPostingNode, LastUpdatedDate, PosRange, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use core::fmt::Debug;
@@ -158,6 +158,7 @@ impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
 pub struct DeltaEncoder {}
 
 impl DeltaEncoder {
+    // #[inline(always)]
     fn compress(_prev: &Option<Posting>, curr: &Posting) -> Posting {
         let mut diff = Posting {
             document_id: curr.document_id,
@@ -171,7 +172,7 @@ impl DeltaEncoder {
         }
         return diff;
     }
-
+    // #[inline(always)]
     fn decompress(_prev: &Option<Posting>, diff: &mut Posting) -> Posting {
         if let Some(previous_posting) = *_prev {
             diff.document_id = diff.document_id + previous_posting.document_id;
@@ -185,7 +186,7 @@ impl DeltaEncoder {
 //NOTE: The postings need to be sorted!
 impl SequentialEncoder<Posting> for DeltaEncoder {
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
-        let mut bytes = Vec::default();
+        let mut bytes = Vec::with_capacity(8);
         let diff = DeltaEncoder::compress(_prev, curr);
         let _count = diff.serialize(&mut bytes);
         bytes
@@ -205,8 +206,9 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
 pub struct VbyteEncoder {}
 
 impl VbyteEncoder {
+    #[inline(always)]
     fn into_vbyte_serialise(mut num: u32) -> Vec<u8> {
-        let mut bytes = Vec::default();
+        let mut bytes = Vec::with_capacity(4);
         //Set everything to have a continuation bit
         while num >= 128 {
             //Little endian order
@@ -220,10 +222,9 @@ impl VbyteEncoder {
         bytes[len] = bytes[len] & !(1 << 7);
         return bytes;
     }
-    fn from_vbyte_deserialise<R: Read>(bytes: R) -> (Posting, usize) {
-        let mut doc_id: u32 = 0; //To compute document_id for Posting
-        let mut position: u32 = 0; //To compute position for Posting
-        let mut reading_doc_id_flag = true; //set true to assign the following bytes until end of byte (continuation bit cleared) to doc id first
+
+    #[inline(always)]
+    fn from_vbyte_deserialise<R: Read>(bytes: &mut R) -> (u32, usize) {
         let mut result = 0; //To be used for calculating doc_id and position
         let mut byte_total_count: usize = 0;
         let mut shift: u8 = 0; //shift amount to store computation in result depending on the number of bytes (mainly by looking at continuation bit)
@@ -237,27 +238,13 @@ impl VbyteEncoder {
             result = (result << shift) | byte_subset;
             //If continuation bit is clear (== 0), save computed (deserialised) results
             if num_byte & 128 == 0 {
-                if reading_doc_id_flag == true {
-                    doc_id = result;
-                    reading_doc_id_flag = false;
-                } else {
-                    position = result;
-                    break;
-                }
-                //Reset now for position posting
-                result = 0;
-                shift = 0;
+                break;
             } else {
                 //After first iteration, where continuation bit happened to be 1, increase shift amount to 7
                 shift = 7;
             }
         }
-        //Create posting based on above computation
-        let vdiff = Posting {
-            document_id: doc_id,
-            position: position,
-        };
-        (vdiff, byte_total_count)
+        return (result, byte_total_count);
     }
 }
 
@@ -266,19 +253,51 @@ impl VbyteEncoder {
 /// The rest would indicate the position
 /// There will be at least 2 bytes
 impl SequentialEncoder<Posting> for VbyteEncoder {
+    // #[inline(always)]
     fn encode(_prev: &Option<Posting>, curr: &Posting) -> Vec<u8> {
-        let mut encoding_bytes = Vec::default();
+        let mut encoding_bytes = Vec::with_capacity(8);
         let vdiff = DeltaEncoder::compress(_prev, curr);
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.document_id));
         encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(vdiff.position));
         encoding_bytes
     }
-
+    // #[inline(always)]
     fn decode<R: Read>(_prev: &Option<Posting>, bytes: &mut R) -> (Posting, usize) {
-        let (mut vdiff, byte_total_count): (Posting, usize) =
+        let (doc_id, doc_byte_count): (u32, usize) = VbyteEncoder::from_vbyte_deserialise(bytes);
+        let (position, position_byte_count): (u32, usize) =
             VbyteEncoder::from_vbyte_deserialise(bytes);
+        let mut vdiff = Posting {
+            document_id: doc_id,
+            position: position,
+        };
+
         let a: Posting = DeltaEncoder::decompress(_prev, &mut vdiff);
-        (a, byte_total_count)
+        (a, doc_byte_count + position_byte_count)
+    }
+}
+//NOTE: Only end_pos_delta is encoded. start_pos of PosRange is serialised without any encoding
+impl SequentialEncoder<PosRange> for VbyteEncoder {
+    fn encode(_: &Option<PosRange>, curr: &PosRange) -> Vec<u8> {
+        let mut encoding_bytes = Vec::default();
+        encoding_bytes
+            .write_u32::<NativeEndian>(curr.start_pos)
+            .unwrap(); //Not encoded
+        encoding_bytes.extend(VbyteEncoder::into_vbyte_serialise(curr.end_pos_delta));
+        encoding_bytes
+    }
+
+    fn decode<R: Read>(_: &Option<PosRange>, bytes: &mut R) -> (PosRange, usize) {
+        let start_pos = bytes.read_u32::<NativeEndian>().unwrap();
+        let (end_pos_delta, end_pos_byte_count): (u32, usize) =
+            VbyteEncoder::from_vbyte_deserialise(bytes);
+
+        (
+            PosRange {
+                start_pos,
+                end_pos_delta,
+            },
+            4 + end_pos_byte_count,
+        )
     }
 }
 
@@ -289,6 +308,7 @@ impl SequentialEncoder<Posting> for VbyteEncoder {
 pub trait Serializable: Default {
     /// the static number of bytes required to serialize
     /// if not known at compile time, then this must return 0 or less
+
     fn serialize<W: Write>(&self, buf: &mut W) -> usize;
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize;
 }
@@ -401,6 +421,20 @@ impl Serializable for String {
             self.push(buf.read_u8().unwrap() as char);
         }
         len as usize + 4
+    }
+}
+
+impl Serializable for PosRange {
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        buf.write_u32::<NativeEndian>(self.start_pos).unwrap();
+        buf.write_u32::<NativeEndian>(self.end_pos_delta).unwrap();
+        8
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        self.start_pos = buf.read_u32::<NativeEndian>().unwrap();
+        self.end_pos_delta = buf.read_u32::<NativeEndian>().unwrap();
+        8
     }
 }
 

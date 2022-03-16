@@ -40,10 +40,10 @@ impl<E: SequentialEncoder<Posting>> From<PostingNode> for EncodedPostingNode<E> 
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Default, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PosRange {
     pub start_pos: u32, //TODO: double check memory requirements, highest article word count etc
-    pub end_pos: u32,
+    pub end_pos_delta: u32,
 }
 
 pub struct Infobox {
