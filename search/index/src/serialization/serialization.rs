@@ -356,6 +356,48 @@ impl<const B: bool> SequentialEncoder<PosRange> for VbyteEncoder<B> {
     }
 }
 
+//Note assuming it is ordered. If not, make sure to set B to false
+impl<const B: bool> SequentialEncoder<(u32, u32)> for VbyteEncoder<B> {
+    fn encode(_prev: &Option<(u32, u32)>, curr: &(u32, u32)) -> Vec<u8> {
+        let mut encoding_bytes = Vec::with_capacity(8);
+        let mut first_elem = curr.0;
+        let mut second_elem = curr.1;
+        //Apply delta encoding if set to true
+        if B {
+            let diff_tuple = match _prev {
+                Some(x) => DeltaEncoder::compress(&Some((x.0, x.1)), (curr.0, curr.1)),
+                None => DeltaEncoder::compress(&None, (curr.0, curr.1)),
+            };
+            first_elem = diff_tuple.0;
+            second_elem = diff_tuple.1;
+        }
+        encoding_bytes.extend(VbyteEncoder::<B>::into_vbyte_serialise(first_elem));
+        encoding_bytes.extend(VbyteEncoder::<B>::into_vbyte_serialise(second_elem));
+
+        encoding_bytes
+    }
+
+    fn decode<R: Read>(_prev: &Option<(u32, u32)>, bytes: &mut R) -> ((u32, u32), usize) {
+        // Vbyte decode
+        let (mut first_elem, first_count): (u32, usize) =
+            VbyteEncoder::<true>::from_vbyte_deserialise(bytes);
+        let (mut second_elem, second_count): (u32, usize) =
+            VbyteEncoder::<true>::from_vbyte_deserialise(bytes);
+
+        //delta decode if true
+        if B {
+            let tuple = match _prev {
+                Some(x) => DeltaEncoder::decompress(&Some(*x), &mut ((first_elem, second_elem))),
+                None => DeltaEncoder::decompress(&None, &mut (first_elem, second_elem)),
+            };
+            first_elem = tuple.0;
+            second_elem = tuple.1;
+        }
+
+        ((first_elem, second_elem), first_count + second_count)
+    }
+}
+
 /// ------------------ Compression [END] -------------------- ///
 
 /// objects which can be turned into a stream of bytes and back
@@ -423,6 +465,23 @@ impl Serializable for u8 {
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
         *self = buf.read_u8().unwrap();
         1
+    }
+}
+
+impl<N: Serializable, M: Serializable> Serializable for (N, M) {
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        let mut count = 0;
+
+        count += self.0.serialize(buf);
+        count += self.1.serialize(buf);
+        count
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        let mut count = 0;
+        count += self.0.deserialize(buf);
+        count += self.1.deserialize(buf);
+        count
     }
 }
 

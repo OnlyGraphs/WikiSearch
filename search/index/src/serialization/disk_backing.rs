@@ -6,7 +6,6 @@ use std::{
     fs::{create_dir_all, remove_dir_all, remove_file, File},
     hash::Hash,
     io::{Read, Seek, Write},
-    ops::Deref,
     path::{Path, PathBuf},
     sync::Arc,
 };

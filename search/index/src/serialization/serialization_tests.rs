@@ -1,10 +1,10 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 use indexmap::IndexMap;
 
 use crate::{
-    DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, PosRange, Posting,
-    PostingNode, SequentialEncoder, Serializable, VbyteEncoder,
+    DeltaEncoder, EncodedSequentialObject, IdentityEncoder, PosRange, Posting, PostingNode,
+    SequentialEncoder, Serializable, VbyteEncoder,
 };
 use chrono::NaiveDateTime;
 
@@ -36,6 +36,13 @@ test_serialize_deserialize!(test_serialize_string, String, "123".to_string());
 test_serialize_deserialize!(test_serialize_int, u32, 69);
 
 test_serialize_deserialize!(test_serialize_vec, Vec<u32>, vec![1, 2, 3, 4, 5, 6]);
+test_serialize_deserialize!(test_serialize_tuple, (u32, u32), (28932, 423242));
+test_serialize_deserialize!(
+    test_serialize_tuple_2,
+    (u32, String),
+    (28932, "hola".to_string())
+);
+
 test_serialize_deserialize!(test_serialize_map,HashMap<String,u32>,HashMap::from([("asd".to_string(),2),("aadasdasd".to_string(),69)]));
 
 test_serialize_deserialize!(
@@ -476,6 +483,8 @@ fn test_delta_with_prev_different_document_decode_2() {
 }
 
 /// --------- V byte ----------
+///
+//Posting
 
 #[test]
 fn test_v_byte_encoder_no_prev() {
@@ -874,6 +883,64 @@ fn test_v_byte_no_prev_decode_posting_range() {
     assert_eq!(encoded, target);
     assert_eq!(size, 6);
 }
+
+///--- Vbyte Tuple (Assuming ordered) ---
+///
+///
+#[test]
+fn test_v_byte_encoder_no_prev_tuple_8() {
+    let encoded = VbyteEncoder::<true>::encode(&None, &(268435455, 134217728));
+    let target = b"\xFF\xFF\xFF\x7F\xC0\x80\x80\x00".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+fn test_v_byte_encoder_tuple_with_prev() {
+    let encoded = VbyteEncoder::<true>::encode(&Some((0, 1)), &(128, 9));
+    let target = b"\x81\0\x09".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_vbyte_no_prev_tuple_decode() {
+    let source = b"\x81\x80\x00\0".to_vec();
+    let (encoded, size): ((u32, u32), usize) = VbyteEncoder::<true>::decode(
+        &None,
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+    let target = (16384, 0);
+    assert_eq!(encoded, target);
+    assert_eq!(size, 4);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_v_byte_with_prev_different_tuple_decode() {
+    let source = b"\x81\0\x81\0".to_vec(); //Difference/Delta Represents doc id 128, position 128 (position is irrelevant to previous document because it is a different id)
+    let (encoded, size): ((u32, u32), usize) = VbyteEncoder::<true>::decode(
+        &Some((128, 128)),
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+    let target = (256, 128);
+    assert_eq!(encoded, target);
+    assert_eq!(size, 4);
+}
+
+// #[test]
+// #[cfg(target_endian = "little")]
+// fn test_v_byte_with_prev_different_tuple_decode() {
+//     let source = b"\x81\0\x81\0".to_vec(); //Difference/Delta Represents doc id 128, position 128 (position is irrelevant to previous document because it is a different id)
+//     let (encoded, size): ((u32, u32), usize) = VbyteEncoder::<true>::decode(
+//         &Some((128, 128)),
+//         &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+//     );
+//     let target = (256, 128);
+//     assert_eq!(encoded, target);
+//     assert_eq!(size, 4);
+// }
 
 ///// ------------
 ///

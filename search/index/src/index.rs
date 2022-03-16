@@ -1,4 +1,3 @@
-use chrono::NaiveDateTime;
 use log::info;
 
 use utils::MemFootprintCalculator;

@@ -2,10 +2,7 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use indexmap::IndexMap;
 
 use crate::{EncodedPostingList, SequentialEncoder};
-use fxhash::{FxBuildHasher, FxHashMap};
-use std::collections::hash_map::RandomState;
-use std::collections::HashMap;
-use std::hash::{BuildHasher, Hasher};
+use fxhash::FxBuildHasher;
 use utils::MemFootprintCalculator;
 pub const DATE_TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
