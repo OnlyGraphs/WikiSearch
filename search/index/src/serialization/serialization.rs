@@ -100,6 +100,13 @@ impl<E: SequentialEncoder<T>, T: Serializable> EncodedSequentialObject<T, E> {
     pub fn byte_len(&self) -> usize {
         self.bytes.len()
     }
+
+    /// encodes without using a previous node
+    /// should only be used with encoders which don't require
+    /// the previous object
+    pub fn push(&mut self, n : T) {
+        self.bytes.extend(E::encode(&None, &n));
+    }
 }
 
 /// encoding

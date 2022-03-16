@@ -14,6 +14,7 @@ use crate::DiskHashMap;
 
 use crate::EncodedPostingNode;
 
+use crate::Posting;
 use crate::index_structs::PosRange;
 use crate::Entry;
 use crate::LastUpdatedDate;
@@ -192,9 +193,6 @@ pub fn with_capacity(
         let total_posting_lists = p.posting_nodes.len();
         info!("Sorting {} posting lists", total_posting_lists);
         p.posting_nodes.into_iter().enumerate().for_each(|(idx,(k,v))|{
-            v.lock().get_mut().unwrap().postings.sort();
-            v.lock().get_mut().unwrap().tf.sort_keys();
-
             {
             let unwrapped = match Arc::try_unwrap(v) {
                 Ok(v) => v,

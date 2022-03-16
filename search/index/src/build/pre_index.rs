@@ -1,6 +1,6 @@
 use crate::{
     DiskHashMap, Document, IndexError, IndexErrorKind, LastUpdatedDate, PosRange, Posting,
-    PostingNode, DATE_TIME_FORMAT,
+    PostingNode, DATE_TIME_FORMAT, VbyteEncoder, EncodedPostingNode,
 };
 use bimap::BiMap;
 use chrono::NaiveDateTime;
@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 /// a common backbone from which any index can be intialized
 pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, PostingNode, 0>,
+    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder<false>>, 0>,
     pub links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     // pub id_title_map: BiMap<u32, String>,
