@@ -52,16 +52,26 @@ impl IndexBuilder for SqlIndexBuilder {
 
 
 
+        let disable_cache = env::var("CACHE_DISABLE").unwrap_or("false".to_string()).parse::<bool>().unwrap_or(false);
         let cap_str = env::var("CACHE_SIZE").unwrap_or("500000".to_string());
+        let cap_per_str = env::var("CACHE_PERSISTENT_SIZE").unwrap_or("100000".to_string());
         let batch_str = env::var("BATCH_SIZE").unwrap_or("5000".to_string());
 
-        let cap = cap_str.parse::<u32>().unwrap();
+        let mut cap = cap_str.parse::<u32>().unwrap();
         let batch_size = batch_str.parse::<u32>().unwrap();
+        let mut cap_per = cap_per_str.parse::<u32>().unwrap();
 
+        if disable_cache{
+            cap = 10000000;
+            cap_per = cap;
+        }
+
+        info!("CACHE_DISABLE found/default: {} records", disable_cache);
         info!("CACHE_SIZE size found/default: {} records", cap);
+        info!("CACHE_PERSISTENT_SIZE size found/default: {} records", cap_per);
         info!("BATCH_SIZE size found/default: {} documents", batch_size);
 
-        let mut pre_index = PreIndex::with_capacity(cap);
+        let mut pre_index = PreIndex::with_capacity(cap,cap_per);
         pre_index.dump_id = highest_dump_id;
 
         // do this in batches 
@@ -156,8 +166,10 @@ impl IndexBuilder for SqlIndexBuilder {
             info!("Building pre-index: {}% ({}s) - processed {} docs, cache size {}",(processed_docs as f32 / num_docs as f32) * 100.0,timer.elapsed().as_secs(),processed_docs,pre_index.cache_size());
         }
 
-        pre_index.clean_cache();
-        
+        if !disable_cache{
+            pre_index.clean_cache();
+        }
+
         pool.close().await;
 
         let idx = Index::from_pre_index(pre_index);

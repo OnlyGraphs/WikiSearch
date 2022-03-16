@@ -24,20 +24,20 @@ impl Default for PreIndex {
     fn default() -> Self {
         Self { 
             dump_id: Default::default(),
-            posting_nodes: DiskHashMap::new(10000,true),
+            posting_nodes: DiskHashMap::new(10000,100,true),
             links: Default::default(), extent: Default::default(), 
-            // id_title_map: Default::default(), 
             last_updated_docs: Default::default(), 
-            curr_doc_appearances: Default::default() }
+            curr_doc_appearances: Default::default() 
+        }
     }
 }
 
 impl PreIndex {
 
-    pub fn with_capacity(cap : u32) -> Self {
+    pub fn with_capacity(cap : u32, persistent_cap : u32) -> Self {
         Self { 
             dump_id: Default::default(),
-            posting_nodes: DiskHashMap::new(cap,true),
+            posting_nodes: DiskHashMap::new(cap,persistent_cap,true),
             links: Default::default(), extent: Default::default(), 
             // id_title_map: Default::default(), 
             last_updated_docs: Default::default(), 
@@ -47,6 +47,8 @@ impl PreIndex {
     pub fn cache_size(&self) -> u32{
         self.posting_nodes.cache_population()
     }
+
+
 
     pub fn clean_cache(&self){
         self.posting_nodes.clean_cache();
@@ -70,14 +72,6 @@ impl PreIndex {
             NaiveDateTime::parse_from_str(&document.last_updated_date, DATE_TIME_FORMAT)
                 .unwrap_or(NaiveDateTime::from_timestamp(0, 0)),
         );
-
-        // // titles
-        // self.id_title_map
-        //     .insert_no_overwrite(document.doc_id, document.title.clone())
-        //     .map_err(|_c| IndexError {
-        //         msg: "Attempted to insert document into index which already exists.".to_string(),
-        //         kind: IndexErrorKind::InvalidOperation,
-        //     })?;
 
 
         //Infoboxes

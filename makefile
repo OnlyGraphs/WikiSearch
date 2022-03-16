@@ -31,9 +31,9 @@ update-schema:
 	cd search && cargo sqlx prepare -- --lib 
 
 run:
-	cd search && cargo run
+	cd search && cargo run 
 flame-run:
-	cd search && cargo flamegraph 
+	cd search && cargo flamegraph --dev
 
 build:
 	cd search && cargo build --release 

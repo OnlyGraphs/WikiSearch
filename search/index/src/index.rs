@@ -3,6 +3,7 @@ use log::info;
 
 use utils::MemFootprintCalculator;
 
+use std::env;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::ops::Deref;
@@ -155,11 +156,12 @@ impl Index {
 
     pub fn with_capacity(
         posting_list_mem_limit: u32,
+        posting_list_persistent_mem_limit: u32,
         articles: u32
     ) -> Self {
         Self {
             dump_id: 0,
-            posting_nodes: DiskHashMap::new(posting_list_mem_limit,true),
+            posting_nodes: DiskHashMap::new(posting_list_mem_limit,posting_list_persistent_mem_limit,true),
             links: HashMap::with_capacity(articles as usize),
             incoming_links: HashMap::with_capacity(articles as usize),
             extent: HashMap::with_capacity(256),
@@ -177,7 +179,7 @@ impl Index {
 
         let mut index = Self {
             dump_id: p.dump_id,
-            posting_nodes: DiskHashMap::new(p.posting_nodes.capacity(),true),
+            posting_nodes: DiskHashMap::new(p.posting_nodes.capacity(),p.posting_nodes.persistent_capacity(),true),
             incoming_links: HashMap::with_capacity(p.links.len()),
             page_rank: HashMap::with_capacity(p.links.len()),
             links: p.links,
@@ -187,12 +189,10 @@ impl Index {
 
         let total_posting_lists = p.posting_nodes.len();
         info!("Sorting {} posting lists", total_posting_lists);
-        (0..p.posting_nodes.len()).for_each(|idx| {
-
-            { 
-            let (k, v) = p.posting_nodes.pop().unwrap();
+        p.posting_nodes.into_iter().enumerate().for_each(|(idx,(k,v))|{
             v.lock().get_mut().unwrap().postings.sort();
-
+            
+            {
             let unwrapped = match Arc::try_unwrap(v) {
                 Ok(v) => v,
                 Err(_) => panic!(),
@@ -212,7 +212,14 @@ impl Index {
             }
         });
         
+        
         // finalize the hashmap, to enable normal caching mode
+        let disable_cache = env::var("CACHE_DISABLE").unwrap_or("false".to_string()).parse::<bool>().unwrap_or(false);
+
+        if !disable_cache{
+            index.posting_nodes.clean_cache();
+        }
+        
         index.posting_nodes.set_runtime_mode();
 
         // back links
