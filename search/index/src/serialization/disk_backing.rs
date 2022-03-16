@@ -1,10 +1,11 @@
-
 use std::{
     borrow::Borrow,
+    collections::{BTreeMap, HashMap},
+    error::Error,
     fmt::Debug,
     fs::{File, remove_file},
     hash::Hash,
-    path::{PathBuf, Path}, error::Error, io::{Read, Seek, Write}, sync::{Arc}, collections::{HashMap, BTreeMap, VecDeque}, ops::Deref,
+    path::{PathBuf, Path}, io::{Read, Seek, Write}, sync::{Arc}, collections::{ VecDeque}, ops::Deref,
 };
 
 use crate::{Serializable};
@@ -14,9 +15,8 @@ use log::info;
 use utils::MemFootprintCalculator;
 use parking_lot::{Mutex};
 use default_env::default_env;
-use once_cell::sync::Lazy; // 1.3.1
-
-
+use itertools::{FoldWhile, Itertools};
+use once_cell::sync::Lazy;
 
 /// a hashmap from DiskHashMap id's to their file handles
 static FILE_HANDLES: Lazy<Mutex<[Option<File>;10]>> = Lazy::new(|| Default::default());
@@ -91,7 +91,7 @@ impl <V : Serializable, const ID : usize> Serializable for Entry<V, ID>{
         match self {
             Entry::Memory(v,_) => v.deserialize(buf),
             _ => panic!(),
-        }    
+        }
     }
 }
 
@@ -141,7 +141,6 @@ impl<V : Serializable, const ID : usize> Entry<V, ID>{
         self.get_mem()
     }
 
-
     // ensures the entry is not in memory
     fn unload(&mut self) -> Result<(), Box<dyn Error>>{
         let (offset,id) = match self {
@@ -162,7 +161,7 @@ impl<V : Serializable, const ID : usize> Entry<V, ID>{
     }
 
     // ensures the entry is in memory
-    pub fn load(&mut self) -> Result<(), Box<dyn Error>>{
+    pub fn load(&mut self) -> Result<(), Box<dyn Error>> {
         match self {
             Entry::Memory(_v, _) =>  Ok(()),
             Entry::Disk(offset, id) => {
@@ -173,14 +172,13 @@ impl<V : Serializable, const ID : usize> Entry<V, ID>{
                     *id
                 );
                 Ok(())
-            },
+            }
         }
     }
 
-
     // ensures the entry is in memory
     // then returns mutable reference to it
-    pub fn get_mut(&mut self) -> Result<&mut V, Box<dyn Error>>{
+    pub fn get_mut(&mut self) -> Result<&mut V, Box<dyn Error>> {
         match self {
             Entry::Memory(ref mut v, _) => Ok(v),
             Entry::Disk(offset, id) => {
@@ -193,12 +191,12 @@ impl<V : Serializable, const ID : usize> Entry<V, ID>{
                     Entry::Memory(ref mut v, _) => Ok(v),
                     _ => panic!()
                 }
-            },
+            }
         }
     }
 
     // tries to retrieve entry from memory, throws error if not present there
-    pub fn get_mem(&self) -> Result<&V, Box<dyn Error>>{
+    pub fn get_mem(&self) -> Result<&V, Box<dyn Error>> {
         match self {
             Entry::Memory(ref v, _) => Ok(v),
             Entry::Disk(_,_) => Err(Box::new(
@@ -207,10 +205,9 @@ impl<V : Serializable, const ID : usize> Entry<V, ID>{
         }
     }
 
-
-    /// fetches the entry from the backing store at the given offset and records the free space gap left over for the hash map to make use of 
+    /// fetches the entry from the backing store at the given offset and records the free space gap left over for the hash map to make use of
     /// later if needed
-    fn fetch(offset : u64, f : &mut File) -> Result<V, Box<dyn Error>>{
+    fn fetch(offset: u64, f: &mut File) -> Result<V, Box<dyn Error>> {
         // open file and fill buffer
         f.seek(std::io::SeekFrom::Start(offset))?;
 
@@ -228,34 +225,35 @@ impl<V : Serializable, const ID : usize> Entry<V, ID>{
     }
 
     /// evicts the entry into the backing store either at the first hole of smallest size or at the end of the store
-    /// returns the offset into the backing store 
-    fn evict(f: &mut File, v: V) -> Result<u64, Box<dyn Error>>{
+    /// returns the offset into the backing store
+    fn evict(f: &mut File, v: V) -> Result<u64, Box<dyn Error>> {
         // serialize into buffer to find out how many bytes necessary
         let mut buf = Vec::default();
         let space_needed = v.serialize(&mut buf) as u64;
-        
+
         // find space
-        let offset : std::io::SeekFrom;
+        let offset: std::io::SeekFrom;
 
         let mut lock = FREE_SPACE_BLOCKS.lock();
 
         let space_map = lock.get_mut(ID)
             .expect(&format!("No free space record for id {}",ID));
 
-        if space_map.is_empty(){
+        if space_map.is_empty() {
             offset = std::io::SeekFrom::End(0);
-        }
-        else{
-            let k = space_map.iter().last().map(|(k,_)| *k)
+        } else {
+            let k = space_map
+                .iter()
+                .last()
+                .map(|(k, _)| *k)
                 .expect("Impossible to reach, in theory");
 
             if k < space_needed {
                 offset = std::io::SeekFrom::End(0);
             } else {
-
                 let mut smallest_space = k;
                 // find smallest fitting hole
-                for k in space_map.keys().rev(){
+                for k in space_map.keys().rev() {
                     if *k < space_needed {
                         break;
                     } else {
@@ -266,38 +264,34 @@ impl<V : Serializable, const ID : usize> Entry<V, ID>{
                 let last_available_offset;
                 let empty;
                 {
+                    let offsets = space_map.get_mut(&smallest_space).unwrap();
 
-                let offsets = space_map.get_mut(&smallest_space)
-                    .unwrap();
-
-                // change space map
-                last_available_offset = offsets.pop().unwrap();
-                empty = offsets.is_empty();
-                
+                    // change space map
+                    last_available_offset = offsets.pop().unwrap();
+                    empty = offsets.is_empty();
                 }
-                
+
                 if empty {
                     space_map.remove(&smallest_space).unwrap();
-                } 
-
+                }
 
                 offset = std::io::SeekFrom::Start(last_available_offset);
 
                 let leftover_offset = last_available_offset + space_needed;
                 let leftover_space = smallest_space - space_needed;
                 if leftover_space > 0 {
-                    space_map.entry(leftover_space)
+                    space_map
+                        .entry(leftover_space)
                         .or_default()
                         .push(leftover_offset);
                 }
-
             }
-        
         }
 
         // serialize to it, record stream position first
         f.seek(offset)?;
-        let abs_offset = f.stream_position()
+        let abs_offset = f
+            .stream_position()
             .expect("Could not get stream position in file");
 
         f.write(&buf)?;
@@ -309,11 +303,9 @@ impl<V : Serializable, const ID : usize> Entry<V, ID>{
 
         *lock.get_mut(ID).unwrap() -= 1;
 
-
         Ok(abs_offset)
     }
 }
-
 
 /// A hashmap which holds a limited number of records in main memory with the rest
 /// of the records held on disk
@@ -338,9 +330,8 @@ where
     K: Serializable + Hash + Eq + Clone,
     V: Serializable + Debug,
 {
-
     pub fn len(&self) -> usize {
-        return self.map.len()
+        return self.map.len();
     }
 
     pub fn capacity(&self) -> u32 {
@@ -357,7 +348,6 @@ where
         info!("Finalizing diskhashmap-{} construction",ID);
         self.build_mode = false;
     }
-
 
     pub fn cache_population(&self) -> u32 {
         *IN_MEM_RECORDS.lock().get(ID).unwrap()
@@ -377,7 +367,7 @@ where
         }
     }
 
-    pub fn clean_cache(&self){
+    pub fn clean_cache(&self) {
         // figure out how many records are in memory
 
         // reduce this number if needed
@@ -412,7 +402,7 @@ where
             loop {
                 if records > self.capacity {
                     let victim = self.evict_victim();
-                    if victim.is_none(){
+                    if victim.is_none() {
                         break;
                     }
                     records = *IN_MEM_RECORDS.lock().get(ID).unwrap();
@@ -421,13 +411,12 @@ where
                 }
             }
         }
-
     }
 
-    pub fn entry<Q : ?Sized>(&self, k:&Q) -> Option<Arc<Mutex<Entry<V,ID>>>>
-    where 
+    pub fn entry<Q: ?Sized>(&self, k: &Q) -> Option<Arc<Mutex<Entry<V, ID>>>>
+    where
         K: Borrow<Q>,
-        Q: Hash + Eq
+        Q: Hash + Eq,
     {
 
         let o =self.map.get_full(k).map(|(idx,_,v)|{
@@ -439,20 +428,18 @@ where
         // which could be the largest one
         self.evict_invariant();
         o
-
     }
 
-    pub fn entry_or_default<Q : ?Sized>(&mut self, k:&Q) -> Arc<Mutex<Entry<V,ID>>>
-    where 
+    pub fn entry_or_default<Q: ?Sized>(&mut self, k: &Q) -> Arc<Mutex<Entry<V, ID>>>
+    where
         K: Borrow<Q>,
-        Q: Hash + Eq + ToOwned<Owned = K>
+        Q: Hash + Eq + ToOwned<Owned = K>,
     {
-
         let v = self.map.get(k);
         let o = match v {
             Some(s) => Arc::clone(s),
             None => {
-                self.insert(k.to_owned(),V::default());
+                self.insert(k.to_owned(), V::default());
                 self.entry(k).expect("This shouldn't happen")
             },
         };
@@ -462,8 +449,12 @@ where
         o
     }
 
-    pub fn path() -> PathBuf{
-        PathBuf::from(format!("{}/diskhashmap-{}",default_env!("TMP_PATH","/tmp"),ID))
+    pub fn path() -> PathBuf {
+        PathBuf::from(format!(
+            "{}/diskhashmap-{}",
+            default_env!("TMP_PATH", "/tmp"),
+            ID
+        ))
     }
 
     pub fn insert(&mut self, k:K, v: V) -> Option<Arc<Mutex<Entry<V,ID>>>>
@@ -506,13 +497,12 @@ where
         *RECORD_PRIORITIES.lock().get_mut(ID).unwrap() = KeyedPriorityQueue::default();
 
         // better safe than sorry
-        if path == Path::new("/") ||
-            path.as_os_str().len() == 0 {
+        if path == Path::new("/") || path.as_os_str().len() == 0 {
             panic!();
         };
 
         Self {
-            map: IndexMap::new(),
+            map: IndexMap::default(),
             capacity: capacity,
             persistent_capacity,
             build_mode
@@ -524,7 +514,7 @@ where
 impl <K, V, const ID : usize> MemFootprintCalculator for DiskHashMap<K, V, ID>
 where 
     K: Serializable + Hash + Eq + Clone + MemFootprintCalculator,
-    V: Serializable + MemFootprintCalculator + Debug
+    V: Serializable + MemFootprintCalculator + Debug,
 {
     fn real_mem(&self) -> u64 {
         self.map.real_mem()

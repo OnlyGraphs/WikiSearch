@@ -32,6 +32,8 @@ update-schema:
 
 run:
 	cd search && cargo run 
+run-release:
+	cd search && cargo run --release
 flame-run:
 	cd search && cargo flamegraph --dev
 

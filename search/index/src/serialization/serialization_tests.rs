@@ -1,69 +1,136 @@
-use std::{path::PathBuf,collections::HashMap};
+use std::collections::HashMap;
 
-use utils::MemFootprintCalculator;
+use indexmap::IndexMap;
 
 use crate::{
-    DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting,
-    SequentialEncoder, Serializable, VbyteEncoder, PostingNode,
+    DeltaEncoder, EncodedSequentialObject, IdentityEncoder, PosRange, Posting, PostingNode,
+    SequentialEncoder, Serializable, VbyteEncoder,
 };
+use chrono::NaiveDateTime;
 
+use crate::LastUpdatedDate;
+use fxhash::FxBuildHasher;
 
 #[macro_export]
 macro_rules! test_serialize_deserialize {
     ($name:ident ,$type:ty,$target:expr ) => {
         #[test]
         fn $name() {
-
             let target = $target;
 
             let mut buffer = Vec::default();
-        
+
             let serialize_bytes = target.serialize(&mut buffer);
-        
-            assert_eq!(serialize_bytes,buffer.len());
-        
+
+            assert_eq!(serialize_bytes, buffer.len());
+
             let mut deserialized = <$type>::default();
             let deserialize_bytes = deserialized.deserialize(&mut buffer.as_slice());
-        
-            assert_eq!(serialize_bytes,deserialize_bytes);
+
+            assert_eq!(serialize_bytes, deserialize_bytes);
         }
     };
 }
 
-test_serialize_deserialize!(test_serialize_string,String,"123".to_string());
-test_serialize_deserialize!(test_serialize_int,u32,69);
+test_serialize_deserialize!(test_serialize_string, String, "123".to_string());
+test_serialize_deserialize!(test_serialize_int, u32, 69);
 
-test_serialize_deserialize!(test_serialize_vec,Vec<u32>,vec![1,2,3,4,5,6]);
+test_serialize_deserialize!(test_serialize_vec, Vec<u32>, vec![1, 2, 3, 4, 5, 6]);
+test_serialize_deserialize!(test_serialize_tuple, (u32, u32), (28932, 423242));
+test_serialize_deserialize!(
+    test_serialize_tuple_2,
+    (u32, String),
+    (28932, "hola".to_string())
+);
+
 test_serialize_deserialize!(test_serialize_map,HashMap<String,u32>,HashMap::from([("asd".to_string(),2),("aadasdasd".to_string(),69)]));
-test_serialize_deserialize!(test_serialize_posting_node,PostingNode,
-    PostingNode{ 
-        postings: vec![
-            Posting{ document_id: 2, position: 1 },
-            Posting{ document_id: 69, position: 69 },
-            Posting{ document_id: 42, position: 42 },
-            ], 
-        df: 0, 
-        tf: HashMap::from([(0,1),(69,42)]) 
-    });
 
+test_serialize_deserialize!(
+    test_serialize_posting_node,
+    PostingNode,
+    PostingNode {
+        postings: vec![
+            Posting {
+                document_id: 2,
+                position: 1
+            },
+            Posting {
+                document_id: 69,
+                position: 69
+            },
+            Posting {
+                document_id: 42,
+                position: 42
+            },
+        ],
+        df: 0,
+        tf: create_index_map_for_test_serialize_posting_node()
+    }
+);
+
+//Helper function to create an arbitrary tf / indexmap
+fn create_index_map_for_test_serialize_posting_node() -> IndexMap<u32, u32, FxBuildHasher> {
+    let mut x = IndexMap::default();
+    x.insert(0, 1);
+    x.insert(69, 42);
+    return x;
+}
 
 #[test]
 #[cfg(target_endian = "little")]
 fn test_serialize_hashmap() {
-    let mut a : HashMap<u32,u32> = HashMap::new();
+    let mut a: HashMap<u32, u32> = HashMap::new();
 
-    a.insert(42,69);
-    a.insert(69,42);
+    a.insert(42, 69);
+    a.insert(69, 42);
 
     let mut out = Vec::default();
 
     a.serialize(&mut out);
 
-    let mut des = HashMap::<u32,u32>::default();
+    let mut des = HashMap::<u32, u32>::default();
 
     des.deserialize(&mut &out[..]);
 
-    assert_eq!(a,des); // ascii codes
+    assert_eq!(a, des); // ascii codes
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_serialize_indexmap() {
+    let mut a: IndexMap<u32, u32, FxBuildHasher> = IndexMap::default();
+
+    a.insert(42, 69);
+    a.insert(69, 42);
+
+    let mut out = Vec::default();
+
+    a.serialize(&mut out);
+
+    let mut des = IndexMap::<u32, u32, FxBuildHasher>::default();
+
+    des.deserialize(&mut &out[..]);
+
+    assert_eq!(a, des); // ascii codes
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_serialize_indexmap_2() {
+    let mut a: IndexMap<u32, u32, FxBuildHasher> = IndexMap::default();
+
+    a.insert(4099, 0);
+    a.insert(2, 2982309);
+
+    let mut out = Vec::default();
+
+    a.serialize(&mut out);
+
+    let mut des = IndexMap::<u32, u32, FxBuildHasher>::default();
+
+    des.deserialize(&mut &out[..]);
+
+    assert_eq!(a, des); // ascii codes
 }
 
 #[test]
@@ -125,6 +192,64 @@ fn test_deserialize_posting() {
     let mut clean = Posting::default();
 
     let ref mut out: &mut &[u8] = &mut &b"E\0\0\0*\0\0\0".to_vec()[..];
+    clean.deserialize(out);
+    assert_eq!(clean, target)
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_serialize_posting_range() {
+    let a = PosRange {
+        start_pos: 69,
+        end_pos_delta: 42,
+    };
+
+    let mut out = Vec::default();
+
+    a.serialize(&mut out);
+
+    assert_eq!(out, b"E\0\0\0*\0\0\0") // ascii codes
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_deserialize_posting_range() {
+    let target = PosRange {
+        start_pos: 69,
+        end_pos_delta: 42,
+    };
+    let mut clean = PosRange::default();
+
+    let ref mut out: &mut &[u8] = &mut &b"E\0\0\0*\0\0\0".to_vec()[..];
+    clean.deserialize(out);
+    assert_eq!(clean, target)
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_serialize_naive_date_time() {
+    let source = LastUpdatedDate {
+        date_time: NaiveDateTime::parse_from_str("2015-07-01 08:59:00", "%Y-%m-%d %H:%M:%S")
+            .unwrap(),
+    };
+
+    let mut out = Vec::default();
+
+    source.serialize(&mut out);
+
+    assert_eq!(out, b"\xDF\x07\0\0\x07\x01\x08\x3B\0"); // year is 4 bytes, so 2015 written in i32 becomes \xDF\x07\0\0. In total, this is 9 bytes
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_deserialize_naive_date_time() {
+    let target = LastUpdatedDate {
+        date_time: NaiveDateTime::parse_from_str("2015-07-01 08:59:00", "%Y-%m-%d %H:%M:%S")
+            .unwrap(),
+    };
+    let mut clean = LastUpdatedDate::default();
+
+    let ref mut out: &mut &[u8] = &mut &b"\xDF\x07\0\0\x07\x01\x08\x3B\0".to_vec()[..];
     clean.deserialize(out);
     assert_eq!(clean, target)
 }
@@ -226,6 +351,7 @@ fn test_identity_encoder_prev() {
     let target = b"E\0\0\0*\0\0\0".to_vec();
     assert_eq!(encoded, target);
 }
+
 /// ----------- Delta --------------
 
 #[test]
@@ -357,10 +483,12 @@ fn test_delta_with_prev_different_document_decode_2() {
 }
 
 /// --------- V byte ----------
+///
+//Posting
 
 #[test]
 fn test_v_byte_encoder_no_prev() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 128,
@@ -374,7 +502,7 @@ fn test_v_byte_encoder_no_prev() {
 
 #[test]
 fn test_v_byte_encoder_no_prev_2() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 8192,
@@ -388,7 +516,7 @@ fn test_v_byte_encoder_no_prev_2() {
 
 #[test]
 fn test_v_byte_encoder_no_prev_3() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 127,
@@ -402,7 +530,7 @@ fn test_v_byte_encoder_no_prev_3() {
 
 #[test]
 fn test_v_byte_encoder_no_prev_4() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 0,
@@ -416,7 +544,7 @@ fn test_v_byte_encoder_no_prev_4() {
 
 #[test]
 fn test_v_byte_encoder_no_prev_5() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 256,
@@ -429,7 +557,7 @@ fn test_v_byte_encoder_no_prev_5() {
 }
 #[test]
 fn test_v_byte_encoder_no_prev_6() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 16383,
@@ -442,7 +570,7 @@ fn test_v_byte_encoder_no_prev_6() {
 }
 #[test]
 fn test_v_byte_encoder_no_prev_7() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 16384,
@@ -456,7 +584,7 @@ fn test_v_byte_encoder_no_prev_7() {
 
 #[test]
 fn test_v_byte_encoder_no_prev_8() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 268435455,
@@ -470,7 +598,7 @@ fn test_v_byte_encoder_no_prev_8() {
 
 #[test]
 fn test_v_byte_encoder_no_prev_9() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 128,
@@ -484,7 +612,7 @@ fn test_v_byte_encoder_no_prev_9() {
 
 #[test]
 fn test_v_byte_encoder_no_prev_10() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &None,
         &Posting {
             document_id: 2097151,
@@ -497,7 +625,7 @@ fn test_v_byte_encoder_no_prev_10() {
 }
 #[test]
 fn test_v_byte_encoder_with_prev() {
-    let encoded = VbyteEncoder::encode(
+    let encoded = VbyteEncoder::<true>::encode(
         &Some(Posting {
             document_id: 0,
             position: 1,
@@ -516,7 +644,7 @@ fn test_v_byte_encoder_with_prev() {
 #[cfg(target_endian = "little")]
 fn test_vbyte_no_prev_decode() {
     let source = b"\x81\x80\x00\0".to_vec();
-    let (encoded, size): (Posting, usize) = VbyteEncoder::decode(
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<true>::decode(
         &None,
         &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
     );
@@ -532,7 +660,7 @@ fn test_vbyte_no_prev_decode() {
 #[cfg(target_endian = "little")]
 fn test_v_byte_no_prev_decode_2() {
     let source = b"\x81\0\x09".to_vec();
-    let (encoded, size): (Posting, usize) = VbyteEncoder::decode(
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<true>::decode(
         &None,
         &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
     );
@@ -548,7 +676,7 @@ fn test_v_byte_no_prev_decode_2() {
 #[cfg(target_endian = "little")]
 fn test_v_byte_no_prev_decode_3() {
     let source = b"\x7F\x09".to_vec();
-    let (encoded, size): (Posting, usize) = VbyteEncoder::decode(
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<true>::decode(
         &None,
         &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
     );
@@ -564,7 +692,7 @@ fn test_v_byte_no_prev_decode_3() {
 #[cfg(target_endian = "little")]
 fn test_v_byte_no_prev_decode_4() {
     let source = b"\x81\0\x81\0".to_vec();
-    let (encoded, size): (Posting, usize) = VbyteEncoder::decode(
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<true>::decode(
         &None,
         &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
     );
@@ -580,7 +708,7 @@ fn test_v_byte_no_prev_decode_4() {
 #[cfg(target_endian = "little")]
 fn test_v_byte_no_prev_decode_5() {
     let source = b"\xFF\xFF\xFF\x7F\xC0\x80\x80\x00".to_vec();
-    let (encoded, size): (Posting, usize) = VbyteEncoder::decode(
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<true>::decode(
         &None,
         &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
     );
@@ -596,7 +724,7 @@ fn test_v_byte_no_prev_decode_5() {
 #[cfg(target_endian = "little")]
 fn test_v_byte_no_prev_decode_6() {
     let source = b"\0\x81\x80\x80\x00".to_vec();
-    let (encoded, size): (Posting, usize) = VbyteEncoder::decode(
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<true>::decode(
         &None,
         &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
     );
@@ -612,7 +740,7 @@ fn test_v_byte_no_prev_decode_6() {
 #[cfg(target_endian = "little")]
 fn test_v_byte_with_prev_same_document_decode() {
     let source = b"\0\x81\0".to_vec(); //Difference/Delta Represents doc id 0, position 128
-    let (encoded, size): (Posting, usize) = VbyteEncoder::decode(
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<true>::decode(
         &Some(Posting {
             document_id: 128,
             position: 128,
@@ -631,7 +759,7 @@ fn test_v_byte_with_prev_same_document_decode() {
 #[cfg(target_endian = "little")]
 fn test_v_byte_with_prev_different_document_decode() {
     let source = b"\x81\0\x81\0".to_vec(); //Difference/Delta Represents doc id 128, position 128 (position is irrelevant to previous document because it is a different id)
-    let (encoded, size): (Posting, usize) = VbyteEncoder::decode(
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<true>::decode(
         &Some(Posting {
             document_id: 128,
             position: 128,
@@ -645,6 +773,174 @@ fn test_v_byte_with_prev_different_document_decode() {
     assert_eq!(encoded, target);
     assert_eq!(size, 4);
 }
+
+#[test]
+fn test_v_byte_encoder_no_delta() {
+    //no delta encoding
+    let encoded = VbyteEncoder::<false>::encode(
+        &Some(Posting {
+            document_id: 120,
+            position: 3,
+        }),
+        &Posting {
+            document_id: 128,
+            position: 9,
+        },
+    );
+    let target = b"\x81\0\x09".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+fn test_v_byte_encoder_no_delta_2() {
+    //no delta encoding
+    let encoded = VbyteEncoder::<false>::encode(
+        &Some(Posting {
+            document_id: 120,
+            position: 3,
+        }),
+        &Posting {
+            document_id: 268435455,
+            position: 134217728,
+        },
+    );
+    let target = b"\xFF\xFF\xFF\x7F\xC0\x80\x80\x00".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_v_byte_decoder_no_delta() {
+    let source = b"\x81\0\x09".to_vec();
+    // no delta decoding
+    //delta flag set to false
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<false>::decode(
+        &Some(Posting {
+            document_id: 128,
+            position: 128,
+        }),
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+    let target = Posting {
+        document_id: 128,
+        position: 9,
+    };
+    assert_eq!(encoded, target);
+    assert_eq!(size, 3);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_v_byte_decoder_no_delta_2() {
+    let source = b"\x81\x80\x00\x01".to_vec();
+    let (encoded, size): (Posting, usize) = VbyteEncoder::<false>::decode(
+        &Some(Posting {
+            document_id: 128,
+            position: 128,
+        }),
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+    let target = Posting {
+        document_id: 16384,
+        position: 1,
+    };
+    assert_eq!(encoded, target);
+    assert_eq!(size, 4);
+}
+
+///--- Vbyte PosRange ---
+///
+///
+
+#[test]
+fn test_v_byte_encoder_no_prev_posting_range() {
+    let encoded = VbyteEncoder::<true>::encode(
+        &None,
+        &PosRange {
+            start_pos: 128,
+            end_pos_delta: 9,
+        },
+    );
+    let target = b"\x80\0\0\0\x09".to_vec(); // 5 bytes (4 for start_pos, because its not encoded), 1 for end_pos, which is in encoding format)
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_v_byte_no_prev_decode_posting_range() {
+    let source = b"\x7F\0\0\0\x81\0".to_vec();
+    let (encoded, size): (PosRange, usize) = VbyteEncoder::<true>::decode(
+        &None,
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+    let target = PosRange {
+        start_pos: 127,
+        end_pos_delta: 128,
+    };
+    assert_eq!(encoded, target);
+    assert_eq!(size, 6);
+}
+
+///--- Vbyte Tuple (Assuming ordered) ---
+///
+///
+#[test]
+fn test_v_byte_encoder_no_prev_tuple_8() {
+    let encoded = VbyteEncoder::<true>::encode(&None, &(268435455, 134217728));
+    let target = b"\xFF\xFF\xFF\x7F\xC0\x80\x80\x00".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+fn test_v_byte_encoder_tuple_with_prev() {
+    let encoded = VbyteEncoder::<true>::encode(&Some((0, 1)), &(128, 9));
+    let target = b"\x81\0\x09".to_vec();
+
+    assert_eq!(encoded, target);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_vbyte_no_prev_tuple_decode() {
+    let source = b"\x81\x80\x00\0".to_vec();
+    let (encoded, size): ((u32, u32), usize) = VbyteEncoder::<true>::decode(
+        &None,
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+    let target = (16384, 0);
+    assert_eq!(encoded, target);
+    assert_eq!(size, 4);
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_v_byte_with_prev_different_tuple_decode() {
+    let source = b"\x81\0\x81\0".to_vec(); //Difference/Delta Represents doc id 128, position 128 (position is irrelevant to previous document because it is a different id)
+    let (encoded, size): ((u32, u32), usize) = VbyteEncoder::<true>::decode(
+        &Some((128, 128)),
+        &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+    );
+    let target = (256, 128);
+    assert_eq!(encoded, target);
+    assert_eq!(size, 4);
+}
+
+// #[test]
+// #[cfg(target_endian = "little")]
+// fn test_v_byte_with_prev_different_tuple_decode() {
+//     let source = b"\x81\0\x81\0".to_vec(); //Difference/Delta Represents doc id 128, position 128 (position is irrelevant to previous document because it is a different id)
+//     let (encoded, size): ((u32, u32), usize) = VbyteEncoder::<true>::decode(
+//         &Some((128, 128)),
+//         &mut source.into_iter().collect::<Vec<u8>>().as_slice(),
+//     );
+//     let target = (256, 128);
+//     assert_eq!(encoded, target);
+//     assert_eq!(size, 4);
+// }
 
 ///// ------------
 ///
@@ -674,7 +970,7 @@ fn test_delta_and_vbyte_encoder_subset() {
     assert_eq!(target_vec, out_delta_decoded);
 
     // ------------ serialise vbyte --------------
-    let obj_vbyte = EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(
+    let obj_vbyte = EncodedSequentialObject::<Posting, VbyteEncoder<true>>::from_iter(
         vec![target_1, target_2].into_iter(),
     );
     let mut out = Vec::default();
@@ -740,8 +1036,9 @@ fn test_delta_and_vbyte_encoder_subset_2() {
     assert_eq!(target_vec, out_delta_decoded);
 
     // ------------ serialise vbyte --------------
-    let obj_vbyte =
-        EncodedSequentialObject::<Posting, VbyteEncoder>::from_iter(target_vec.clone().into_iter());
+    let obj_vbyte = EncodedSequentialObject::<Posting, VbyteEncoder<true>>::from_iter(
+        target_vec.clone().into_iter(),
+    );
     let mut out = Vec::default();
     obj_vbyte.serialize(&mut out);
 
