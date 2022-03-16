@@ -1,69 +1,81 @@
-use std::{path::PathBuf,collections::HashMap};
+use std::{collections::HashMap, path::PathBuf};
 
 use utils::MemFootprintCalculator;
 
 use crate::{
-    DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting,
-    SequentialEncoder, Serializable, VbyteEncoder, PostingNode,
+    DeltaEncoder, DiskHashMap, EncodedSequentialObject, IdentityEncoder, Posting, PostingNode,
+    SequentialEncoder, Serializable, VbyteEncoder,
 };
+use chrono::NaiveDateTime;
 
+use crate::LastUpdatedDate;
 
 #[macro_export]
 macro_rules! test_serialize_deserialize {
     ($name:ident ,$type:ty,$target:expr ) => {
         #[test]
         fn $name() {
-
             let target = $target;
 
             let mut buffer = Vec::default();
-        
+
             let serialize_bytes = target.serialize(&mut buffer);
-        
-            assert_eq!(serialize_bytes,buffer.len());
-        
+
+            assert_eq!(serialize_bytes, buffer.len());
+
             let mut deserialized = <$type>::default();
             let deserialize_bytes = deserialized.deserialize(&mut buffer.as_slice());
-        
-            assert_eq!(serialize_bytes,deserialize_bytes);
+
+            assert_eq!(serialize_bytes, deserialize_bytes);
         }
     };
 }
 
-test_serialize_deserialize!(test_serialize_string,String,"123".to_string());
-test_serialize_deserialize!(test_serialize_int,u32,69);
+test_serialize_deserialize!(test_serialize_string, String, "123".to_string());
+test_serialize_deserialize!(test_serialize_int, u32, 69);
 
-test_serialize_deserialize!(test_serialize_vec,Vec<u32>,vec![1,2,3,4,5,6]);
+test_serialize_deserialize!(test_serialize_vec, Vec<u32>, vec![1, 2, 3, 4, 5, 6]);
 test_serialize_deserialize!(test_serialize_map,HashMap<String,u32>,HashMap::from([("asd".to_string(),2),("aadasdasd".to_string(),69)]));
-test_serialize_deserialize!(test_serialize_posting_node,PostingNode,
-    PostingNode{ 
+test_serialize_deserialize!(
+    test_serialize_posting_node,
+    PostingNode,
+    PostingNode {
         postings: vec![
-            Posting{ document_id: 2, position: 1 },
-            Posting{ document_id: 69, position: 69 },
-            Posting{ document_id: 42, position: 42 },
-            ], 
-        df: 0, 
-        tf: HashMap::from([(0,1),(69,42)]) 
-    });
-
+            Posting {
+                document_id: 2,
+                position: 1
+            },
+            Posting {
+                document_id: 69,
+                position: 69
+            },
+            Posting {
+                document_id: 42,
+                position: 42
+            },
+        ],
+        df: 0,
+        tf: HashMap::from([(0, 1), (69, 42)])
+    }
+);
 
 #[test]
 #[cfg(target_endian = "little")]
 fn test_serialize_hashmap() {
-    let mut a : HashMap<u32,u32> = HashMap::new();
+    let mut a: HashMap<u32, u32> = HashMap::new();
 
-    a.insert(42,69);
-    a.insert(69,42);
+    a.insert(42, 69);
+    a.insert(69, 42);
 
     let mut out = Vec::default();
 
     a.serialize(&mut out);
 
-    let mut des = HashMap::<u32,u32>::default();
+    let mut des = HashMap::<u32, u32>::default();
 
     des.deserialize(&mut &out[..]);
 
-    assert_eq!(a,des); // ascii codes
+    assert_eq!(a, des); // ascii codes
 }
 
 #[test]
@@ -125,6 +137,35 @@ fn test_deserialize_posting() {
     let mut clean = Posting::default();
 
     let ref mut out: &mut &[u8] = &mut &b"E\0\0\0*\0\0\0".to_vec()[..];
+    clean.deserialize(out);
+    assert_eq!(clean, target)
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_serialize_naive_date_time() {
+    let source = LastUpdatedDate {
+        date_time: NaiveDateTime::parse_from_str("2015-07-01 08:59:00", "%Y-%m-%d %H:%M:%S")
+            .unwrap(),
+    };
+
+    let mut out = Vec::default();
+
+    source.serialize(&mut out);
+
+    assert_eq!(out, b"\xDF\x07\0\0\x07\x01\x08\x3B\0"); // year is 4 bytes, so 2015 written in i32 becomes \xDF\x07\0\0. In total, this is 9 bytes
+}
+
+#[test]
+#[cfg(target_endian = "little")]
+fn test_deserialize_naive_date_time() {
+    let target = LastUpdatedDate {
+        date_time: NaiveDateTime::parse_from_str("2015-07-01 08:59:00", "%Y-%m-%d %H:%M:%S")
+            .unwrap(),
+    };
+    let mut clean = LastUpdatedDate::default();
+
+    let ref mut out: &mut &[u8] = &mut &b"\xDF\x07\0\0\x07\x01\x08\x3B\0".to_vec()[..];
     clean.deserialize(out);
     assert_eq!(clean, target)
 }

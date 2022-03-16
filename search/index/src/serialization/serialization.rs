@@ -1,5 +1,6 @@
-use crate::{EncodedPostingNode, Posting, PostingNode};
+use crate::{EncodedPostingNode, LastUpdatedDate, Posting, PostingNode};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
+use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use core::fmt::Debug;
 use core::hash::Hash;
 
@@ -314,6 +315,78 @@ impl Serializable for u32 {
     }
 }
 
+impl Serializable for i32 {
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        buf.write_i32::<NativeEndian>(*self).unwrap();
+        4
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        *self = buf.read_i32::<NativeEndian>().unwrap();
+        4
+    }
+}
+
+impl Serializable for u16 {
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        buf.write_u16::<NativeEndian>(*self).unwrap();
+        2
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        *self = buf.read_u16::<NativeEndian>().unwrap();
+        2
+    }
+}
+
+impl Serializable for u8 {
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        buf.write_u8(*self).unwrap();
+        1
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        *self = buf.read_u8().unwrap();
+        1
+    }
+}
+
+impl Serializable for LastUpdatedDate {
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        let mut count = 0;
+        buf.write_i32::<NativeEndian>(self.date_time.date().year() as i32) //year is defined as i32
+            .unwrap();
+        count += 4;
+        buf.write_u8(self.date_time.date().month() as u8).unwrap();
+        count += 1;
+        buf.write_u8(self.date_time.date().day() as u8).unwrap();
+        count += 1;
+        buf.write_u8(self.date_time.time().hour() as u8).unwrap();
+        count += 1;
+        buf.write_u8(self.date_time.time().minute() as u8).unwrap();
+        count += 1;
+        buf.write_u8(self.date_time.time().second() as u8).unwrap();
+        count += 1;
+
+        count
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        let year = buf.read_i32::<NativeEndian>().unwrap();
+        let month = buf.read_u8().unwrap();
+        let day = buf.read_u8().unwrap();
+
+        let hour = buf.read_u8().unwrap();
+        let min = buf.read_u8().unwrap();
+        let sec = buf.read_u8().unwrap();
+
+        let d = NaiveDate::from_ymd(year, month as u32, day as u32);
+        let t = NaiveTime::from_hms(hour as u32, min as u32, sec as u32);
+        self.date_time = NaiveDateTime::new(d, t);
+        9
+    }
+}
+
 impl Serializable for String {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         let mut bytes = self.as_bytes();
@@ -388,15 +461,16 @@ impl<E: Serializable> Serializable for Vec<E> {
 }
 
 impl<K, V> Serializable for HashMap<K, V>
-where 
-K: Serializable + Hash + Eq,
-V: Serializable,
-
+where
+    K: Serializable + Hash + Eq,
+    V: Serializable,
 {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         let mut count = 4;
         buf.write_u32::<NativeEndian>(self.len() as u32).unwrap();
-        count = self.iter().fold(count, |a, (k,v)| a + k.serialize(buf) + v.serialize(buf));
+        count = self
+            .iter()
+            .fold(count, |a, (k, v)| a + k.serialize(buf) + v.serialize(buf));
 
         count
     }
@@ -411,7 +485,7 @@ V: Serializable,
 
             count += k.deserialize(buf);
             count += v.deserialize(buf);
-            self.insert(k,v);
+            self.insert(k, v);
         });
         count
     }
