@@ -1,5 +1,6 @@
 use crate::page_rank::{init_page_rank, update_page_rank, update_all_page_ranks, compute_page_ranks};
 use std::collections::HashMap;
+use rand::Rng;
 
 // #[test]
 // fn test_init_page_rank() {
@@ -235,5 +236,147 @@ fn test_calculate_page_rank() {
 
     for (key, value) in pr {
         println!("Page {}: {}", key, value);
+    }
+}
+
+#[test]
+fn test_page_rank_converged_1() {
+
+    let mut outgoing_links: HashMap<u32, Vec<u32>> = HashMap::new();
+    outgoing_links.insert(0, vec![1]);
+    outgoing_links.insert(1, vec![0, 2]);
+    outgoing_links.insert(2, vec![0,1,3]);
+
+    let mut incoming_links: HashMap<u32, Vec<u32>> = HashMap::new();
+    incoming_links.insert(0, vec![1,2,3]);
+    incoming_links.insert(1, vec![0,2,3]);
+    incoming_links.insert(2, vec![1,3]);
+
+    let d = 0.85;
+
+    let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
+    update_all_page_ranks(&outgoing_links, &incoming_links, &mut page_rank, d);
+
+    let mut iterations = 1;
+    loop {
+        if update_all_page_ranks(&outgoing_links, &incoming_links,&mut page_rank, d){
+            println!("Number of iterations until convergence: {}", iterations);
+            break;
+        } else {
+            iterations += 1;
+        }
+    }
+}
+
+#[test]
+fn test_page_rank_converged_2() {
+
+    let mut outgoing_links: HashMap<u32, Vec<u32>> = HashMap::new();
+    outgoing_links.insert(0, vec![1]);
+    outgoing_links.insert(1, vec![0, 2]);
+    outgoing_links.insert(2, vec![0,1,3]);
+    outgoing_links.insert(3, vec![0,1,2]);
+
+    let mut incoming_links: HashMap<u32, Vec<u32>> = HashMap::new();
+    incoming_links.insert(0, vec![1,2,3]);
+    incoming_links.insert(1, vec![0,2,3]);
+    incoming_links.insert(2, vec![1,3]);
+    incoming_links.insert(3, vec![2]);
+
+    let d = 0.85;
+
+    let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
+    update_all_page_ranks(&outgoing_links, &incoming_links, &mut page_rank, d);
+
+    let mut iterations = 1;
+    loop {
+        if update_all_page_ranks(&outgoing_links, &incoming_links,&mut page_rank, d){
+            println!("Number of iterations until convergence: {}", iterations);
+            break;
+        } else {
+            iterations += 1;
+        }
+    }
+}
+
+#[test]
+fn test_page_rank_converged_3() {
+
+    let mut outgoing_links: HashMap<u32, Vec<u32>> = HashMap::new();
+    outgoing_links.insert(0, vec![1, 4]);
+    outgoing_links.insert(1, vec![0, 2, 4]);
+    outgoing_links.insert(2, vec![0,1,3, 4]);
+    outgoing_links.insert(3, vec![0,1,2, 4]);
+    outgoing_links.insert(4, vec![0]);
+
+    let mut incoming_links: HashMap<u32, Vec<u32>> = HashMap::new();
+    incoming_links.insert(0, vec![1,2,3, 4]);
+    incoming_links.insert(1, vec![0,2,3]);
+    incoming_links.insert(2, vec![1,3]);
+    incoming_links.insert(3, vec![2]);
+    incoming_links.insert(4, vec![0,1,2,3]);
+
+    let d = 0.85;
+
+    let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
+    update_all_page_ranks(&outgoing_links, &incoming_links, &mut page_rank, d);
+
+    let mut iterations = 1;
+    loop {
+        if update_all_page_ranks(&outgoing_links, &incoming_links,&mut page_rank, d){
+            println!("Number of iterations until convergence: {}", iterations);
+            break;
+        } else {
+            iterations += 1;
+        }
+    }
+}
+
+
+#[test]
+fn test_page_rank_converged_4() {
+
+    let number_of_pages = 1000;
+
+    let mut outgoing_links: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut incoming_links: HashMap<u32, Vec<u32>> = HashMap::new();
+
+    for i in 0..number_of_pages {
+        incoming_links.insert(i, vec![]);
+    }
+
+    let mut rng = rand::thread_rng();
+
+    for n in 0..number_of_pages {
+        // Randomly decide on the number of out links
+        let num_out_links = rng.gen_range(0,1000);
+        let mut out_links: Vec<u32> = Vec::with_capacity(num_out_links);
+        for i in 0..num_out_links {
+            loop {
+                let new_num = rng.gen_range(0,1000);
+                if !(out_links.contains(&new_num) || new_num == n) {
+                    let current_in_links = incoming_links.get(&new_num).unwrap();
+                    current_in_links.append(&mut vec![i as u32]);
+                    incoming_links.insert(new_num, *current_in_links);
+                    out_links.push(new_num);
+                    break;
+                }
+            }
+        }
+    }
+
+    let d = 0.85;
+
+    let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
+    update_all_page_ranks(&outgoing_links, &incoming_links, &mut page_rank, d);
+
+    let mut iterations = 1;
+    loop {
+        if update_all_page_ranks(&outgoing_links, &incoming_links,&mut page_rank, d){
+            println!("Number of iterations until convergence: {}", iterations);
+            break;
+        } else {
+            iterations += 1;
+        }
     }
 }
