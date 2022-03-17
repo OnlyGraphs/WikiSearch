@@ -106,13 +106,17 @@ impl<V: Serializable + MemFootprintCalculator, const ID: usize> MemFootprintCalc
 }
 
 impl<V: Serializable, const ID: usize> Entry<V, ID> {
-    pub fn into_inner(self) -> Result<V, Box<dyn Error>> {
+    pub fn into_inner(mut self) -> Result<V, Box<dyn Error>> {
         match self {
             Entry::Memory(v, _) => Ok(v),
-            Entry::Disk(v, k) => Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Data was not in memory."),
-            ))),
+            Entry::Disk(_, _) => {
+                self.load()?;
+                
+                match self {
+                    Entry::Memory(v, _) => Ok(v),
+                    Entry::Disk(_, _) => panic!(),
+                }
+            }
         }
     }
 

@@ -205,12 +205,11 @@ impl Index {
             .enumerate()
             .for_each(|(idx, (k, v))| {
                 {
-                    let unwrapped = match Arc::try_unwrap(v) {
-                        Ok(v) => v,
+                    let unwrapped  = 
+                    match Arc::try_unwrap(v) {
+                        Ok(v) => v.into_inner(),
                         Err(_) => panic!(),
-                    }
-                    .into_inner()
-                    .into_inner()
+                    }.into_inner()
                     .unwrap();
 
                     let encoded_node = EncodedPostingNode::from(unwrapped);
