@@ -102,12 +102,14 @@ pub struct RelationSearchOutput {
     pub documents: Vec<RelationDocument>,
     pub relations: Vec<Relation>,
     pub domain: String,
+    pub suggested_query: String,
 }
 
 #[derive(Serialize, Debug)]
 pub struct SearchOutput {
     pub documents: Vec<Document>,
     pub domain: String,
+    pub suggested_query: String
 }
 
 

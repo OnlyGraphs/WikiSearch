@@ -201,7 +201,8 @@ pub async fn search(
 
     Ok(Json(SearchOutput{
         documents: future_documents,
-        domain: env::var("DOMAIN").unwrap_or("en".to_string())
+        domain: env::var("DOMAIN").unwrap_or("en".to_string()),
+        suggested_query: "".to_string()
     }))
 }
 
@@ -350,7 +351,8 @@ pub async fn relational(
     Ok(Json(RelationSearchOutput {
         documents: documents,
         relations: relations.into_iter().collect(),
-        domain: env::var("DOMAIN").unwrap_or("en".to_string())
+        domain: env::var("DOMAIN").unwrap_or("en".to_string()),
+        suggested_query: "".to_string()
     }))
 }
 
