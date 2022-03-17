@@ -42,6 +42,7 @@ test_serialize_deserialize!(test_serialize_int_3, u8, 69 as u8);
 test_serialize_deserialize!(test_serialize_int_4, i32, 32980);
 
 test_serialize_deserialize!(test_serialize_vec, Vec<u32>, vec![1, 2, 3, 4, 5, 6]);
+
 test_serialize_deserialize!(
     test_serialize_vec_2,
     Vec<u16>,
@@ -49,10 +50,17 @@ test_serialize_deserialize!(
 );
 
 test_serialize_deserialize!(test_serialize_tuple, (u32, u32), (28932, 423242));
+
 test_serialize_deserialize!(
     test_serialize_tuple_2,
     (u32, String),
     (28932, "hola".to_string())
+);
+
+test_serialize_deserialize!(
+    test_serialize_tuple_vector,
+    Vec<(u32, u32)>,
+    vec![(28932, 423242), (3, 4), (543, 533)]
 );
 
 test_serialize_deserialize!(test_serialize_map,HashMap<String,u32>,HashMap::from([("asd".to_string(),2),("aadasdasd".to_string(),69)]));
@@ -88,6 +96,7 @@ fn create_index_map_for_test_serialize_posting_node() -> IndexMap<u32, u32, FxBu
     x.insert(69, 433);
     x.insert(100069, 5000);
     x.insert(100070, 1);
+    x.insert(1000370, 1);
 
     return x;
 }
@@ -111,6 +120,52 @@ test_serialize_deserialize!(
     test_vbyte_encoding_no_delta_indexmap_macro,
     EncodedSequentialObject<(u32, u32), VbyteEncoder<false>>,
     EncodedSequentialObject::<(u32, u32), VbyteEncoder<false>>::from_iter(create_index_map_for_test_serialize_posting_node().into_iter())
+);
+
+test_serialize_deserialize!(
+    test_vbyte_encoding_posting_macro,
+    EncodedSequentialObject<Posting, VbyteEncoder<true>>,
+    EncodedSequentialObject::<Posting, VbyteEncoder<true>>::from_iter(vec![
+        Posting {
+            document_id: 2,
+            position: 1
+        },
+        Posting {
+            document_id: 69,
+            position: 69
+        },
+        Posting {
+            document_id: 69,
+            position: 4294967295
+        },
+        Posting {
+            document_id: 39084334,
+            position: 3
+        },
+    ].into_iter())
+);
+
+test_serialize_deserialize!(
+    test_vbyte_encoding_posting_range_macro,
+    EncodedSequentialObject<PosRange, VbyteEncoder<true>>,
+    EncodedSequentialObject::<PosRange, VbyteEncoder<true>>::from_iter(vec![
+        PosRange {
+            start_pos: 2,
+            end_pos_delta: 1
+        },
+        PosRange {
+            start_pos: 69,
+            end_pos_delta: 69
+        },
+        PosRange {
+            start_pos: 69,
+            end_pos_delta: 4294967295
+        },
+        PosRange {
+            start_pos: 39084334,
+            end_pos_delta: 3
+        },
+    ].into_iter())
 );
 
 #[test]
@@ -144,6 +199,38 @@ fn test_serialize_indexmap() {
     a.insert(69, 34);
     a.insert(42, 42);
     a.insert(2, 2982309);
+
+    let mut out = Vec::default();
+
+    a.serialize(&mut out);
+
+    let mut des = IndexMap::<u32, u32, FxBuildHasher>::default();
+
+    des.deserialize(&mut &out[..]);
+
+    assert_eq!(a, des); // ascii codes
+}
+
+fn test_serialize_indexmap_sort() {
+    let mut a: IndexMap<u32, u32, FxBuildHasher> = IndexMap::default();
+    use indexmap::indexmap;
+
+    a.insert(42, 69);
+    a.insert(69, 42);
+    a.insert(69, 34);
+    a.insert(42, 42);
+    a.insert(2, 2982309);
+
+    let map: IndexMap<u32, u32> = indexmap! {
+        42 => 69,
+        69 => 42,
+        69 => 34,
+        42 => 42,
+        2 => 2982309,
+
+    };
+    a.sort_keys();
+    assert_eq!(map, a);
 
     let mut out = Vec::default();
 
