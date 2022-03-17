@@ -14,10 +14,10 @@ use crate::DiskHashMap;
 
 use crate::EncodedPostingNode;
 
-use crate::Posting;
 use crate::index_structs::PosRange;
 use crate::Entry;
 use crate::LastUpdatedDate;
+use crate::Posting;
 use crate::VbyteEncoder;
 
 use crate::compute_page_ranks;
@@ -155,14 +155,18 @@ impl Index {
         self.last_updated_docs.get(&doc_id).cloned()
     }
 
-pub fn with_capacity(
+    pub fn with_capacity(
         posting_list_mem_limit: u32,
         posting_list_persistent_mem_limit: u32,
-        articles: u32
+        articles: u32,
     ) -> Self {
         Self {
             dump_id: 0,
-            posting_nodes: DiskHashMap::new(posting_list_mem_limit,posting_list_persistent_mem_limit,true),
+            posting_nodes: DiskHashMap::new(
+                posting_list_mem_limit,
+                posting_list_persistent_mem_limit,
+                true,
+            ),
 
             links: HashMap::with_capacity(articles as usize),
             incoming_links: HashMap::with_capacity(articles as usize),
@@ -181,7 +185,11 @@ pub fn with_capacity(
 
         let mut index = Self {
             dump_id: p.dump_id,
-            posting_nodes: DiskHashMap::new(p.posting_nodes.capacity(),p.posting_nodes.persistent_capacity(),true),
+            posting_nodes: DiskHashMap::new(
+                p.posting_nodes.capacity(),
+                p.posting_nodes.persistent_capacity(),
+                true,
+            ),
 
             incoming_links: HashMap::with_capacity(p.links.len()),
             page_rank: HashMap::with_capacity(p.links.len()),
@@ -192,37 +200,44 @@ pub fn with_capacity(
 
         let total_posting_lists = p.posting_nodes.len();
         info!("Sorting {} posting lists", total_posting_lists);
-        p.posting_nodes.into_iter().enumerate().for_each(|(idx,(k,v))|{
-            {
-            let unwrapped = match Arc::try_unwrap(v) {
-                Ok(v) => v,
-                Err(_) => panic!(),
-            }  .into_inner()
-                .into_inner()
-                .unwrap();
+        p.posting_nodes
+            .into_iter()
+            .enumerate()
+            .for_each(|(idx, (k, v))| {
+                {
+                    let unwrapped = match Arc::try_unwrap(v) {
+                        Ok(v) => v,
+                        Err(_) => panic!(),
+                    }
+                    .into_inner()
+                    .into_inner()
+                    .unwrap();
 
-                let encoded_node = EncodedPostingNode::from(unwrapped);
-                index.posting_nodes.insert(k, encoded_node);
-            } // for dropping lock on v in case we want to evict it
+                    let encoded_node = EncodedPostingNode::from(unwrapped);
+                    index.posting_nodes.insert(k, encoded_node);
+                } // for dropping lock on v in case we want to evict it
 
-            // every R records report progress
-            if idx % 10000 as usize == 0 {
-                info!(
-                    "Sorted {}% ({}s)",
-                    (idx as f32 / total_posting_lists as f32) * 100.0,
-                    timer.elapsed().as_secs()
-                );
-                timer = Instant::now();
-            }
-        });
-        
+                // every R records report progress
+                if idx % 10000 as usize == 0 {
+                    info!(
+                        "Sorted {}% ({}s)",
+                        (idx as f32 / total_posting_lists as f32) * 100.0,
+                        timer.elapsed().as_secs()
+                    );
+                    timer = Instant::now();
+                }
+            });
+
         // finalize the hashmap, to enable normal caching mode
-        let disable_cache = env::var("CACHE_DISABLE").unwrap_or("false".to_string()).parse::<bool>().unwrap_or(false);
+        let disable_cache = env::var("CACHE_DISABLE")
+            .unwrap_or("false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
 
-        if !disable_cache{
+        if !disable_cache {
             index.posting_nodes.clean_cache();
         }
-        
+
         index.posting_nodes.set_runtime_mode();
 
         // back links

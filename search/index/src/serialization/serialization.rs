@@ -104,7 +104,7 @@ impl<E: SequentialEncoder<T>, T: Serializable> EncodedSequentialObject<T, E> {
     /// encodes without using a previous node
     /// should only be used with encoders which don't require
     /// the previous object
-    pub fn push(&mut self, n : T) {
+    pub fn push(&mut self, n: T) {
         self.bytes.extend(E::encode(&None, &n));
     }
 }
@@ -492,41 +492,41 @@ impl<N: Serializable, M: Serializable> Serializable for (N, M) {
     }
 }
 
-impl Serializable for LastUpdatedDate {
-    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
-        let mut count = 0;
-        buf.write_i32::<NativeEndian>(self.date_time.date().year() as i32) //year is defined as i32
-            .unwrap();
-        count += 4;
-        buf.write_u8(self.date_time.date().month() as u8).unwrap();
-        count += 1;
-        buf.write_u8(self.date_time.date().day() as u8).unwrap();
-        count += 1;
-        buf.write_u8(self.date_time.time().hour() as u8).unwrap();
-        count += 1;
-        buf.write_u8(self.date_time.time().minute() as u8).unwrap();
-        count += 1;
-        buf.write_u8(self.date_time.time().second() as u8).unwrap();
-        count += 1;
+// impl Serializable for LastUpdatedDate {
+//     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+//         let mut count = 0;
+//         buf.write_i32::<NativeEndian>(self.date_time.date().year() as i32) //year is defined as i32
+//             .unwrap();
+//         count += 4;
+//         buf.write_u8(self.date_time.date().month() as u8).unwrap();
+//         count += 1;
+//         buf.write_u8(self.date_time.date().day() as u8).unwrap();
+//         count += 1;
+//         buf.write_u8(self.date_time.time().hour() as u8).unwrap();
+//         count += 1;
+//         buf.write_u8(self.date_time.time().minute() as u8).unwrap();
+//         count += 1;
+//         buf.write_u8(self.date_time.time().second() as u8).unwrap();
+//         count += 1;
 
-        count
-    }
+//         count
+//     }
 
-    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
-        let year = buf.read_i32::<NativeEndian>().unwrap();
-        let month = buf.read_u8().unwrap();
-        let day = buf.read_u8().unwrap();
+//     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+//         let year = buf.read_i32::<NativeEndian>().unwrap();
+//         let month = buf.read_u8().unwrap();
+//         let day = buf.read_u8().unwrap();
 
-        let hour = buf.read_u8().unwrap();
-        let min = buf.read_u8().unwrap();
-        let sec = buf.read_u8().unwrap();
+//         let hour = buf.read_u8().unwrap();
+//         let min = buf.read_u8().unwrap();
+//         let sec = buf.read_u8().unwrap();
 
-        let d = NaiveDate::from_ymd(year, month as u32, day as u32);
-        let t = NaiveTime::from_hms(hour as u32, min as u32, sec as u32);
-        self.date_time = NaiveDateTime::new(d, t);
-        9
-    }
-}
+//         let d = NaiveDate::from_ymd(year, month as u32, day as u32);
+//         let t = NaiveTime::from_hms(hour as u32, min as u32, sec as u32);
+//         self.date_time = NaiveDateTime::new(d, t);
+//         9
+//     }
+// }
 
 impl Serializable for String {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
@@ -568,7 +568,7 @@ where
         buf.write_u32::<NativeEndian>(self.bytes.len() as u32)
             .unwrap();
         buf.write_all(&mut &self.bytes.clone()).unwrap();
-        self.bytes.len()
+        self.bytes.len() + 4
     }
 
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
@@ -576,7 +576,7 @@ where
         for _ in 0..len {
             self.bytes.push(buf.read_u8().unwrap());
         }
-        self.bytes.len()
+        self.bytes.len() + 4
     }
 }
 
