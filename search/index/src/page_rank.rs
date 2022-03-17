@@ -1,4 +1,4 @@
-use std::{collections::HashMap, cmp::max, time::Instant};
+use std::{collections::HashMap, cmp::max, time::Instant, f64::INFINITY};
 
 use log::info;
 
@@ -18,15 +18,15 @@ pub fn init_page_rank(ids: &HashMap<u32, Vec<u32>>, init_value: f64) -> HashMap<
 /// Compute the page rank value of a single page
 /// page --> id of page for which to compute the page rank
 /// d --> damping factor
-/// Returns the change in page rank from previous iteration
-pub fn update_page_rank(page: u32, d: f64, in_links: &Vec<u32>,old_page_ranks: &HashMap<u32,f64>, page_ranks: &mut HashMap<u32, f64>, out_links: &HashMap<u32, Vec<u32>>) -> f64{
+/// returns the updated page rank
+pub fn update_page_rank(page: u32, d: f64, in_links: &Vec<u32>, page_ranks: &mut HashMap<u32, f64>, out_links: &HashMap<u32, Vec<u32>>, prev_page_ranks: &HashMap<u32, f64>) {
 
-    let previous_page_rank = *page_ranks.get(&page).unwrap(); // guaranteed to exist
+    //let previous_page_rank = *page_ranks.get(&page).unwrap(); // guaranteed to exist
     let mut page_rank = 1.0-d;
     let mut summed = 0.0;
     for page in in_links {
-        let pr = *old_page_ranks.get(&page).unwrap_or(&0.0);
-
+        let pr = prev_page_ranks.get(&page).unwrap_or(&0.0);
+    
         // the number of outgoing links for any page in the list should be at least one, so set it to that by default
         // however some pages might not satisfy this, force this number to avoid div by zero
         let ca_len = max(
@@ -36,29 +36,65 @@ pub fn update_page_rank(page: u32, d: f64, in_links: &Vec<u32>,old_page_ranks: &
 
         summed = summed + (pr/ca_len);
     }
+    
     page_rank = page_rank + d*(summed as f64);
     page_ranks.insert(page,page_rank); // should always replace an old key
+}
 
+// Normalize the page ranks to be within the range 0 and 1
+// Returns the change in page rank from the previous iteration
+pub fn normalize_pr(min: f64, max: f64, page_ranks: &mut HashMap<u32, f64>, prev_page_ranks: &HashMap<u32, f64>) -> f64 {
 
-    return previous_page_rank - page_rank
+    let mut delta = 0.0;
+
+    page_ranks.iter_mut().for_each(|(page, page_rank)|  {
+        // Normalize the new page rank
+        let normalized_page_rank = (*page_rank-min)/(max-min);
+        
+        let prev_page_rank = prev_page_ranks.get(&page).unwrap();
+        delta += (normalized_page_rank-prev_page_rank).abs();
+
+        // update page rank
+        *page_rank = normalized_page_rank;
+    });
+
+    return delta;
+}
+
+pub fn softmax(page_ranks: &mut HashMap<u32, f64>, prev_page_ranks: &HashMap<u32, f64>) -> f64 {
+    let mut pr_sum = 0.0;
+    let mut delta = 0.0;
+
+    // Sum all the page ranks together
+    page_ranks.iter_mut().for_each(|(page, page_rank)|  {
+        // Add the current page rank to the total sum
+        pr_sum += *page_rank;
+    });
+
+    page_ranks.iter_mut().for_each(|(page, page_rank)|  {
+        // update the page rank by dividing the value by the total sum of page ranks
+        let new_pr = *page_rank/pr_sum;
+
+        let prev_page_rank = prev_page_ranks.get(&page).unwrap();
+        delta += (new_pr-prev_page_rank).abs();
+
+        *page_rank = new_pr;
+    });
+
+    return delta;
 }
 
 /// Performs an iteration of page rank
 /// Returns true if converged false otherwise
 pub fn update_all_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_links: &HashMap<u32, Vec<u32>>, current_pr: &mut HashMap<u32, f64>, d: f64) -> bool {
     
-    let mut converged = true;
     let old_pr = current_pr.clone();
 
     for (page, in_links) in incoming_links {
-        let delta = update_page_rank(*page, d, in_links,&old_pr, current_pr, outgoing_links);
-
-        if delta.abs() > 0.000001 {
-            converged = false;
-        }    
+        update_page_rank(*page, d, in_links,current_pr, outgoing_links, &old_pr);
     }
 
-    return converged
+    return softmax(current_pr, &old_pr) < 0.000001*(current_pr.keys().len() as f64);
 }
 
 pub fn compute_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_links: &HashMap<u32, Vec<u32>>, d:f64) -> HashMap<u32, f64> {
