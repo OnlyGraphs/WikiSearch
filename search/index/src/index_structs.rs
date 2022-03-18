@@ -1,7 +1,9 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use indexmap::IndexMap;
 
-use crate::{EncodedPostingList, SequentialEncoder};
+use crate::{
+    DeltaEncoder, EncodedPostingList, EncodedSequentialObject, SequentialEncoder, VbyteEncoder,
+};
 use fxhash::FxBuildHasher;
 use utils::MemFootprintCalculator;
 pub const DATE_TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -32,10 +34,29 @@ where
 
 impl<E: SequentialEncoder<Posting>> From<PostingNode> for EncodedPostingNode<E> {
     fn from(o: PostingNode) -> Self {
+        let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
+        sorted_nodes.sort();
+
         Self {
-            postings: EncodedPostingList::from_iter(o.postings.into_iter()),
+            postings: EncodedPostingList::from_iter(sorted_nodes.into_iter()),
             df: o.df,
             tf: o.tf,
+        }
+    }
+}
+
+impl From<EncodedPostingNode<VbyteEncoder<false>>> for EncodedPostingNode<VbyteEncoder<true>> {
+    fn from(o: EncodedPostingNode<VbyteEncoder<false>>) -> Self {
+        let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
+        sorted_nodes.sort();
+
+        let mut sorted_tf = o.tf;
+        sorted_tf.sort_keys();
+
+        Self {
+            postings: EncodedSequentialObject::from_iter(sorted_nodes.into_iter()),
+            df: o.df,
+            tf: sorted_tf,
         }
     }
 }
@@ -84,12 +105,12 @@ impl MemFootprintCalculator for LastUpdatedDate {
     }
 }
 
-impl Default for LastUpdatedDate {
-    fn default() -> Self {
-        let d = NaiveDate::from_ymd(0, 1, 1);
-        let t = NaiveTime::from_hms(0, 0, 0);
-        LastUpdatedDate {
-            date_time: NaiveDateTime::new(d, t),
-        }
-    }
-}
+// impl Default for LastUpdatedDate {
+//     fn default() -> Self {
+//         let d = NaiveDate::from_ymd(0, 1, 1);
+//         let t = NaiveTime::from_hms(0, 0, 0);
+//         LastUpdatedDate {
+//             date_time: NaiveDateTime::new(d, t),
+//         }
+//     }
+// }
