@@ -26,7 +26,7 @@ use parking_lot::Mutex;
 #[derive(Default)]
 pub struct Index {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder<true>>, 1>, // index map because we want to keep this sorted
+    pub posting_nodes: DiskHashMap<EncodedPostingNode<VbyteEncoder<true>>, 1>, // index map because we want to keep this sorted
     pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
@@ -202,7 +202,7 @@ impl Index {
         p.posting_nodes
             .into_iter()
             .enumerate()
-            .for_each(|(idx, (k, v))| {
+            .for_each(|(idx, (str_key, mapping, v))| {
                 v.lock().get_mut().unwrap().postings.sort();
                 v.lock().get_mut().unwrap().tf.sort_keys();
 
@@ -216,7 +216,7 @@ impl Index {
                     .unwrap();
 
                     let encoded_node = EncodedPostingNode::from(unwrapped);
-                    index.posting_nodes.insert(k, encoded_node);
+                    index.posting_nodes.insert(&str_key, encoded_node);
                 } // for dropping lock on v in case we want to evict it
 
                 // every R records report progress

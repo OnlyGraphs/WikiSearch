@@ -222,7 +222,7 @@ impl SequentialEncoder<Posting> for DeltaEncoder {
 }
 
 // B is a boolean flag to indiciate if we want to apply delta encoding or not
-#[derive(Default, Eq, PartialEq, Debug)]
+#[derive(Default, Eq, PartialEq, Debug, Hash)]
 pub struct VbyteEncoder<const B: bool> {}
 
 impl<const B: bool> VbyteEncoder<B> {

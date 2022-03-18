@@ -2,7 +2,7 @@ use bimap::BiMap;
 use chrono::NaiveDateTime;
 use either::Either;
 use indexmap::IndexMap;
-
+use indexmap::IndexSet;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
@@ -94,6 +94,17 @@ where
         self.iter()
             .fold(0, |a, (k, v)| v.real_mem() + k.real_mem() + a)
             + size_of::<IndexMap<K, V, S>>() as u64 // need this as above doesnt count metadata
+    }
+}
+
+impl<K, S> MemFootprintCalculator for IndexSet<K, S>
+where
+    K: MemFootprintCalculator,
+    S: BuildHasher,
+{
+    fn real_mem(&self) -> u64 {
+        self.iter().fold(0, |a, k| k.real_mem() + a) + size_of::<IndexSet<K, S>>() as u64
+        // need this as above doesnt count metadata
     }
 }
 

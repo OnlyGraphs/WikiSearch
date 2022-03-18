@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 /// a common backbone from which any index can be intialized
 pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, PostingNode, 0>,
+    pub posting_nodes: DiskHashMap<PostingNode, 0>,
     pub links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     // pub id_title_map: BiMap<u32, String>,
@@ -103,7 +103,7 @@ impl PreIndex {
         // collect DF values
         for s in self.curr_doc_appearances.drain() {
             self.posting_nodes
-                .entry((&s))
+                .entry(&s)
                 .unwrap()
                 .lock()
                 .get_mut()
