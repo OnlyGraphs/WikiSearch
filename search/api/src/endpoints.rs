@@ -1,9 +1,9 @@
-use crate::RelationDocument;
 use crate::structs::SortType;
 use crate::structs::{
     Document, RESTSearchData, Relation, RelationSearchOutput, RelationalSearchParameters,
     SearchOutput, SearchParameters, UserFeedback,
 };
+use crate::RelationDocument;
 use actix_web::http::header::ContentType;
 use actix_web::ResponseError;
 use actix_web::{
@@ -21,13 +21,14 @@ use log::{debug, info};
 use parser::parser::parse_query;
 use retrieval::correct_query;
 use retrieval::query_correction::TOTAL_POSTING_CORRECTION_THRESHOLD;
-use retrieval::{execute_relational_query, ScoredRelationDocument};
 use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocument};
+use retrieval::{execute_relational_query, ScoredRelationDocument};
 use serde::Serialize;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::fmt::{self, Display};
 use std::time::Instant;
 
@@ -104,10 +105,9 @@ pub async fn search(
         .parse()
         .unwrap();
 
-    let mut timer_whole = Instant::now();
+    let timer_whole = Instant::now();
 
     info!("received query: {}", q.query);
-    let mut timer = Instant::now();
 
     //Initialise Database connection to retrieve article title and abstract for each document found for the query
     let pool = PgPoolOptions::new()
@@ -123,12 +123,16 @@ pub async fn search(
         .index_rest
         .read()
         .map_err(|e| APIError::new_internal_error(&e))?;
-   
-    let (_, ref mut query) = parse_query(&q.query)
-        .map_err(|e| APIError::new_user_error(&e, &e))?;
 
+    let (_, ref mut query) = parse_query(&q.query).map_err(|e| APIError::new_user_error(&e, &e))?;
+
+    let mut timer = Instant::now();
     preprocess_query(query).map_err(|e| APIError::new_user_error(&e, &e))?;
-    info!("preproced query: {:?}, {}s", query, timer.elapsed().as_secs_f32());
+    info!(
+        "preproced query: {:?}, {}s",
+        query,
+        timer.elapsed().as_secs_f32()
+    );
 
     timer = Instant::now();
     let postings_query = execute_query(query, &idx);
@@ -144,12 +148,9 @@ pub async fn search(
     info!("{}", format!("Suggested Query:\n {}", suggested_query));
     info!("Corrected query: {}s", timer.elapsed().as_secs_f32());
 
-
     timer = Instant::now();
     let mut postings = postings_query.collect::<Vec<Posting>>();
-    info!("sorted query: {}s", timer.elapsed().as_secs_f32());
 
-    timer = Instant::now();
     let capped_max_results = min(q.results_per_page.0, 150);
     // score documents if necessary and sort appropriately
     let ordered_docs: Vec<ScoredDocument> = match q.sort_by {
@@ -218,10 +219,17 @@ pub async fn search(
         .into_iter()
         .collect::<Result<Vec<Document>, APIError>>()?; // fail on a single internal error
 
-    info!("Query: {} took: {}s",&q.query, timer_whole.elapsed().as_secs_f32());
+    info!("sorted query: {}s", timer.elapsed().as_secs_f32());
+
+    info!(
+        "Query: {} took: {}s",
+        &q.query,
+        timer_whole.elapsed().as_secs_f32()
+    );
 
     Ok(Json(SearchOutput {
         documents: future_documents,
+        domain: env::var("DOMAIN").unwrap_or("en".to_string()),
         suggested_query: suggested_query,
     }))
 }
@@ -285,7 +293,11 @@ pub async fn relational(
     let capped_max_results = min(q.max_results.0, 150) as usize;
 
     let mut scored_documents = execute_relational_query(query, &idx);
-    scored_documents.sort_by(|a,b| a.hops.partial_cmp(&b.hops).unwrap_or(std::cmp::Ordering::Equal)); // TODO; hmm
+    scored_documents.sort_by(|a, b| {
+        a.hops
+            .partial_cmp(&b.hops)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    }); // TODO; hmm
     scored_documents = scored_documents
         .into_iter()
         .take(capped_max_results)
@@ -345,7 +357,7 @@ pub async fn relational(
     // also there may be duplicates, need to retrieve this while crawling the graph
     let relations: HashSet<Relation> = scored_documents
         .iter()
-        .flat_map(|ScoredRelationDocument { doc_id, ..}| {
+        .flat_map(|ScoredRelationDocument { doc_id, .. }| {
             idx.get_links(*doc_id)
                 .iter()
                 .filter_map(|target| {
@@ -372,11 +384,16 @@ pub async fn relational(
         })
         .collect();
 
-    info!("Relational Query: {:?} took: {}s",&q.query, timer.elapsed().as_secs_f32());
+    info!(
+        "Relational Query: {:?} took: {}s",
+        &q.query,
+        timer.elapsed().as_secs_f32()
+    );
 
     Ok(Json(RelationSearchOutput {
         documents: documents,
         relations: relations.into_iter().collect(),
+        domain: env::var("DOMAIN").unwrap_or("en".to_string()),
     }))
 }
 

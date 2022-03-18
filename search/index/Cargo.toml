@@ -1,3 +1,4 @@
+
 [package]
 name = "index"
 version = "0.1.1"
@@ -29,3 +30,8 @@ num-integer = "0.1.44"
 parking_lot= "0.12.0"
 default-env = "0.1.1"
 ternary-tree="0.1.1"
+once_cell = "1.10.0"
+more-asserts = "0.2.2"
+keyed_priority_queue = "0.4.1"
+fxhash = "0.2.1"
+rayon = "1.5.1"

@@ -1,20 +1,21 @@
 use crate::{
-    DiskTstMap, Document, IndexError, IndexErrorKind, PosRange, Posting, PostingNode,
-    DATE_TIME_FORMAT,
+    DiskHashMap, Document, IndexError, IndexErrorKind, LastUpdatedDate, PosRange, Posting,
+    PostingNode, DATE_TIME_FORMAT,
 };
 use bimap::BiMap;
 use chrono::NaiveDateTime;
+use itertools::Itertools;
 use parser::StructureElem;
 use std::collections::{HashMap, HashSet};
 
 /// a common backbone from which any index can be intialized
 pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskTstMap<PostingNode, 0>,
-    pub links: HashMap<u32, Vec<String>>,
+    pub posting_nodes: DiskHashMap<String, PostingNode, 0>,
+    pub links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
-    pub id_title_map: BiMap<u32, String>,
-    pub last_updated_docs: HashMap<u32, NaiveDateTime>,
+    // pub id_title_map: BiMap<u32, String>,
+    pub last_updated_docs: HashMap<u32, LastUpdatedDate>,
     // for keeping track of unique token appearances in the current document
     curr_doc_appearances: HashSet<String>,
 }
@@ -23,10 +24,9 @@ impl Default for PreIndex {
     fn default() -> Self {
         Self {
             dump_id: Default::default(),
-            posting_nodes: DiskTstMap::new(1),
+            posting_nodes: DiskHashMap::new(10000, 100, true),
             links: Default::default(),
             extent: Default::default(),
-            id_title_map: Default::default(),
             last_updated_docs: Default::default(),
             curr_doc_appearances: Default::default(),
         }
@@ -34,39 +34,47 @@ impl Default for PreIndex {
 }
 
 impl PreIndex {
-    pub fn with_capacity(cap: u32) -> Self {
+    pub fn with_capacity(cap: u32, persistent_cap: u32) -> Self {
         Self {
             dump_id: Default::default(),
-            posting_nodes: DiskTstMap::new(cap),
+            posting_nodes: DiskHashMap::new(cap, persistent_cap, true),
             links: Default::default(),
             extent: Default::default(),
-            id_title_map: Default::default(),
+            // id_title_map: Default::default(),
             last_updated_docs: Default::default(),
             curr_doc_appearances: Default::default(),
         }
     }
 
+    pub fn cache_size(&self) -> u32 {
+        self.posting_nodes.cache_population()
+    }
+
     pub fn clean_cache(&self) {
-        self.posting_nodes.clean_cache_all();
+        self.posting_nodes.clean_cache();
     }
 
     pub fn add_document(&mut self, document: Box<Document>) -> Result<(), IndexError> {
+        if self.links.contains_key(&document.doc_id) {
+            return Err(IndexError {
+                msg: "Attempted to insert document into index which already exists.".to_string(),
+                kind: IndexErrorKind::InvalidOperation,
+            });
+        }
+
         let mut word_pos = 0;
 
         // metadata
         self.last_updated_docs.insert(
             document.doc_id,
-            NaiveDateTime::parse_from_str(&document.last_updated_date, DATE_TIME_FORMAT)
+            LastUpdatedDate {
+                date_time: NaiveDateTime::parse_from_str(
+                    &document.last_updated_date,
+                    DATE_TIME_FORMAT,
+                )
                 .unwrap_or(NaiveDateTime::from_timestamp(0, 0)),
+            },
         );
-
-        // titles
-        self.id_title_map
-            .insert_no_overwrite(document.doc_id, document.title.clone())
-            .map_err(|_c| IndexError {
-                msg: "Attempted to insert document into index which already exists.".to_string(),
-                kind: IndexErrorKind::InvalidOperation,
-            })?;
 
         //Infoboxes
         word_pos = document.infoboxes.iter().fold(word_pos, |a, i| {
@@ -95,7 +103,7 @@ impl PreIndex {
         // collect DF values
         for s in self.curr_doc_appearances.drain() {
             self.posting_nodes
-                .entry(&s)
+                .entry((&s))
                 .unwrap()
                 .lock()
                 .get_mut()
@@ -136,9 +144,9 @@ impl PreIndex {
 
     fn add_links(&mut self, doc_id: u32, article_links: &str) -> Result<(), IndexError> {
         // out links
-        let link_titles: Vec<String> = article_links
+        let link_titles: Vec<u32> = article_links
             .split("\t")
-            .map(|c| c.trim().to_string())
+            .filter_map(|c| c.trim().to_string().parse::<u32>().ok())
             .collect();
 
         // in links
@@ -163,9 +171,9 @@ impl PreIndex {
             .entry(doc_id)
             .or_insert(PosRange {
                 start_pos: prev_pos, // if not exists, initialize range
-                end_pos: word_pos,
+                end_pos_delta: 0,
             })
-            .end_pos = word_pos; // if exists, extend it
+            .end_pos_delta += 1; // if exists, extend it
 
         return word_pos;
     }

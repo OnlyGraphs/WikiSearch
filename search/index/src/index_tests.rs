@@ -2,14 +2,13 @@ use crate::{get_document_with_date_time, PreIndex, DATE_TIME_FORMAT};
 
 use crate::utils::{get_document_with_links, get_document_with_text};
 use crate::{
-    index::{Index},
-    index_structs::Posting,
+    index::Index,
+    index_structs::{LastUpdatedDate, Posting},
 };
+use chrono::NaiveDateTime;
 use std::array::IntoIter;
 use std::collections::HashMap;
 use utils::utils::MemFootprintCalculator;
-
-use chrono::NaiveDateTime;
 
 // TODO: split tests by library
 // add integration tests
@@ -18,6 +17,7 @@ use chrono::NaiveDateTime;
 fn test_real_mem_primitives() {
     assert_eq!((0 as u32).real_mem(), 4);
     assert_eq!((0 as u64).real_mem(), 8);
+
     assert_eq!(("hello".to_string()).real_mem(), 24 + 5);
     assert_eq!(("hello").real_mem(), 16 + 5);
     assert_eq!(
@@ -31,9 +31,11 @@ fn test_real_mem_primitives() {
 }
 #[test]
 fn test_real_mem_naive_date_time() {
-    let datetime =
-        NaiveDateTime::parse_from_str("2015-07-01 08:59:60", "%Y-%m-%d %H:%M:%S").unwrap();
-    assert_eq!(datetime.real_mem(), 4 + 4 + 4);
+    let doc_datetime = LastUpdatedDate {
+        date_time: NaiveDateTime::parse_from_str("2015-07-01 08:59:60", "%Y-%m-%d %H:%M:%S")
+            .unwrap(),
+    };
+    assert_eq!(doc_datetime.real_mem(), 4 + 4 + 4);
 }
 #[test]
 fn test_index_date_time_parsing_correct() {
@@ -49,12 +51,17 @@ fn test_index_date_time_parsing_correct() {
         .add_document(get_document_with_date_time(1, "1", str1))
         .unwrap();
 
-    let datetime_correct1 = NaiveDateTime::parse_from_str(str1, DATE_TIME_FORMAT).unwrap();
+    let datetime_correct1 = LastUpdatedDate {
+        date_time: NaiveDateTime::parse_from_str(str1, DATE_TIME_FORMAT).unwrap(),
+    };
     //Second Example
+
     pre_idx
         .add_document(get_document_with_date_time(2, "2", test_str2))
         .unwrap();
-    let datetime_correct2 = NaiveDateTime::parse_from_str(actual_str2, DATE_TIME_FORMAT).unwrap();
+    let datetime_correct2 = LastUpdatedDate {
+        date_time: NaiveDateTime::parse_from_str(actual_str2, DATE_TIME_FORMAT).unwrap(),
+    };
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -144,7 +151,14 @@ fn test_basic_index_get_postings() {
     let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(
-        idx.get_postings("aaa").unwrap().lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>(),
+        idx.get_postings("aaa")
+            .unwrap()
+            .lock()
+            .get()
+            .unwrap()
+            .postings
+            .into_iter()
+            .collect::<Vec<Posting>>(),
         vec![Posting {
             document_id: 2,
             position: 0,
@@ -152,7 +166,14 @@ fn test_basic_index_get_postings() {
     );
 
     assert_eq!(
-        idx.get_postings("ddd").unwrap().lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>(),
+        idx.get_postings("ddd")
+            .unwrap()
+            .lock()
+            .get()
+            .unwrap()
+            .postings
+            .into_iter()
+            .collect::<Vec<Posting>>(),
         vec![Posting {
             document_id: 2,
             position: 3,
@@ -160,14 +181,30 @@ fn test_basic_index_get_postings() {
     );
 
     assert_eq!(
-        idx.get_postings("ggg").unwrap().lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>(),
+        idx.get_postings("ggg")
+            .unwrap()
+            .lock()
+            .get()
+            .unwrap()
+            .postings
+            .into_iter()
+            .collect::<Vec<Posting>>(),
         vec![Posting {
             document_id: 2,
             position: 6,
         }]
     );
 
-    assert_eq!(idx.get_postings("dick").map(|v| v.lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>()),None);
+    assert_eq!(
+        idx.get_postings("dick").map(|v| v
+            .lock()
+            .get()
+            .unwrap()
+            .postings
+            .into_iter()
+            .collect::<Vec<Posting>>()),
+        None
+    );
 }
 
 #[test]
@@ -199,7 +236,14 @@ fn test_sorted_postings() {
     let idx = Index::from_pre_index(pre_idx);
 
     assert_eq!(
-        idx.get_postings("ggg").unwrap().lock().get().unwrap().postings.into_iter().collect::<Vec<Posting>>(),
+        idx.get_postings("ggg")
+            .unwrap()
+            .lock()
+            .get()
+            .unwrap()
+            .postings
+            .into_iter()
+            .collect::<Vec<Posting>>(),
         vec![
             Posting {
                 document_id: 2,
@@ -220,7 +264,6 @@ fn test_sorted_postings() {
         ]
     );
 }
-
 
 #[test]
 fn test_basic_index_tf() {
@@ -288,13 +331,13 @@ fn test_basic_index_links() {
     let mut pre_idx = PreIndex::default();
 
     pre_idx
-        .add_document(get_document_with_links(0, "source", "target1\ttarget2"))
+        .add_document(get_document_with_links(0, "source", "1\t2"))
         .unwrap();
     pre_idx
-        .add_document(get_document_with_links(1, "target1", "target2\ttarget1"))
+        .add_document(get_document_with_links(1, "target1", "2\t1"))
         .unwrap();
     pre_idx
-        .add_document(get_document_with_links(2, "target2", "source\ttarget1"))
+        .add_document(get_document_with_links(2, "target2", "0\t1"))
         .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
