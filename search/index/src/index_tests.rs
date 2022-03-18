@@ -211,10 +211,11 @@ fn test_basic_index_get_postings() {
 fn test_sorted_postings() {
     let mut pre_idx = PreIndex::default();
 
+
     pre_idx
         .add_document(get_document_with_text(
-            3,
-            "d1",
+            2,
+            "d0",
             vec![("", "ggg bbb")],
             "ccc ddd",
             vec!["eee fff"],
@@ -224,8 +225,8 @@ fn test_sorted_postings() {
 
     pre_idx
         .add_document(get_document_with_text(
-            2,
-            "d0",
+            3,
+            "d1",
             vec![("", "ggg bbb")],
             "ccc ddd",
             vec!["eee fff"],

@@ -37,6 +37,8 @@ run-release:
 flame-run:
 	cd search && cargo flamegraph --dev
 
+flame-run-release:
+	cd search && cargo flamegraph 
 build:
 	cd search && cargo build --release 
 

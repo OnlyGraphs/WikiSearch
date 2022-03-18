@@ -34,11 +34,11 @@ where
 
 impl<E: SequentialEncoder<Posting>> From<PostingNode> for EncodedPostingNode<E> {
     fn from(o: PostingNode) -> Self {
-        let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
-        sorted_nodes.sort();
+        // let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
+        // sorted_nodes.sort();
 
         Self {
-            postings: EncodedPostingList::from_iter(sorted_nodes.into_iter()),
+            postings: EncodedPostingList::from_iter(o.postings.into_iter()),
             df: o.df,
             tf: o.tf,
         }
@@ -47,14 +47,14 @@ impl<E: SequentialEncoder<Posting>> From<PostingNode> for EncodedPostingNode<E> 
 
 impl From<EncodedPostingNode<VbyteEncoder<false>>> for EncodedPostingNode<VbyteEncoder<true>> {
     fn from(o: EncodedPostingNode<VbyteEncoder<false>>) -> Self {
-        let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
-        sorted_nodes.sort();
+        // let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
+        // sorted_nodes.sort();
 
         let mut sorted_tf = o.tf;
         sorted_tf.sort_keys();
 
         Self {
-            postings: EncodedSequentialObject::from_iter(sorted_nodes.into_iter()),
+            postings: EncodedSequentialObject::from_iter(o.postings.into_iter()),
             df: o.df,
             tf: sorted_tf,
         }
