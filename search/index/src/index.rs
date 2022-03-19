@@ -27,7 +27,7 @@ use parking_lot::Mutex;
 #[derive(Default)]
 pub struct Index {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder<true>>, 1>, // index map because we want to keep this sorted
+    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder<Posting,true>>, 0>, // index map because we want to keep this sorted
     pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
@@ -139,7 +139,7 @@ impl Index {
     pub fn get_postings(
         &self,
         token: &str,
-    ) -> Option<Arc<Mutex<Entry<EncodedPostingNode<VbyteEncoder<true>>, 1>>>> {
+    ) -> Option<Arc<Mutex<Entry<EncodedPostingNode<VbyteEncoder<Posting,true>>, 0>>>> {
         self.posting_nodes.entry(token)
     }
 
@@ -185,57 +185,13 @@ impl Index {
 
         let mut index = Self {
             dump_id: p.dump_id,
-            posting_nodes: DiskHashMap::new(
-                p.posting_nodes.capacity(),
-                p.posting_nodes.persistent_capacity(),
-                true,
-            ),
-
+            posting_nodes: p.posting_nodes,
             incoming_links: HashMap::with_capacity(p.links.len()),
             page_rank: HashMap::with_capacity(p.links.len()),
             links: p.links,
             extent: p.extent,
             last_updated_docs: p.last_updated_docs,
         };
-
-        let total_posting_lists = p.posting_nodes.len();
-        info!("Sorting {} posting lists", total_posting_lists);
-        p.posting_nodes
-            .into_iter()
-            .enumerate()
-            .for_each(|(idx, (k, v))| {
-                {
-                    let unwrapped  = 
-                    match Arc::try_unwrap(v) {
-                        Ok(v) => v.into_inner(),
-                        Err(_) => panic!(),
-                    }.into_inner()
-                    .unwrap();
-
-                    let encoded_node = EncodedPostingNode::from(unwrapped);
-                    index.posting_nodes.insert(k, encoded_node);
-                } // for dropping lock on v in case we want to evict it
-
-                // every R records report progress
-                if idx % 10000 as usize == 0 {
-                    info!(
-                        "Sorted {}% ({}s)",
-                        (idx as f32 / total_posting_lists as f32) * 100.0,
-                        timer.elapsed().as_secs()
-                    );
-                    timer = Instant::now();
-                }
-            });
-
-        // finalize the hashmap, to enable normal caching mode
-        let disable_cache = env::var("CACHE_DISABLE")
-            .unwrap_or("false".to_string())
-            .parse::<bool>()
-            .unwrap_or(false);
-
-        if !disable_cache {
-            index.posting_nodes.clean_cache();
-        }
 
         index.posting_nodes.set_runtime_mode();
 
