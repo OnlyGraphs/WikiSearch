@@ -203,15 +203,11 @@ impl Index {
             .into_iter()
             .enumerate()
             .for_each(|(idx, (str_key, mapping, v))| {
-                v.lock().get_mut().unwrap().postings.sort();
-                v.lock().get_mut().unwrap().tf.sort_keys();
-
                 {
                     let unwrapped = match Arc::try_unwrap(v) {
-                        Ok(v) => v,
+                        Ok(v) => v.into_inner(),
                         Err(_) => panic!(),
                     }
-                    .into_inner()
                     .into_inner()
                     .unwrap();
 

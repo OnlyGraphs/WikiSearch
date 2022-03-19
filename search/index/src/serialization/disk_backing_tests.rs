@@ -201,6 +201,11 @@ fn test_disk_map_iterator() {
     d.insert("3224", 22);
 
     let o = d.insert("0123", 16);
+
+    println!("{:?}", d.entry_or_default("0123"));
+    println!("{:?}", d.entry_or_default("943780349"));
+    println!("{:?}", d.entry("943780349"));
+
     let mut vec = Vec::default();
 
     d.into_iter()
@@ -208,6 +213,7 @@ fn test_disk_map_iterator() {
         .for_each(|(idx, (str_key, mapping, v))| {
             vec.push((str_key, mapping, v));
         });
+    println!("{:?}", vec);
 
     assert_eq!(vec[0].0, ("0123".to_string()));
     assert_eq!(vec[0].1, 0);
