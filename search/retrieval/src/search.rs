@@ -34,7 +34,8 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
         tokenisation_options: Default::default(),
         fold_case: true,
         remove_stop_words: false, //Set to false , to avoid edge cases like the*ter (theater, where "the" can be considered a stop word)
-        normalisation: preprocessor::Normalisation::None, //no stemming as that would lose structure of query?
+        normalisation: preprocessor::Normalisation::None, //no stemming as that would lose structure of query? 
+        remove_url: false, 
     };
 
     match *query {
