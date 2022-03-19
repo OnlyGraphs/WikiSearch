@@ -462,7 +462,7 @@ fn test_parse_simple_relation_query() {
 
 #[test]
 fn test_parse_simple_relation_query2() {
-    let query = " #LINKSTO , 69 , 3 ";
+    let query = " #LINKSTO  69  3 ";
     let expected_root = 69;
     let expected_hops = 3;
     let expected_sub = None;
