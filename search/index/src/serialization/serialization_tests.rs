@@ -271,6 +271,8 @@ test_serialize_deserialize!(
         }]
     )
 );
+
+
 test_serialize_deserialize!(
     test_serialize_encoded_sequential_object_vbyte_delta,
     EncodedSequentialObject::<Posting, VbyteEncoder<Posting,true>>,
@@ -295,6 +297,11 @@ test_serialize_deserialize!(
     )
 );
 
+test_serialize_deserialize!(
+    test_serialize_encoded_sequential_object_vbyte_delta_empty,
+    EncodedSequentialObject::<Posting, VbyteEncoder<Posting,true>>,
+    EncodedSequentialObject::<Posting, VbyteEncoder<Posting,true>>::from_iter(Vec::default().into_iter())
+);
 
 #[test]
 fn test_push_encoded_object_identity(){

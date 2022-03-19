@@ -163,6 +163,31 @@ where
     }
 }
 
+impl<T, E> Serializable for EncodedSequentialObject<T, E>
+where
+    E: SequentialEncoder<T> + Default,
+    T: Serializable,
+{
+    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
+        let mut count = 4 + self.bytes.len();
+
+        buf.write_u32::<NativeEndian>(self.bytes.len() as u32)
+            .unwrap();
+        buf.write_all(&mut &self.bytes).unwrap();
+        count += self.encoder.serialize(buf);
+
+        count 
+    }
+
+    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
+        let len = buf.read_u32::<NativeEndian>().unwrap();
+        for _ in 0..len {
+            self.bytes.push(buf.read_u8().unwrap());
+        }
+        self.encoder.deserialize(buf) + self.bytes.len() + 4 
+    }
+}
+
 /// ------------------ Compression -------------------- ///
 //TODO! Elias gamma code, or potentially Google's Group varint encoding
 
@@ -316,6 +341,7 @@ impl<T : Serializable,const B: bool> VbyteEncoder<T,B> {
         let mut result: u32 = 0;
         let mut byte_total_count: usize = 0;
         let mut shift = 0;
+
         let mut curr_byte= bytes.read_u8().unwrap();
 
         loop {
@@ -723,26 +749,7 @@ impl Serializable for PosRange {
     }
 }
 
-impl<T, E> Serializable for EncodedSequentialObject<T, E>
-where
-    E: SequentialEncoder<T> + Default,
-    T: Serializable,
-{
-    fn serialize<W: Write>(&self, buf: &mut W) -> usize {
-        buf.write_u32::<NativeEndian>(self.bytes.len() as u32)
-            .unwrap();
-        buf.write_all(&mut &self.bytes).unwrap();
-        self.bytes.len() + 4
-    }
 
-    fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
-        let len = buf.read_u32::<NativeEndian>().unwrap();
-        for _ in 0..len {
-            self.bytes.push(buf.read_u8().unwrap());
-        }
-        self.bytes.len() + 4
-    }
-}
 
 impl Serializable for Posting {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
