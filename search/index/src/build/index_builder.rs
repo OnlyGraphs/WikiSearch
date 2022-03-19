@@ -6,7 +6,6 @@ use crate::{
 };
 use async_trait::async_trait;
 
-use itertools::izip;
 use log::{info, error};
 use sqlx::Row;
 use sqlx::{postgres::PgPoolOptions, query, query_scalar};

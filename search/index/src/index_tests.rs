@@ -326,6 +326,7 @@ fn test_basic_index_df() {
     assert_eq!(idx.df("kirby"), 0);
 }
 
+
 #[test]
 fn test_basic_index_links() {
     let mut pre_idx = PreIndex::default();

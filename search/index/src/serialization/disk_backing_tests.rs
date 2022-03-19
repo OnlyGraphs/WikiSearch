@@ -193,6 +193,32 @@ fn test_disk_hash_map_insert_existing() {
 }
 
 #[test]
+
+fn test_disk_map_iterator() {
+    let mut d = DiskHashMap::<u32, 2>::new(10, 1, false);
+
+    d.insert("0123", 32);
+    d.insert("3224", 22);
+
+    let o = d.insert("0123", 16);
+    let mut vec = Vec::default();
+
+    d.into_iter()
+        .enumerate()
+        .for_each(|(idx, (str_key, mapping, v))| {
+            vec.push((str_key, mapping, v));
+        });
+
+    assert_eq!(vec[0].0, ("0123".to_string()));
+    assert_eq!(vec[0].1, 0);
+    assert_eq!(*vec[0].2.lock().get().unwrap(), 16 as u32);
+
+    assert_eq!(vec[1].0, ("3224".to_string()));
+    assert_eq!(vec[1].1, 1);
+    assert_eq!(*vec[1].2.lock().get().unwrap(), 22 as u32);
+}
+
+#[test]
 fn test_disk_hash_map_path() {
     assert_eq!(
         DiskHashMap::<u32, 4>::path(),

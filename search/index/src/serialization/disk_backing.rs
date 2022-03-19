@@ -520,18 +520,20 @@ where
     pub fn insert(&mut self, k: &str, v: V) -> Option<Arc<Mutex<Entry<V, ID>>>>
 where {
         let o = self.tst.get(k);
+        let mut x: Option<Arc<Mutex<Entry<V, ID>>>> = None;
+
+        if let Some(val) = o {
+            x = Some(self.map.get(*val as usize).unwrap().clone());
+        };
 
         // if the value is nothing, we need to make sure to remove its record
-        let final_o = match o {
+        match &x {
             None => {
                 let idx = (self.map.len()) as u32;
 
                 self.tst.insert(k, idx);
 
-                self.map.push(Arc::new(Mutex::new(Entry::Memory(
-                    v,
-                    self.map.len() as u32,
-                ))));
+                self.map.push(Arc::new(Mutex::new(Entry::Memory(v, idx))));
 
                 *IN_MEM_RECORDS.lock().get_mut(ID).unwrap() += 1;
                 RECORD_PRIORITIES
@@ -539,21 +541,21 @@ where {
                     .get_mut(ID)
                     .unwrap()
                     .push((self.map.len() - 1) as u32, 0.into());
-                None
             }
-            Some(f) => {
-                self.map.insert(
-                    *f as usize,
-                    Arc::new(Mutex::new(Entry::Memory(v, self.map.len() as u32))),
-                );
-                self.map.get(*f as usize).unwrap().lock().set_id(*f as u32);
-                Some(self.map.get(*f as usize).unwrap().clone())
+            Some(_) => {
+                self.map[*o.unwrap() as usize] =
+                    Arc::new(Mutex::new(Entry::Memory(v, self.map.len() as u32)));
+                self.map
+                    .get(*o.unwrap() as usize)
+                    .unwrap()
+                    .lock()
+                    .set_id(*o.unwrap() as u32);
             }
         };
 
         self.evict_invariant();
 
-        final_o
+        x
     }
 
     pub fn new(capacity: u32, persistent_capacity: u32, build_mode: bool) -> Self {
