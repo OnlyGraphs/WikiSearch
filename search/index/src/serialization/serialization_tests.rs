@@ -52,11 +52,16 @@ test_serialize_deserialize!(
 );
 
 test_serialize_deserialize!(test_serialize_tuple, (u32, u32), (28932, 423242));
-test_serialize_deserialize!(test_serialize_option_posting,Option<Posting>, Some(Posting{
-     document_id: 42, position: 69 
-}));
+test_serialize_deserialize!(
+    test_serialize_option_posting,
+    Option<Posting>,
+    Some(Posting {
+        document_id: 42,
+        position: 69
+    })
+);
 
-test_serialize_deserialize!(test_serialize_option_posting_none,Option<Posting>,None);
+test_serialize_deserialize!(test_serialize_option_posting_none, Option<Posting>, None);
 
 test_serialize_deserialize!(
     test_serialize_tuple_2,
@@ -91,7 +96,8 @@ test_serialize_deserialize!(
             },
         ],
         df: 0,
-        tf: create_index_map_for_test_serialize_posting_node()
+        tf: create_index_map_for_test_serialize_posting_node(),
+        postings_count: 3
     }
 );
 
@@ -120,7 +126,10 @@ test_serialize_deserialize!(
 test_serialize_deserialize!(
     test_serialize_posting_range,
     (PosRange),
-    PosRange{ start_pos: 69, end_pos_delta: 42 }
+    PosRange {
+        start_pos: 69,
+        end_pos_delta: 42
+    }
 );
 
 // test_serialize_deserialize!(
@@ -256,28 +265,25 @@ fn test_serialize_indexmap_2() {
 
 /// --------------------- Compression Tests -------------- ////
 
-
-
 test_serialize_deserialize!(
     test_serialize_encoded_sequential_object_identity,
     EncodedSequentialObject::<Posting, IdentityEncoder>,
-    EncodedSequentialObject::<Posting, IdentityEncoder>::from_iter(
-        vec![Posting {
+    EncodedSequentialObject::<Posting, IdentityEncoder>::from_iter(vec![
+        Posting {
             document_id: 69,
             position: 42,
-        }, Posting {
+        },
+        Posting {
             document_id: 42,
             position: 69,
-        }]
-    )
+        }
+    ])
 );
-
 
 test_serialize_deserialize!(
     test_serialize_encoded_sequential_object_vbyte_delta,
-    EncodedSequentialObject::<Posting, VbyteEncoder<Posting,true>>,
-    EncodedSequentialObject::<Posting, VbyteEncoder<Posting,true>>::from_iter(
-        vec![
+    EncodedSequentialObject::<Posting, VbyteEncoder<Posting, true>>,
+    EncodedSequentialObject::<Posting, VbyteEncoder<Posting, true>>::from_iter(vec![
         Posting {
             document_id: 2,
             position: 0,
@@ -293,18 +299,20 @@ test_serialize_deserialize!(
         Posting {
             document_id: 3,
             position: 6,
-        }]
-    )
+        }
+    ])
 );
 
 test_serialize_deserialize!(
     test_serialize_encoded_sequential_object_vbyte_delta_empty,
-    EncodedSequentialObject::<Posting, VbyteEncoder<Posting,true>>,
-    EncodedSequentialObject::<Posting, VbyteEncoder<Posting,true>>::from_iter(Vec::default().into_iter())
+    EncodedSequentialObject::<Posting, VbyteEncoder<Posting, true>>,
+    EncodedSequentialObject::<Posting, VbyteEncoder<Posting, true>>::from_iter(
+        Vec::default().into_iter()
+    )
 );
 
 #[test]
-fn test_push_encoded_object_identity(){
+fn test_push_encoded_object_identity() {
     let target = vec![
         Posting {
             document_id: 2,
@@ -321,37 +329,37 @@ fn test_push_encoded_object_identity(){
         Posting {
             document_id: 3,
             position: 6,
-        }];
+        },
+    ];
 
     let mut o = EncodedSequentialObject::<Posting, IdentityEncoder>::default();
 
-    o.push(Posting{
+    o.push(Posting {
         document_id: 2,
         position: 0,
     });
-    o.push(Posting{
+    o.push(Posting {
         document_id: 2,
         position: 6,
     });
-    o.push(Posting{
+    o.push(Posting {
         document_id: 3,
         position: 0,
     });
-    o.push(Posting{
+    o.push(Posting {
         document_id: 3,
         position: 6,
     });
 
-    let encoded_target = EncodedSequentialObject::<Posting,IdentityEncoder>::from_iter(target.clone().into_iter());
-    
-    assert_eq!(encoded_target.into_iter().collect::<Vec<Posting>>(),target);
-    assert_eq!(o.into_iter().collect::<Vec<Posting>>(),target);
+    let encoded_target =
+        EncodedSequentialObject::<Posting, IdentityEncoder>::from_iter(target.clone().into_iter());
 
+    assert_eq!(encoded_target.into_iter().collect::<Vec<Posting>>(), target);
+    assert_eq!(o.into_iter().collect::<Vec<Posting>>(), target);
 }
 
-
 #[test]
-fn test_push_encoded_object_vbyte(){
+fn test_push_encoded_object_vbyte() {
     let target = vec![
         Posting {
             document_id: 2,
@@ -368,32 +376,34 @@ fn test_push_encoded_object_vbyte(){
         Posting {
             document_id: 3,
             position: 6,
-        }];
+        },
+    ];
 
-    let mut o = EncodedSequentialObject::<Posting, VbyteEncoder<Posting,true>>::default();
+    let mut o = EncodedSequentialObject::<Posting, VbyteEncoder<Posting, true>>::default();
 
-    o.push(Posting{
+    o.push(Posting {
         document_id: 2,
         position: 0,
     });
-    o.push(Posting{
+    o.push(Posting {
         document_id: 2,
         position: 6,
     });
-    o.push(Posting{
+    o.push(Posting {
         document_id: 3,
         position: 0,
     });
-    o.push(Posting{
+    o.push(Posting {
         document_id: 3,
         position: 6,
     });
 
-    let encoded_target = EncodedSequentialObject::<Posting,VbyteEncoder<Posting,true>>::from_iter(target.clone().into_iter());
-    
-    assert_eq!(encoded_target.into_iter().collect::<Vec<Posting>>(),target);
-    assert_eq!(o.into_iter().collect::<Vec<Posting>>(),target);
+    let encoded_target = EncodedSequentialObject::<Posting, VbyteEncoder<Posting, true>>::from_iter(
+        target.clone().into_iter(),
+    );
 
+    assert_eq!(encoded_target.into_iter().collect::<Vec<Posting>>(), target);
+    assert_eq!(o.into_iter().collect::<Vec<Posting>>(), target);
 }
 
 // #[test]
@@ -446,7 +456,6 @@ fn test_push_encoded_object_vbyte(){
 
 /// ----------- Delta --------------
 
-
 #[macro_export]
 macro_rules! test_encoder {
     ($name:ident,$name_2:ident ,$type_encoder:ty,$type_encoded:ty, $target_len:expr, $( $item:expr ),*   ) => {
@@ -459,7 +468,7 @@ macro_rules! test_encoder {
                 sequence.push($item);
             )*
 
-                
+
 
             // encoding part
             let mut buffer = Cursor::new(Vec::default());
@@ -473,7 +482,7 @@ macro_rules! test_encoder {
             buffer.seek(std::io::SeekFrom::Start(0)).unwrap();
 
             // decoding part
-            
+
             let mut encoder_decode = <$type_encoder>::default();
             let mut decoded_sequence = Vec::default();
             let mut decoded_byte_count = 0;
@@ -481,14 +490,14 @@ macro_rules! test_encoder {
                 let (curr_decoded, bytes_decoded) = encoder_decode.decode(&mut buffer);
                 decoded_byte_count += bytes_decoded;
                 decoded_sequence.push(curr_decoded);
-                
+
                 if decoded_byte_count >= encoded_byte_count {
                     break;
-                } 
+                }
             }
 
-            assert_eq!(decoded_sequence,sequence,"expected decoded (left) to be equal to original input (right), buffer was: {:?}", buffer); 
-            assert_eq!(decoded_byte_count,encoded_byte_count, "encoded bytes declared (left) were not the same as declared decoded bytes (right)"); 
+            assert_eq!(decoded_sequence,sequence,"expected decoded (left) to be equal to original input (right), buffer was: {:?}", buffer);
+            assert_eq!(decoded_byte_count,encoded_byte_count, "encoded bytes declared (left) were not the same as declared decoded bytes (right)");
             assert_eq!(buffer.get_mut().len(),$target_len, "Sequence: {:?} encoded to: {:?} target byte count (right) not equal to length of buffer (left)",sequence,buffer); // we get expected byte count
 
 
@@ -528,7 +537,7 @@ macro_rules! test_encoder {
             // serialization part
 
             // decoding part
-            
+
             let mut encoder_decode = <$type_encoder>::default();
             let mut decoded_sequence = Vec::default();
             let mut decoded_byte_count = 0;
@@ -536,7 +545,7 @@ macro_rules! test_encoder {
                 let (curr_decoded, bytes_decoded) = encoder_decode.decode(&mut buffer);
                 decoded_byte_count += bytes_decoded;
                 decoded_sequence.push(curr_decoded);
-                
+
                 // after each decoding serialize /deserialize encoder
                 let mut buf = Vec::default();
                 // get clean slate
@@ -549,11 +558,11 @@ macro_rules! test_encoder {
 
                 if decoded_byte_count >= encoded_byte_count {
                     break;
-                } 
+                }
             }
 
-            assert_eq!(decoded_sequence,sequence,"expected decoded (left) to be equal to original input (right), buffer was: {:?}", buffer); 
-            assert_eq!(decoded_byte_count,encoded_byte_count, "encoded bytes declared (left) were not the same as declared decoded bytes (right)"); 
+            assert_eq!(decoded_sequence,sequence,"expected decoded (left) to be equal to original input (right), buffer was: {:?}", buffer);
+            assert_eq!(decoded_byte_count,encoded_byte_count, "encoded bytes declared (left) were not the same as declared decoded bytes (right)");
             assert_eq!(buffer.get_mut().len(),$target_len, "Sequence: {:?} encoded to: {:?} target byte count (right) not equal to length of buffer (left)",sequence,buffer); // we get expected byte count
 
 
@@ -573,8 +582,6 @@ macro_rules! test_encoder {
 //     let target = b"E\0\0\0*\0\0\0".to_vec();
 //     assert_eq!(encoded, target);
 // }
-
-
 
 // #[test]
 // fn test_delta_encoder_no_prev() {
@@ -711,11 +718,11 @@ macro_rules! test_encoder {
 test_encoder!(
     test_v_byte_encoder_1,
     test_v_byte_encoder_1_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     2,
     Posting {
-        document_id:69,
+        document_id: 69,
         position: 42,
     }
 );
@@ -723,11 +730,11 @@ test_encoder!(
 test_encoder!(
     test_v_byte_encoder_2,
     test_v_byte_encoder_2_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     3,
     Posting {
-        document_id:8192,
+        document_id: 8192,
         position: 0,
     }
 );
@@ -735,37 +742,35 @@ test_encoder!(
 test_encoder!(
     test_v_byte_encoder_3,
     test_v_byte_encoder_3_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     2,
     Posting {
-        document_id:127,
+        document_id: 127,
         position: 0,
     }
 );
 
-
 test_encoder!(
     test_v_byte_encoder_4,
     test_v_byte_encoder_4_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     3,
     Posting {
-        document_id:0,
+        document_id: 0,
         position: 128,
     }
 );
 
-
 test_encoder!(
     test_v_byte_encoder_5,
     test_v_byte_encoder_5_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     3,
     Posting {
-        document_id:256,
+        document_id: 256,
         position: 0,
     }
 );
@@ -773,102 +778,19 @@ test_encoder!(
 test_encoder!(
     test_v_byte_encoder_6,
     test_v_byte_encoder_6_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     3,
     Posting {
-        document_id:16383,
+        document_id: 16383,
         position: 0,
     }
 );
-
 
 test_encoder!(
     test_v_byte_encoder_7,
     test_v_byte_encoder_7_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
-    Posting,
-    4,
-    Posting {
-        document_id:16384,
-        position: 0,
-    }
-);
-
-test_encoder!(
-    test_v_byte_encoder_8,
-    test_v_byte_encoder_8_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
-    Posting,
-    8,
-    Posting {
-        document_id:268435455,
-        position: 134217728,
-    }
-);
-
-test_encoder!(
-    test_v_byte_encoder_9,
-    test_v_byte_encoder_9_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
-    Posting,
-    4,
-    Posting {
-        document_id:128,
-        position: 128,
-    }
-);
-
-test_encoder!(
-    test_v_byte_encoder_10,
-    test_v_byte_encoder_10_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
-    Posting,
-    4,
-    Posting {
-        document_id:2097151,
-        position: 0,
-    }
-);
-
-
-test_encoder!(
-    test_v_byte_encoder_11,
-    test_v_byte_encoder_11_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
-    Posting,
-    5,
-    Posting {
-        document_id:0,
-        position: 1,
-    },
-    Posting {
-        document_id:128,
-        position: 9,
-    }
-);
-
-
-test_encoder!(
-    test_v_byte_encoder_12,
-    test_v_byte_encoder_12_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
-    Posting,
-    5,
-    Posting {
-        document_id:0,
-        position: 1,
-    },
-    Posting {
-        document_id:128,
-        position: 9,
-    }
-);
-
-test_encoder!(
-    test_v_byte_encoder_13,
-    test_v_byte_encoder_13_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     4,
     Posting {
@@ -877,13 +799,90 @@ test_encoder!(
     }
 );
 
+test_encoder!(
+    test_v_byte_encoder_8,
+    test_v_byte_encoder_8_serialize_deserialize,
+    VbyteEncoder::<Posting, true>,
+    Posting,
+    8,
+    Posting {
+        document_id: 268435455,
+        position: 134217728,
+    }
+);
 
+test_encoder!(
+    test_v_byte_encoder_9,
+    test_v_byte_encoder_9_serialize_deserialize,
+    VbyteEncoder::<Posting, true>,
+    Posting,
+    4,
+    Posting {
+        document_id: 128,
+        position: 128,
+    }
+);
 
+test_encoder!(
+    test_v_byte_encoder_10,
+    test_v_byte_encoder_10_serialize_deserialize,
+    VbyteEncoder::<Posting, true>,
+    Posting,
+    4,
+    Posting {
+        document_id: 2097151,
+        position: 0,
+    }
+);
+
+test_encoder!(
+    test_v_byte_encoder_11,
+    test_v_byte_encoder_11_serialize_deserialize,
+    VbyteEncoder::<Posting, true>,
+    Posting,
+    5,
+    Posting {
+        document_id: 0,
+        position: 1,
+    },
+    Posting {
+        document_id: 128,
+        position: 9,
+    }
+);
+
+test_encoder!(
+    test_v_byte_encoder_12,
+    test_v_byte_encoder_12_serialize_deserialize,
+    VbyteEncoder::<Posting, true>,
+    Posting,
+    5,
+    Posting {
+        document_id: 0,
+        position: 1,
+    },
+    Posting {
+        document_id: 128,
+        position: 9,
+    }
+);
+
+test_encoder!(
+    test_v_byte_encoder_13,
+    test_v_byte_encoder_13_serialize_deserialize,
+    VbyteEncoder::<Posting, true>,
+    Posting,
+    4,
+    Posting {
+        document_id: 16384,
+        position: 0,
+    }
+);
 
 test_encoder!(
     test_v_byte_encoder_14,
     test_v_byte_encoder_14_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     7,
     Posting {
@@ -899,7 +898,7 @@ test_encoder!(
 test_encoder!(
     test_v_byte_encoder_15,
     test_v_byte_encoder_15_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     8,
     Posting {
@@ -915,7 +914,7 @@ test_encoder!(
 test_encoder!(
     test_v_byte_encoder_no_delta_1,
     test_v_byte_encoder_no_delta_1_serialize_deserialize,
-    VbyteEncoder::<Posting,false>,
+    VbyteEncoder::<Posting, false>,
     Posting,
     5,
     Posting {
@@ -931,7 +930,7 @@ test_encoder!(
 test_encoder!(
     test_v_byte_encoder_no_delta_2,
     test_v_byte_encoder_no_delta_2_serialize_deserialize,
-    VbyteEncoder::<Posting,false>,
+    VbyteEncoder::<Posting, false>,
     Posting,
     10,
     Posting {
@@ -947,7 +946,7 @@ test_encoder!(
 test_encoder!(
     test_v_byte_encoder_no_delta_3,
     test_v_byte_encoder_no_delta_3_serialize_deserialize,
-    VbyteEncoder::<Posting,false>,
+    VbyteEncoder::<Posting, false>,
     Posting,
     7,
     Posting {
@@ -960,11 +959,10 @@ test_encoder!(
     }
 );
 
-
 test_encoder!(
     test_v_byte_encoder_no_delta_4,
     test_v_byte_encoder_no_delta_4_serialize_deserialize,
-    VbyteEncoder::<Posting,false>,
+    VbyteEncoder::<Posting, false>,
     Posting,
     8,
     Posting {
@@ -1060,7 +1058,7 @@ test_encoder!(
 test_encoder!(
     test_delta_and_vbyte_encoder_subset,
     test_delta_and_vbyte_encoder_subset_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     4,
     Posting {
@@ -1076,7 +1074,7 @@ test_encoder!(
 test_encoder!(
     test_delta_and_vbyte_encoder_repeated_doc,
     test_delta_and_vbyte_encoder_repeated_doc_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     8,
     Posting {
@@ -1097,11 +1095,10 @@ test_encoder!(
     }
 );
 
-
 test_encoder!(
     test_delta_and_vbyte_encoder_2,
     test_delta_and_vbyte_encoder_2_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     9,
     Posting {
@@ -1125,7 +1122,7 @@ test_encoder!(
 test_encoder!(
     test_delta_and_vbyte_encoder_subset_2,
     test_delta_and_vbyte_encoder_subset_2_serialize_deserialize,
-    VbyteEncoder::<Posting,true>,
+    VbyteEncoder::<Posting, true>,
     Posting,
     23,
     Posting {
@@ -1158,14 +1155,13 @@ test_encoder!(
     },
     Posting {
         document_id: 182737, // 19
-        position: 2,  // 20
+        position: 2,         // 20
     },
     Posting {
         document_id: 182737, // 21
-        position: 10, // 22
+        position: 10,        // 22
     }
 );
-
 
 // #[test]
 // #[cfg(target_endian = "little")]
@@ -1287,7 +1283,7 @@ fn test_from_and_to_iter() {
         position: 42,
     };
 
-    let obj = EncodedSequentialObject::<Posting, VbyteEncoder<Posting,true>>::from_iter(
+    let obj = EncodedSequentialObject::<Posting, VbyteEncoder<Posting, true>>::from_iter(
         vec![target_1, target_2].into_iter(),
     );
 

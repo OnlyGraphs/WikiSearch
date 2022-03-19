@@ -1,5 +1,5 @@
+use std::fmt::{self, Display};
 use strum_macros::IntoStaticStr;
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BinaryOp {
     And,
@@ -60,10 +60,59 @@ pub enum Query {
         sub: Option<Box<Query>>,
     },
     WildcardQuery {
-        prefix: String,  // before wildcard
-        postfix: String, // after wildcard
+        prefix: String, // before wildcard
+        suffix: String, // after wildcard
     },
     FreetextQuery {
         tokens: Vec<String>,
     },
+}
+
+impl Display for BinaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            BinaryOp::And => write!(f, "AND"),
+            BinaryOp::Or => write!(f, "OR"),
+        }
+    }
+}
+
+impl Display for UnaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            UnaryOp::Not => write!(f, "NOT"),
+        }
+    }
+}
+
+impl Display for StructureElem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StructureElem::Title => write!(f, "#TITLE"),
+            StructureElem::Category => write!(f, "#CATEGORY"),
+            StructureElem::Citation => write!(f, "#CITATION"),
+            StructureElem::Infobox(str) => write!(f, "{}", str),
+        }
+    }
+}
+
+impl Display for Query {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Query::BinaryQuery { op, lhs, rhs } => write!(f, "{} {} {}", lhs, op, rhs),
+            Query::UnaryQuery { op, sub } => write!(f, "{} {}", op, sub),
+            Query::PhraseQuery { tks } => write!(f, "{}", tks.join(" ")),
+            Query::DistanceQuery { dst, lhs, rhs } => {
+                write!(f, "{},{},{},{}", crate::parser::DIST_TAG, dst, lhs, rhs)
+            }
+            Query::StructureQuery { elem, sub } => write!(f, "{}: {}", elem, sub),
+            Query::RelationQuery { root, hops, sub } => {
+                write!(f, "root:{}\n hops:{}\n query:{:?}", root, hops, sub) //TODO: Probably need to do this in a better way
+            }
+            Query::WildcardQuery { prefix, suffix } => write!(f, "{}*{}", prefix, suffix),
+            Query::FreetextQuery { tokens } => {
+                write!(f, "{}", tokens.join(" "))
+            }
+        }
+    }
 }

@@ -112,7 +112,7 @@ impl<V: Serializable, const ID: usize> Entry<V, ID> {
             Entry::Memory(v, _) => Ok(v),
             Entry::Disk(_, _) => {
                 self.load()?;
-                
+
                 match self {
                     Entry::Memory(v, _) => Ok(v),
                     Entry::Disk(_, _) => panic!(),
@@ -340,7 +340,7 @@ where
 {
     map: Vec<Arc<Mutex<Entry<V, ID>>>>,
     tst: Tst<usize>,
-    
+
     /// how many records to allow in memory at one time during runtime
     capacity: u32,
     /// how many records to retain between batch evictions
@@ -448,8 +448,7 @@ where
         }
     }
 
-    pub fn entry(&self, k: &str) -> Option<Arc<Mutex<Entry<V, ID>>>>
-    {
+    pub fn entry(&self, k: &str) -> Option<Arc<Mutex<Entry<V, ID>>>> {
         let o = self
             .tst
             .get(k)
@@ -464,7 +463,6 @@ where
         self.evict_invariant();
         o
     }
-
 
     pub fn entry_wild_card(&self, k: &str) -> Vec<&Arc<Mutex<Entry<V, ID>>>> {
         let mut v: Vec<&Arc<Mutex<Entry<V, ID>>>> = Vec::new();
@@ -484,10 +482,8 @@ where
         closest_neighbour_keys
     }
 
-    
     pub fn entry_or_default(&mut self, k: &str) -> Arc<Mutex<Entry<V, ID>>>
-    where
-    {
+where {
         let v = self.tst.get(k).and_then(|x| self.map.get(*x as usize));
         let o = match v {
             Some(s) => Arc::clone(s),
@@ -510,11 +506,8 @@ where
         ))
     }
 
-    pub fn insert(&mut self, k: &str, v: V) -> Option<Arc<Mutex<Entry<V, ID>>>>{
-
+    pub fn insert(&mut self, k: &str, v: V) -> Option<Arc<Mutex<Entry<V, ID>>>> {
         let idx = self.tst.get(k);
-
-
 
         // self.map
         // Arc::new(Mutex::new(Entry::Memory(v, self.map.len() as u32)))
@@ -522,8 +515,11 @@ where
         // if the value is nothing, we need to make sure to remove its record
         let old = match &idx {
             None => {
-                self.tst.insert(k,self.map.len());
-                self.map.push(Arc::new(Mutex::new(Entry::Memory(v, self.map.len() as u32))));
+                self.tst.insert(k, self.map.len());
+                self.map.push(Arc::new(Mutex::new(Entry::Memory(
+                    v,
+                    self.map.len() as u32,
+                ))));
 
                 *IN_MEM_RECORDS.lock().get_mut(ID).unwrap() += 1;
                 RECORD_PRIORITIES
@@ -533,10 +529,10 @@ where
                     .push((self.map.len() - 1) as u32, 0.into());
                 None
             }
-            Some(i) => {
-                Some(std::mem::replace(&mut self.map[**i],
-                    Arc::new(Mutex::new(Entry::Memory(v, **i as u32)))))
-            },
+            Some(i) => Some(std::mem::replace(
+                &mut self.map[**i],
+                Arc::new(Mutex::new(Entry::Memory(v, **i as u32))),
+            )),
         };
 
         self.evict_invariant();
@@ -581,7 +577,7 @@ where
     V: Serializable + MemFootprintCalculator + Debug,
 {
     fn real_mem(&self) -> u64 {
-        self.map.real_mem()
+        self.map.real_mem() + self.tst.stat().bytes.total as u64
     }
 }
 

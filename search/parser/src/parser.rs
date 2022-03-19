@@ -5,11 +5,13 @@ use nom::{
     bytes::complete::{tag, tag_no_case, take_until, take_while, take_while1},
     character::complete::{digit0, digit1},
     character::{is_alphanumeric, is_space},
+    combinator::eof,
     multi::{many1, separated_list0},
+    sequence::terminated,
     IResult,
 };
 
-const DIST_TAG: &str = "#DIST";
+pub const DIST_TAG: &str = "#DIST";
 
 // Helper functions
 
@@ -103,8 +105,30 @@ pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
     }
 
     alt((
+        terminated(parse_relation_query, eof),
+        terminated(parse_dist_query, eof),
+        terminated(parse_binary_query, eof),
+        terminated(parse_not_query, eof),
+        terminated(parse_structure_query, eof),
+        terminated(parse_freetext_query, eof),
+        terminated(parse_phrase_query, eof),
+        terminated(parse_wildcard_query, eof),
+    ))(nxt)
+}
+
+fn parse_query_sub(nxt: &str) -> IResult<&str, Box<Query>> {
+    if nxt.chars().count() == 0 {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            //the new struct, instead of the tuple
+            "Empty query.",
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
+    alt((
         parse_relation_query,
         parse_dist_query,
+        parse_wildcard_query,
         parse_binary_query,
         parse_not_query,
         parse_structure_query,
@@ -116,7 +140,7 @@ pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
 pub fn parse_structure_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, struct_elem) = parse_structure_elem(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, query) = parse_query(nxt)?;
+    let (nxt, query) = parse_query_sub(nxt)?;
 
     Ok((
         nxt,
@@ -135,7 +159,7 @@ pub fn parse_structure_query(nxt: &str) -> IResult<&str, Box<Query>> {
 //     let (nxt, _) = parse_separator(nxt)?;
 //     let (nxt, hops) = digit0(nxt)?;
 //     let (nxt, _) = parse_separator(nxt)?;
-//     let res = opt(parse_query)(nxt);
+//     let res = opt(parse_query_sub)(nxt);
 
 //     let sub_query = match res {
 //         Ok((_, Some(v))) => match *v {
@@ -195,7 +219,7 @@ pub fn parse_not_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, _) = tag_no_case("NOT")(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, query) = parse_query(nxt)?;
+    let (nxt, query) = parse_query_sub(nxt)?;
 
     return Ok((
         nxt,
@@ -213,8 +237,8 @@ pub fn parse_or_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (query2, _) = tag("OR")(query2)?;
     let (query2, _) = parse_separator(query2)?;
 
-    let (_nxt, q1) = parse_query(query1)?;
-    let (nxt, q2) = parse_query(query2)?;
+    let (_nxt, q1) = parse_query_sub(query1)?;
+    let (nxt, q2) = parse_query_sub(query2)?;
 
     return Ok((
         nxt,
@@ -232,8 +256,8 @@ pub fn parse_and_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (query2, query1) = take_until("AND")(nxt)?;
     let (query2, _) = tag("AND")(query2)?;
     let (query2, _) = parse_separator(query2)?;
-    let (_nxt, q1) = parse_query(query1)?;
-    let (nxt, q2) = parse_query(query2)?;
+    let (_nxt, q1) = parse_query_sub(query1)?;
+    let (nxt, q2) = parse_query_sub(query2)?;
 
     return Ok((
         nxt,
@@ -262,7 +286,7 @@ pub fn parse_wildcard_query(nxt: &str) -> IResult<&str, Box<Query>> {
         nxt,
         Box::new(Query::WildcardQuery {
             prefix: lhs.to_string(),
-            postfix: rhs.to_string(),
+            suffix: rhs.to_string(),
         }),
     ))
 }
@@ -299,7 +323,7 @@ pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, hops) = digit1(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
-    let (nxt, sub) = parse_query(nxt)?;
+    let (nxt, sub) = parse_query_sub(nxt)?;
 
     Ok((
         nxt,
