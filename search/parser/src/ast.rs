@@ -21,11 +21,12 @@ pub enum StructureElem {
 
 impl From<&str> for StructureElem {
     fn from(i: &str) -> Self {
-        match i.to_lowercase().as_str() {
-            "#title" => StructureElem::Title,
-            "#category" => StructureElem::Category,
-            "#citation" => StructureElem::Citation,
-            _ => StructureElem::Infobox(i.to_string()),
+        let lowercase = i.to_lowercase();
+        match lowercase.as_str() {
+            "title" => StructureElem::Title,
+            "category" => StructureElem::Category,
+            "citation" => StructureElem::Citation,
+            _ => StructureElem::Infobox(lowercase.to_string()),
         }
     }
 }
