@@ -1,7 +1,7 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use indexmap::IndexMap;
 
-use crate::{EncodedPostingList, SequentialEncoder};
+use crate::{EncodedPostingList, EncodedSequentialObject, SequentialEncoder, VbyteEncoder};
 use fxhash::FxBuildHasher;
 use utils::MemFootprintCalculator;
 pub const DATE_TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -25,19 +25,41 @@ pub struct EncodedPostingNode<E>
 where
     E: SequentialEncoder<Posting>,
 {
+    pub postings_count: u32,
+
     pub postings: EncodedPostingList<E>,
     pub df: u32,
     pub tf: IndexMap<u32, u32, FxBuildHasher>,
-    pub postings_count: u32,
 }
 
 impl<E: SequentialEncoder<Posting>> From<PostingNode> for EncodedPostingNode<E> {
     fn from(o: PostingNode) -> Self {
+        let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
+        sorted_nodes.sort();
+
         Self {
-            postings_count: o.postings.len() as u32,
-            postings: EncodedPostingList::from_iter(o.postings.into_iter()),
+            postings_count: sorted_nodes.len() as u32,
+            postings: EncodedPostingList::from_iter(sorted_nodes.into_iter()),
             df: o.df,
             tf: o.tf,
+        }
+    }
+}
+
+impl From<EncodedPostingNode<VbyteEncoder<false>>> for EncodedPostingNode<VbyteEncoder<true>> {
+    fn from(o: EncodedPostingNode<VbyteEncoder<false>>) -> Self {
+        let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
+        sorted_nodes.sort();
+
+        let mut sorted_tf = o.tf;
+        sorted_tf.sort_keys();
+
+        Self {
+            postings_count: sorted_nodes.len() as u32,
+
+            postings: EncodedSequentialObject::from_iter(sorted_nodes.into_iter()),
+            df: o.df,
+            tf: sorted_tf,
         }
     }
 }

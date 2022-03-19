@@ -481,7 +481,7 @@ where
         let o = match v {
             Some(s) => Arc::clone(s),
             None => {
-                self.insert(k, V::default());
+                self.insert(&k.to_owned(), V::default());
                 self.entry(k).expect("This shouldn't happen")
             }
         };
@@ -520,14 +520,19 @@ where
     pub fn insert(&mut self, k: &str, v: V) -> Option<Arc<Mutex<Entry<V, ID>>>>
 where {
         let o = self.tst.get(k);
-        let idx = self.map.len() as u32;
 
         // if the value is nothing, we need to make sure to remove its record
         let final_o = match o {
             None => {
-                self.tst.insert(k, self.map.len() as u32);
+                let idx = (self.map.len()) as u32;
 
-                self.map.push(Arc::new(Mutex::new(Entry::Memory(v, idx))));
+                self.tst.insert(k, idx);
+
+                self.map.push(Arc::new(Mutex::new(Entry::Memory(
+                    v,
+                    self.map.len() as u32,
+                ))));
+
                 *IN_MEM_RECORDS.lock().get_mut(ID).unwrap() += 1;
                 RECORD_PRIORITIES
                     .lock()
@@ -537,6 +542,10 @@ where {
                 None
             }
             Some(f) => {
+                self.map.insert(
+                    *f as usize,
+                    Arc::new(Mutex::new(Entry::Memory(v, self.map.len() as u32))),
+                );
                 self.map.get(*f as usize).unwrap().lock().set_id(*f as u32);
                 Some(self.map.get(*f as usize).unwrap().clone())
             }
