@@ -15,6 +15,20 @@ pub struct Posting {
     pub position: u32,
 }
 
+impl Into<(u32,u32)> for Posting {
+    fn into(self) -> (u32,u32) {
+        (self.document_id, self.position)
+    }
+}
+
+impl Into<(u32,u32)> for &Posting {
+    fn into(self) -> (u32,u32) {
+        (self.document_id, self.position)
+    }
+}
+
+
+
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct PostingNode {
     pub postings: Vec<Posting>,
@@ -32,34 +46,6 @@ where
     pub tf: IndexMap<u32, u32, FxBuildHasher>,
 }
 
-impl<E: SequentialEncoder<Posting>> From<PostingNode> for EncodedPostingNode<E> {
-    fn from(o: PostingNode) -> Self {
-        let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
-        sorted_nodes.sort();
-
-        Self {
-            postings: EncodedPostingList::from_iter(sorted_nodes.into_iter()),
-            df: o.df,
-            tf: o.tf,
-        }
-    }
-}
-
-impl From<EncodedPostingNode<VbyteEncoder<false>>> for EncodedPostingNode<VbyteEncoder<true>> {
-    fn from(o: EncodedPostingNode<VbyteEncoder<false>>) -> Self {
-        let mut sorted_nodes = o.postings.into_iter().collect::<Vec<Posting>>();
-        sorted_nodes.sort();
-
-        let mut sorted_tf = o.tf;
-        sorted_tf.sort_keys();
-
-        Self {
-            postings: EncodedSequentialObject::from_iter(sorted_nodes.into_iter()),
-            df: o.df,
-            tf: sorted_tf,
-        }
-    }
-}
 
 #[derive(Default, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PosRange {

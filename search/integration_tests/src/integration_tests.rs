@@ -338,6 +338,16 @@ fn test_one_word_query() {
     let mut pre_idx= PreIndex::default();
 
     pre_idx.add_document(get_document_with_text(
+        2,
+        "d2",
+        vec![("", "aaa bbb")],
+        "ccc ddd",
+        vec!["eee ddd"],
+        "ggg hhh",
+    ))
+    .unwrap();
+
+    pre_idx.add_document(get_document_with_text(
         3,
         "d3",
         vec![("", "aaa bbb")],
@@ -347,15 +357,6 @@ fn test_one_word_query() {
     ))
     .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "aaa bbb")],
-        "ccc ddd",
-        vec!["eee ddd"],
-        "ggg hhh",
-    ))
-    .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -391,15 +392,6 @@ fn test_one_word_query() {
 fn test_and_query() {
     let mut pre_idx= PreIndex::default();
 
-    pre_idx.add_document(get_document_with_text(
-        3,
-        "d3",
-        vec![("", "aaa bbb")],
-        "ccc hello",
-        vec!["eee world"],
-        "ggg hhh",
-    ))
-    .unwrap();
 
     pre_idx.add_document(get_document_with_text(
         2,
@@ -410,6 +402,18 @@ fn test_and_query() {
         "world ppp",
     ))
     .unwrap();
+
+
+    pre_idx.add_document(get_document_with_text(
+        3,
+        "d3",
+        vec![("", "aaa bbb")],
+        "ccc hello",
+        vec!["eee world"],
+        "ggg hhh",
+    ))
+    .unwrap();
+
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -452,6 +456,16 @@ fn test_multiple_word_query_same_as_or() {
     let mut pre_idx= PreIndex::default();
 
     pre_idx.add_document(get_document_with_text(
+        2,
+        "d2",
+        vec![("", "iii jjj")],
+        "hello lll",
+        vec!["mmm nnn"],
+        "ooo ppp",
+    ))
+    .unwrap();
+
+    pre_idx.add_document(get_document_with_text(
         3,
         "d3",
         vec![("", "aaa bbb")],
@@ -461,15 +475,6 @@ fn test_multiple_word_query_same_as_or() {
     ))
     .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "iii jjj")],
-        "hello lll",
-        vec!["mmm nnn"],
-        "ooo ppp",
-    ))
-    .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -573,6 +578,15 @@ fn test_distance_query_execute() {
     let mut pre_idx= PreIndex::default();
 
     pre_idx.add_document(get_document_with_text(
+        2,
+        "d2",
+        vec![("", "iii world")],
+        "hello lll",
+        vec!["hello world"],
+        "ooo ppp",
+    ))
+    .unwrap();
+    pre_idx.add_document(get_document_with_text(
         3,
         "d3",
         vec![("", "world hello")],
@@ -582,15 +596,7 @@ fn test_distance_query_execute() {
     ))
     .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "iii world")],
-        "hello lll",
-        vec!["hello world"],
-        "ooo ppp",
-    ))
-    .unwrap();
+
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -675,6 +681,16 @@ fn test_phrase_query_execute() {
     let mut pre_idx= PreIndex::default();
 
     pre_idx.add_document(get_document_with_text(
+        2,
+        "d2",
+        vec![("", "iii world")],
+        "hello lll",
+        vec!["hello world"],
+        "ooo ppp",
+    ))
+    .unwrap();
+
+    pre_idx.add_document(get_document_with_text(
         3,
         "d3",
         vec![("", "world hello")],
@@ -684,15 +700,6 @@ fn test_phrase_query_execute() {
     ))
     .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "iii world")],
-        "hello lll",
-        vec!["hello world"],
-        "ooo ppp",
-    ))
-    .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -729,6 +736,15 @@ fn test_phrase_query_multiple() {
     let mut pre_idx= PreIndex::default();
 
     pre_idx.add_document(get_document_with_text(
+        2,
+        "d2",
+        vec![("", "iii world")],
+        "hello lll",
+        vec!["hello world"],
+        "ooo ppp",
+    ))
+    .unwrap();
+    pre_idx.add_document(get_document_with_text(
         3,
         "d3",
         vec![("", "world hello")],
@@ -738,15 +754,7 @@ fn test_phrase_query_multiple() {
     ))
     .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "iii world")],
-        "hello lll",
-        vec!["hello world"],
-        "ooo ppp",
-    ))
-    .unwrap();
+
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -787,6 +795,16 @@ fn test_phrase_query_multiple_same_start() {
     let mut pre_idx= PreIndex::default();
 
     pre_idx.add_document(get_document_with_text(
+        2,
+        "d2",
+        vec![("", "hello world momma")],
+        "hello world",
+        vec!["hello world"],
+        "ooo ppp",
+    ))
+    .unwrap();
+
+    pre_idx.add_document(get_document_with_text(
         3,
         "d3",
         vec![("", "hello world momma")],
@@ -796,15 +814,7 @@ fn test_phrase_query_multiple_same_start() {
     ))
     .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "hello world momma")],
-        "hello world",
-        vec!["hello world"],
-        "ooo ppp",
-    ))
-    .unwrap();
+
 
     let idx = Index::from_pre_index(pre_idx);
 
@@ -856,6 +866,17 @@ fn test_structure_search_citation() {
     let mut pre_idx= PreIndex::default();
 
     pre_idx.add_document(get_document_with_text(
+        2,
+        "d2",
+        vec![("", "hello world")],
+        "hello world",
+        vec!["ddd ddd"],
+        "ooo ppp",
+    ))
+    .unwrap();
+
+    
+    pre_idx.add_document(get_document_with_text(
         3,
         "d3",
         vec![("", "aaa bbb")],
@@ -865,15 +886,6 @@ fn test_structure_search_citation() {
     ))
     .unwrap();
 
-    pre_idx.add_document(get_document_with_text(
-        2,
-        "d2",
-        vec![("", "hello world")],
-        "hello world",
-        vec!["ddd ddd"],
-        "ooo ppp",
-    ))
-    .unwrap();
 
     let idx = Index::from_pre_index(pre_idx);
 
