@@ -2,16 +2,19 @@ use index::index::Index;
 
 use log::info;
 // use parser::errors::{QueryError, QueryErrorKind};
+use index::disk_backing::TernaryFunctions;
 use parser::ast::Query;
 
 // for search - query correction (spell correction)
 pub const TOTAL_POSTING_CORRECTION_THRESHOLD: u32 = 10000; // If the results are below this threshold, we execute spell checking
 pub const TOKEN_CORRECTION_THRESHOLD: u32 = 1000; //For each token, see if we perform spell checking
-pub const CORRECTION_TRIES: u8 = 2; // Number of tries to attempt spell checking. for each failed try, the distance to key argument is increased
+pub const CORRECTION_TRIES: u8 = 3; // Number of tries to attempt spell checking. for each failed try, the distance to key argument is increased
 pub const CORRECTION_KEY_DISTANCE: u8 = 1; //Starting distance of current token that is being spell checked to closest words/neighbours in the tree. In orher words, how far do we look in the tree by the difference of characters
 pub const CORRECTION_KEY_DISTANCE_ADD_PER_TRY: u8 = 1; //Increase in distance key per try iteration
+pub const SUGGEST_MOST_APPEARANCES: bool = true; //Increase in distance key per try iteration
 
 ///main function to be called to spell check query
+/// TODO: Refactor
 pub fn correct_query<'a>(query: &Query, index: &'a Index) -> String {
     //Define parameters
     let token_correction_threshold: u32 = std::env::var("TOKEN_CORRECTION_THRESHOLD")
@@ -31,6 +34,11 @@ pub fn correct_query<'a>(query: &Query, index: &'a Index) -> String {
             .unwrap_or(CORRECTION_KEY_DISTANCE_ADD_PER_TRY.to_string())
             .parse()
             .unwrap();
+
+    let only_most_appearances: bool = std::env::var("SUGGEST_MOST_APPEARANCES")
+        .unwrap_or(SUGGEST_MOST_APPEARANCES.to_string())
+        .parse()
+        .unwrap();
     let new_query = correct_query_sub(
         query,
         index,
@@ -38,6 +46,7 @@ pub fn correct_query<'a>(query: &Query, index: &'a Index) -> String {
         correction_number_of_tries_per_token,
         correction_key_distance_per_token,
         correction_key_distance_per_token_append_amount,
+        only_most_appearances,
     );
     let mut suggestion = "".to_string();
     if new_query != *query {
@@ -54,6 +63,7 @@ pub fn correct_query_sub<'a>(
     number_of_tries: u8,
     key_distance: u8,
     key_distance_append_amount: u8,
+    only_most_appearances: bool,
 ) -> Query {
     match query {
         Query::BinaryQuery { op, lhs, rhs } => {
@@ -66,6 +76,7 @@ pub fn correct_query_sub<'a>(
                     number_of_tries,
                     key_distance,
                     key_distance_append_amount,
+                    only_most_appearances,
                 )),
                 rhs: Box::new(correct_query_sub(
                     rhs,
@@ -74,6 +85,7 @@ pub fn correct_query_sub<'a>(
                     number_of_tries,
                     key_distance,
                     key_distance_append_amount,
+                    only_most_appearances,
                 )),
             };
         }
@@ -87,6 +99,7 @@ pub fn correct_query_sub<'a>(
                     number_of_tries,
                     key_distance,
                     key_distance_append_amount,
+                    only_most_appearances,
                 )),
             };
         }
@@ -98,6 +111,7 @@ pub fn correct_query_sub<'a>(
                 number_of_tries,
                 key_distance,
                 key_distance_append_amount,
+                only_most_appearances,
             );
             let new_query = Query::PhraseQuery { tks: new_tokens };
             return new_query;
@@ -110,6 +124,7 @@ pub fn correct_query_sub<'a>(
                 number_of_tries,
                 key_distance,
                 key_distance_append_amount,
+                only_most_appearances,
             )
             .pop()
             .unwrap_or(lhs.clone());
@@ -120,6 +135,7 @@ pub fn correct_query_sub<'a>(
                 number_of_tries,
                 key_distance,
                 key_distance_append_amount,
+                only_most_appearances,
             )
             .pop()
             .unwrap_or(rhs.clone());
@@ -142,6 +158,7 @@ pub fn correct_query_sub<'a>(
                     number_of_tries,
                     key_distance,
                     key_distance_append_amount,
+                    only_most_appearances,
                 )));
             }
 
@@ -161,6 +178,7 @@ pub fn correct_query_sub<'a>(
                 number_of_tries,
                 key_distance,
                 key_distance_append_amount,
+                only_most_appearances,
             );
 
             let new_query = Query::FreetextQuery { tokens: new_tokens };
@@ -178,6 +196,7 @@ fn mark_tokens_to_correct<'a>(
     number_of_tries: u8,
     key_distance: u8,
     key_distance_append_amount: u8,
+    only_most_appearances: bool,
 ) -> Vec<String> {
     let mut new_tokens = Vec::<String>::new();
     let existing_tokens_markers: Vec<(&String, bool)> = tokens
@@ -201,6 +220,8 @@ fn mark_tokens_to_correct<'a>(
                 number_of_tries,
                 key_distance,
                 key_distance_append_amount,
+                token_threshold,
+                only_most_appearances,
             );
             new_tokens.push(corrected_token.clone());
         } else {
@@ -218,14 +239,19 @@ pub fn investigate_query_naive_correction<'a>(
     mut tries: u8,
     mut key_distance: u8,
     key_distance_append_amount: u8,
+    postings_token_threshold: u32,
+    based_on_postings_count: bool,
 ) -> String {
     // let token = tokens.pop().unwrap_or("".to_string());
 
     while tries > 0 {
         if token != "" {
-            let mut closest_keys = index
-                .posting_nodes
-                .find_nearest_neighbour_keys(&token, key_distance.into());
+            let mut closest_keys = index.posting_nodes.find_nearest_neighbour_keys(
+                &token,
+                key_distance.into(),
+                postings_token_threshold,
+                based_on_postings_count,
+            );
 
             //sort by length closest to the token.
             //Performs subtraction, but if something goes wrong, unwrap to default of substitution

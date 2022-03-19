@@ -12,7 +12,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::Serializable;
+use crate::{EncodedPostingNode, Posting, SequentialEncoder, Serializable};
 use default_env::default_env;
 use indexmap::IndexMap;
 use itertools::{FoldWhile, Itertools};
@@ -464,22 +464,24 @@ where
         o
     }
 
+    pub fn entry_by_index(&self, x: usize) -> Option<Arc<Mutex<Entry<V, ID>>>> {
+        let o = self.map.get(x).map(|v| {
+            v.lock().load().unwrap(); // force a load, users can't unload so this preserves RAM invariant within this function
+            Arc::clone(v)
+        });
+        // check invariant, evicts less used / freshest elements first idealy
+        // the eviction might evict the same element which is when the invariant exceeds RAM capacity by up to one elements size
+        // which could be the largest one
+        self.evict_invariant();
+        o
+    }
+
     pub fn entry_wild_card(&self, k: &str) -> Vec<&Arc<Mutex<Entry<V, ID>>>> {
         let mut v: Vec<&Arc<Mutex<Entry<V, ID>>>> = Vec::new();
         self.tst
             .visit_crossword_values(k, '*', |s| v.push(self.map.get(*s as usize).unwrap()));
 
         v
-    }
-    pub fn find_nearest_neighbour_keys(&self, k: &str, distance_to_key: usize) -> Vec<String> {
-        let mut closest_neighbour_keys: Vec<String> = Vec::new();
-        let mut it = self.tst.iter_neighbor(k, distance_to_key);
-
-        while let Some(_) = it.next() {
-            closest_neighbour_keys.push(it.current_key());
-        }
-
-        closest_neighbour_keys
     }
 
     pub fn entry_or_default(&mut self, k: &str) -> Arc<Mutex<Entry<V, ID>>>
@@ -605,3 +607,66 @@ where
 //         self.map.into_iter()
 //     }
 // }
+
+pub trait TernaryFunctions<F, const ID: usize>
+where
+    F: SequentialEncoder<Posting> + Debug,
+{
+    fn get_postings_count(&self, posting_node_index: usize) -> u32;
+    fn get_wildcard_postings(
+        &self,
+        token: &str,
+    ) -> Vec<&Arc<Mutex<Entry<EncodedPostingNode<F>, ID>>>>;
+    fn find_nearest_neighbour_keys(
+        &self,
+        k: &str,
+        distance_to_key: usize,
+        threshold: u32,
+        based_on_postings_count: bool,
+    ) -> Vec<String>;
+}
+
+impl<F, const ID: usize> TernaryFunctions<F, ID> for DiskHashMap<EncodedPostingNode<F>, ID>
+where
+    F: SequentialEncoder<Posting> + Debug,
+{
+    fn get_wildcard_postings(
+        &self,
+        token: &str,
+    ) -> Vec<&Arc<Mutex<Entry<EncodedPostingNode<F>, ID>>>> {
+        return self.entry_wild_card(token);
+    }
+
+    fn get_postings_count(&self, posting_node_index: usize) -> u32 {
+        return self
+            .entry_by_index(posting_node_index)
+            .unwrap()
+            .lock()
+            .get()
+            .unwrap()
+            .postings_count;
+    }
+
+    fn find_nearest_neighbour_keys(
+        &self,
+        k: &str,
+        distance_to_key: usize,
+        threshold: u32,
+        based_on_postings_count: bool,
+    ) -> Vec<String> {
+        let mut closest_neighbour_keys: Vec<String> = Vec::new();
+        let mut it = self.tst.iter_neighbor(k, distance_to_key);
+        while let Some(index_mapping) = it.next() {
+            let mut count = threshold;
+            if based_on_postings_count {
+                count = self.get_postings_count(*index_mapping);
+            }
+            //Get keys that are greater than a certain threshold, when the based_on_postings_count flag is set
+            if count >= threshold {
+                closest_neighbour_keys.push(it.current_key());
+            }
+        }
+
+        closest_neighbour_keys
+    }
+}
