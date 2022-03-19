@@ -30,6 +30,12 @@ pub struct ScoredRelationDocument {
 pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
     // first pass, preprocess
     let ref opts = ProcessingOptions::default();
+    let ref opts_wild_card = ProcessingOptions {
+        tokenisation_options: Default::default(),
+        fold_case: true,
+        remove_stop_words: false, //Set to false , to avoid edge cases like the*ter (theater, where "the" can be considered a stop word)
+        normalisation: preprocessor::Normalisation::None, //no stemming as that would lose structure of query?
+    };
 
     match *query {
         Query::RelationQuery { ref mut sub, .. } => {
@@ -85,10 +91,18 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
         }
         Query::WildcardQuery {
             ref mut prefix,
-            ref mut postfix,
+            ref mut suffix,
         } => {
-            *prefix = prefix.to_lowercase(); // needs a more thorough look
-            *postfix = postfix.to_lowercase();
+            // *prefix = prefix.to_lowercase(); // needs a more thorough look
+            // *suffix = suffix.to_lowercase();
+            *prefix = Preprocessor::process(opts_wild_card, prefix.to_string())
+                .into_iter()
+                .filter(|w| !w.trim().is_empty())
+                .collect();
+            *suffix = Preprocessor::process(opts_wild_card, suffix.to_string())
+                .into_iter()
+                .filter(|w| !w.trim().is_empty())
+                .collect();
         }
     };
 
@@ -185,7 +199,31 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
                 }
             }
         }
-        Query::WildcardQuery { .. } => todo!(), // TODO: needs index support
+        Query::WildcardQuery {
+            ref prefix,
+            ref suffix,
+        } => {
+            let init = PostingIterator::new(empty::<Posting>());
+            let mut wild_token: String = "".to_string();
+            wild_token.push_str(prefix);
+            wild_token.push_str("*");
+            wild_token.push_str(suffix);
+            let vec_encoded_postings = index.posting_nodes.entry_wild_card(&wild_token);
+            vec_encoded_postings.iter().fold(init, |a, iter| {
+                PostingIterator::new(UnionMergeIterator::new(
+                    Box::new(a),
+                    Box::new(
+                        iter.lock()
+                            .get()
+                            .unwrap()
+                            .postings
+                            .into_iter()
+                            .collect::<Vec<Posting>>()
+                            .into_iter(),
+                    ),
+                ))
+            })
+        }
         Query::StructureQuery { ref elem, ref sub } => {
             PostingIterator::new(execute_query(sub, index).filter(|c| {
                 match index.get_extent_for(elem.clone().into(), &c.document_id) {

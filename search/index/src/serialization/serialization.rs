@@ -1,5 +1,5 @@
 use crate::{EncodedPostingNode, LastUpdatedDate, PosRange, Posting, PostingNode};
-use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt, LittleEndian};
+use byteorder::{LittleEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use core::fmt::Debug;
 use core::hash::Hash;
@@ -9,7 +9,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     hash::BuildHasher,
-    io::{Read, Write, Cursor},
+    io::{Cursor, Read, Write},
     marker::PhantomData,
 };
 use utils::MemFootprintCalculator;
@@ -18,7 +18,7 @@ use utils::MemFootprintCalculator;
 /// an encoder is the bridge between a list of bytes [u8] and the in-memory object representation
 /// an example would be a V-byte encoder, which saves space using the fact that intermediate values are close to each other
 pub trait SequentialEncoder<T: Serializable>: Serializable {
-    fn encode<W : Write>(&mut self, curr: &T, out : &mut W ) -> usize;
+    fn encode<W: Write>(&mut self, curr: &T, out: &mut W) -> usize;
     fn decode<R: Read>(&mut self, bytes: &mut R) -> (T, usize);
 }
 
@@ -35,30 +35,29 @@ where
     encoder: E,
     _ph: PhantomData<T>,
 }
-impl<T,E> PartialEq for EncodedSequentialObject<T,E> 
-where 
+impl<T, E> PartialEq for EncodedSequentialObject<T, E>
+where
     E: SequentialEncoder<T>,
-    T: Serializable
+    T: Serializable,
 {
     fn eq(&self, other: &Self) -> bool {
         self.bytes == other.bytes
     }
 }
 
-impl<T,E> Eq for EncodedSequentialObject<T,E> 
-where 
+impl<T, E> Eq for EncodedSequentialObject<T, E>
+where
     E: SequentialEncoder<T>,
-    T: Serializable
+    T: Serializable,
 {
-
 }
 
 impl<E: SequentialEncoder<T>, T: Serializable> EncodedSequentialObject<T, E> {
-    pub fn new(b: Vec<u8>, encoder : E) -> Self {
+    pub fn new(b: Vec<u8>, encoder: E) -> Self {
         Self {
             bytes: b,
             _ph: PhantomData::default(),
-            encoder
+            encoder,
         }
     }
 
@@ -114,10 +113,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos < self.cursor.get_ref().len() {
-            let (out, count) = self.decoder.decode(
-                &mut self.cursor,
-
-            );
+            let (out, count) = self.decoder.decode(&mut self.cursor);
             self.pos += count;
             Some(out)
         } else {
@@ -125,8 +121,6 @@ where
         }
     }
 }
-
-
 
 /// encoding
 impl<E: SequentialEncoder<T>, T: Serializable> FromIterator<T> for EncodedSequentialObject<T, E> {
@@ -139,7 +133,7 @@ impl<E: SequentialEncoder<T>, T: Serializable> FromIterator<T> for EncodedSequen
             Some(v)
         });
 
-        EncodedSequentialObject::new(b.to_owned(),e)
+        EncodedSequentialObject::new(b.to_owned(), e)
     }
 }
 
@@ -176,7 +170,7 @@ where
         buf.write_all(&mut &self.bytes).unwrap();
         count += self.encoder.serialize(buf);
 
-        count 
+        count
     }
 
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
@@ -184,7 +178,7 @@ where
         for _ in 0..len {
             self.bytes.push(buf.read_u8().unwrap());
         }
-        self.encoder.deserialize(buf) + self.bytes.len() + 4 
+        self.encoder.deserialize(buf) + self.bytes.len() + 4
     }
 }
 
@@ -197,7 +191,7 @@ where
 pub struct IdentityEncoder {}
 
 impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
-    fn encode<W : Write>(&mut self, curr: &T, out: &mut W) -> usize {
+    fn encode<W: Write>(&mut self, curr: &T, out: &mut W) -> usize {
         let count = curr.serialize(out);
         count
     }
@@ -209,7 +203,7 @@ impl<T: Serializable> SequentialEncoder<T> for IdentityEncoder {
     }
 }
 
-impl Serializable for IdentityEncoder{
+impl Serializable for IdentityEncoder {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         return 0;
     }
@@ -244,7 +238,6 @@ impl DeltaEncoder {
         }
         return *diff;
     }
-
 }
 // //NOTE: The postings need to be sorted!
 // impl SequentialEncoder<Posting> for DeltaEncoder {
@@ -296,32 +289,23 @@ impl DeltaEncoder {
 
 // B is a boolean flag to indiciate if we want to apply delta encoding or not
 #[derive(Default, Eq, PartialEq, Debug)]
-pub struct VbyteEncoder<T : Serializable,const B: bool> {
+pub struct VbyteEncoder<T: Serializable, const B: bool> {
     prev: Option<T>,
     in_streak: bool,
 }
 
-
-
-
-impl<T : Serializable,const B: bool> VbyteEncoder<T,B> {
-    
-
-
-    
+impl<T: Serializable, const B: bool> VbyteEncoder<T, B> {
     #[cfg(target_endian = "little")]
     #[inline(always)]
-    fn into_vbyte_serialise<W : Write>(mut num: u32, out : &mut W ) -> usize {
-        
+    fn into_vbyte_serialise<W: Write>(mut num: u32, out: &mut W) -> usize {
         let mut count = 0;
         // on little endian, we take from the left so decoding is natural
         let mut curr_byte;
         loop {
-
-            curr_byte = (num & 127) as u8; 
+            curr_byte = (num & 127) as u8;
             count += 1;
 
-            if num < 128{
+            if num < 128 {
                 // set 8th bit to 0
                 out.write_u8(curr_byte & !(1 << 7) as u8).unwrap();
                 break;
@@ -330,7 +314,6 @@ impl<T : Serializable,const B: bool> VbyteEncoder<T,B> {
                 num = num >> 7;
                 out.write_u8(curr_byte | (1 << 7) as u8).unwrap();
             }
-
         }
 
         return count;
@@ -342,16 +325,15 @@ impl<T : Serializable,const B: bool> VbyteEncoder<T,B> {
         let mut byte_total_count: usize = 0;
         let mut shift = 0;
 
-        let mut curr_byte= bytes.read_u8().unwrap();
+        let mut curr_byte = bytes.read_u8().unwrap();
 
         loop {
-
             // byte order is assumed to be in correct endiannes
             // for this to work
             result |= ((curr_byte & 127) as u32) << shift;
             byte_total_count += 1;
             shift += 7;
-            if (curr_byte & 128) != 0{
+            if (curr_byte & 128) != 0 {
                 curr_byte = bytes.read_u8().unwrap();
             } else {
                 break;
@@ -366,37 +348,35 @@ impl<T : Serializable,const B: bool> VbyteEncoder<T,B> {
 ///Hence when decoding, the first bytes with continuation bit (in 8th bit) set  until the last byte with the bit unset/cleared (i.e it is set to 0), is the document
 /// The rest would indicate the position
 /// There will be at least 2 bytes
-impl<const B: bool> SequentialEncoder<Posting> for VbyteEncoder<Posting,B> {
+impl<const B: bool> SequentialEncoder<Posting> for VbyteEncoder<Posting, B> {
     #[inline(always)]
-    fn encode<W : Write>(&mut self, curr: &Posting, out : &mut W) -> usize {
-        
-
-        let to_encode : (u32,u32);
+    fn encode<W: Write>(&mut self, curr: &Posting, out: &mut W) -> usize {
+        let to_encode: (u32, u32);
         if B {
-            to_encode = DeltaEncoder::compress(&self.prev.map(|v| v.into()),curr.into());
+            to_encode = DeltaEncoder::compress(&self.prev.map(|v| v.into()), curr.into());
         } else {
             to_encode = curr.into();
         }
 
-        // encode doc_id first 
-        let encode_doc_id: bool = self.prev.map(|v| 
-            v.document_id != curr.document_id)
+        // encode doc_id first
+        let encode_doc_id: bool = self
+            .prev
+            .map(|v| v.document_id != curr.document_id)
             .unwrap_or(true);
-       
 
         let mut count = 0;
 
         //Apply vbyte encoding
-        if encode_doc_id{
+        if encode_doc_id {
             // marker for end of document streak, decoder recognizes the document id comes after, and is different
-            if self.in_streak{
+            if self.in_streak {
                 count += 1;
                 out.write_u8(0).unwrap(); // 8th bit is reserved for 0-1 but otherwise it's free real estate
                 self.in_streak = false;
             };
             count += Self::into_vbyte_serialise(to_encode.0, out);
         } else {
-            if !self.in_streak{
+            if !self.in_streak {
                 // if first in streak, still encode it, so decoder can recognize streak
                 count += Self::into_vbyte_serialise(to_encode.0, out);
             }
@@ -409,68 +389,63 @@ impl<const B: bool> SequentialEncoder<Posting> for VbyteEncoder<Posting,B> {
     }
     #[inline(always)]
     fn decode<R: Read>(&mut self, bytes: &mut R) -> (Posting, usize) {
-        
-
-        let (doc_id,pos,count) = match self.prev {
+        let (doc_id, pos, count) = match self.prev {
             Some(prev) => {
-                // if we had a previous posting with the same doc_id 
+                // if we had a previous posting with the same doc_id
                 let (possible_doc_id, count) = Self::from_vbyte_deserialise(bytes);
 
-                if self.in_streak{
+                if self.in_streak {
                     // if we were in a streak before check it has ended
-                    if possible_doc_id == 0{
+                    if possible_doc_id == 0 {
                         self.in_streak = false;
                         // meaning this byte was a marker, read the next two values as normal
-                        let (doc_id,count_a) = Self::from_vbyte_deserialise(bytes);
+                        let (doc_id, count_a) = Self::from_vbyte_deserialise(bytes);
                         let (pos, count_b) = Self::from_vbyte_deserialise(bytes);
-                        (doc_id,pos,count_a + count_b + (1 as usize))
+                        (doc_id, pos, count_a + count_b + (1 as usize))
                     } else {
                         // otherwise this was a position since we are in the same doc id
-                        if B{
-                            (0 ,possible_doc_id,count)
+                        if B {
+                            (0, possible_doc_id, count)
                         } else {
-                            (prev.document_id,possible_doc_id, count)   
+                            (prev.document_id, possible_doc_id, count)
                         }
                     }
                 } else {
                     // if not in streak, check that we are now in one
-                    if (B && possible_doc_id == 0) || (!B && prev.document_id == possible_doc_id){
+                    if (B && possible_doc_id == 0) || (!B && prev.document_id == possible_doc_id) {
                         self.in_streak = true;
                     };
 
                     // read off the position too
                     let (pos, count_b) = Self::from_vbyte_deserialise(bytes);
 
-                    (possible_doc_id,pos,count + count_b)
+                    (possible_doc_id, pos, count + count_b)
                 }
-            },
+            }
             _ => {
                 // no streak possible just normal deserial
-                let (doc_id,count_a) = Self::from_vbyte_deserialise(bytes);
+                let (doc_id, count_a) = Self::from_vbyte_deserialise(bytes);
                 let (pos, count_b) = Self::from_vbyte_deserialise(bytes);
-                (doc_id,pos,count_a + count_b)            
-            },
+                (doc_id, pos, count_a + count_b)
+            }
         };
 
-
-
-        let decoded: (u32,u32) = if B {
-            DeltaEncoder::decompress(&self.prev.map(|v| v.into()),&mut (doc_id,pos))
+        let decoded: (u32, u32) = if B {
+            DeltaEncoder::decompress(&self.prev.map(|v| v.into()), &mut (doc_id, pos))
         } else {
-            (doc_id,pos)
+            (doc_id, pos)
         };
-        let o = Posting{
+        let o = Posting {
             document_id: decoded.0,
             position: decoded.1,
         };
 
         self.prev = Some(o);
-        return(o,count)
-
+        return (o, count);
     }
 }
 
-impl <T:Serializable,const B: bool> Serializable for VbyteEncoder<T,B>{
+impl<T: Serializable, const B: bool> Serializable for VbyteEncoder<T, B> {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         let mut count = 0;
         count += self.prev.serialize(buf);
@@ -482,7 +457,7 @@ impl <T:Serializable,const B: bool> Serializable for VbyteEncoder<T,B>{
         let mut count = 0;
         count += self.prev.deserialize(buf);
         count += self.in_streak.deserialize(buf);
-        count    
+        count
     }
 }
 
@@ -708,17 +683,17 @@ impl Serializable for String {
     }
 }
 
-impl <T : Serializable>Serializable for Option<T> {
+impl<T: Serializable> Serializable for Option<T> {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         let mut count = 1;
         match self {
             Some(v) => {
                 buf.write_u8(1);
                 count += v.serialize(buf)
-            },
+            }
             None => {
                 buf.write_u8(0);
-            },
+            }
         }
         count
     }
@@ -729,11 +704,10 @@ impl <T : Serializable>Serializable for Option<T> {
             let mut v = T::default();
             count += v.deserialize(buf);
             *self = Some(v);
-        } 
+        }
         count
     }
 }
-
 
 impl Serializable for PosRange {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
@@ -748,8 +722,6 @@ impl Serializable for PosRange {
         8
     }
 }
-
-
 
 impl Serializable for Posting {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
@@ -860,6 +832,8 @@ where
         count += self.postings.serialize(buf);
         count += self.df.serialize(buf);
         count += self.tf.serialize(buf);
+        count += self.postings_count.serialize(buf);
+
         count
     }
 
@@ -868,6 +842,8 @@ where
         count += self.postings.deserialize(buf);
         count += self.df.deserialize(buf);
         count += self.tf.deserialize(buf);
+        count += self.postings_count.deserialize(buf);
+
         count
     }
 }
@@ -878,6 +854,8 @@ impl Serializable for PostingNode {
         count += self.postings.serialize(buf);
         count += self.df.serialize(buf);
         count += self.tf.serialize(buf);
+        count += self.postings_count.serialize(buf);
+
         count
     }
 
@@ -886,6 +864,8 @@ impl Serializable for PostingNode {
         count += self.postings.deserialize(buf);
         count += self.df.deserialize(buf);
         count += self.tf.deserialize(buf);
+        count += self.postings_count.deserialize(buf);
+
         count
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
-    DiskHashMap, Document, IndexError, IndexErrorKind, LastUpdatedDate, PosRange, Posting,
-    PostingNode, DATE_TIME_FORMAT, VbyteEncoder, EncodedPostingNode,
+    DiskHashMap, Document, EncodedPostingNode, IndexError, IndexErrorKind, LastUpdatedDate,
+    PosRange, Posting, PostingNode, VbyteEncoder, DATE_TIME_FORMAT,
 };
 use bimap::BiMap;
 use chrono::NaiveDateTime;
@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 /// a common backbone from which any index can be intialized
 pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder<Posting,true>>, 0>,
+    pub posting_nodes: DiskHashMap<EncodedPostingNode<VbyteEncoder<Posting, true>>, 0>,
     pub links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     // pub id_title_map: BiMap<u32, String>,
@@ -24,33 +24,33 @@ impl Default for PreIndex {
     fn default() -> Self {
         Self {
             dump_id: Default::default(),
-            posting_nodes: DiskHashMap::new(10000,100,true),
-            links: Default::default(), extent: Default::default(), 
-            last_updated_docs: Default::default(), 
-            curr_doc_appearances: Default::default() 
-
+            posting_nodes: DiskHashMap::new(10000, 100, true),
+            links: Default::default(),
+            extent: Default::default(),
+            last_updated_docs: Default::default(),
+            curr_doc_appearances: Default::default(),
         }
     }
 }
 
 impl PreIndex {
-    pub fn with_capacity(cap : u32, persistent_cap : u32) -> Self {
-        Self { 
+    pub fn with_capacity(cap: u32, persistent_cap: u32) -> Self {
+        Self {
             dump_id: Default::default(),
-            posting_nodes: DiskHashMap::new(cap,persistent_cap,true),
-            links: Default::default(), extent: Default::default(), 
-            // id_title_map: Default::default(), 
-            last_updated_docs: Default::default(), 
-            curr_doc_appearances: Default::default() }
-
+            posting_nodes: DiskHashMap::new(cap, persistent_cap, true),
+            links: Default::default(),
+            extent: Default::default(),
+            // id_title_map: Default::default(),
+            last_updated_docs: Default::default(),
+            curr_doc_appearances: Default::default(),
+        }
     }
 
     pub fn cache_size(&self) -> u32 {
         self.posting_nodes.cache_population()
     }
 
-
-    pub fn clean_cache(&self){
+    pub fn clean_cache(&self) {
         self.posting_nodes.clean_cache();
     }
 
@@ -115,7 +115,7 @@ impl PreIndex {
     }
 
     fn add_tokens(&mut self, doc_id: u32, text_to_add: &str, mut word_pos: u32) -> u32 {
-        for token in text_to_add.split(" ") {
+        for token in text_to_add.split(" ").filter(|s| s.len() != 0) {
             self.add_posting(token, doc_id, word_pos);
             word_pos += 1;
         }
@@ -135,6 +135,7 @@ impl PreIndex {
             document_id: docid,
             position: word_pos,
         });
+        node.postings_count += 1;
 
         *node.tf.entry(docid).or_default() += 1;
     }

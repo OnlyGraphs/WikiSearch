@@ -20,6 +20,7 @@ use keyed_priority_queue::KeyedPriorityQueue;
 use log::info;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use ternary_tree::Tst;
 use utils::MemFootprintCalculator;
 
 /// a hashmap from DiskHashMap id's to their file handles
@@ -111,7 +112,7 @@ impl<V: Serializable, const ID: usize> Entry<V, ID> {
             Entry::Memory(v, _) => Ok(v),
             Entry::Disk(_, _) => {
                 self.load()?;
-                
+
                 match self {
                     Entry::Memory(v, _) => Ok(v),
                     Entry::Disk(_, _) => panic!(),
@@ -333,12 +334,13 @@ impl<V: Serializable, const ID: usize> Entry<V, ID> {
 /// records are swapped as necessary
 /// INVARIANT: The number of bytes of all values in the cache (as per their serialization)
 /// will never exceed the capacity + largest value in the cache (due to the way bookkeping has to be done in entries)
-pub struct DiskHashMap<K, V, const ID: usize>
+pub struct DiskHashMap<V, const ID: usize>
 where
-    K: Serializable + Hash + Eq + Clone,
     V: Serializable + Debug,
 {
-    map: IndexMap<K, Arc<Mutex<Entry<V, ID>>>>,
+    map: Vec<Arc<Mutex<Entry<V, ID>>>>,
+    tst: Tst<usize>,
+
     /// how many records to allow in memory at one time during runtime
     capacity: u32,
     /// how many records to retain between batch evictions
@@ -346,9 +348,8 @@ where
     build_mode: bool,
 }
 
-impl<K, V, const ID: usize> DiskHashMap<K, V, ID>
+impl<V, const ID: usize> DiskHashMap<V, ID>
 where
-    K: Serializable + Hash + Eq + Clone,
     V: Serializable + Debug,
 {
     pub fn len(&self) -> usize {
@@ -384,7 +385,7 @@ where
             .map(|(v, _)| v);
 
         if let Some(v) = victim {
-            let v = self.map.get_index(v as usize).unwrap().1;
+            let v = self.map.get(v as usize).unwrap();
             v.lock().unload().unwrap();
             Some(v)
         } else {
@@ -447,15 +448,15 @@ where
         }
     }
 
-    pub fn entry<Q: ?Sized>(&self, k: &Q) -> Option<Arc<Mutex<Entry<V, ID>>>>
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq,
-    {
-        let o = self.map.get_full(k).map(|(idx, _, v)| {
-            v.lock().load().unwrap(); // force a load, users can't unload so this preserves RAM invariant within this function
-            Arc::clone(v)
-        });
+    pub fn entry(&self, k: &str) -> Option<Arc<Mutex<Entry<V, ID>>>> {
+        let o = self
+            .tst
+            .get(k)
+            .and_then(|x| self.map.get(*x as usize))
+            .map(|v| {
+                v.lock().load().unwrap(); // force a load, users can't unload so this preserves RAM invariant within this function
+                Arc::clone(v)
+            });
         // check invariant, evicts less used / freshest elements first idealy
         // the eviction might evict the same element which is when the invariant exceeds RAM capacity by up to one elements size
         // which could be the largest one
@@ -463,16 +464,31 @@ where
         o
     }
 
-    pub fn entry_or_default<Q: ?Sized>(&mut self, k: &Q) -> Arc<Mutex<Entry<V, ID>>>
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq + ToOwned<Owned = K>,
-    {
-        let v = self.map.get(k);
+    pub fn entry_wild_card(&self, k: &str) -> Vec<&Arc<Mutex<Entry<V, ID>>>> {
+        let mut v: Vec<&Arc<Mutex<Entry<V, ID>>>> = Vec::new();
+        self.tst
+            .visit_crossword_values(k, '*', |s| v.push(self.map.get(*s as usize).unwrap()));
+
+        v
+    }
+    pub fn find_nearest_neighbour_keys(&self, k: &str, distance_to_key: usize) -> Vec<String> {
+        let mut closest_neighbour_keys: Vec<String> = Vec::new();
+        let mut it = self.tst.iter_neighbor(k, distance_to_key);
+
+        while let Some(_) = it.next() {
+            closest_neighbour_keys.push(it.current_key());
+        }
+
+        closest_neighbour_keys
+    }
+
+    pub fn entry_or_default(&mut self, k: &str) -> Arc<Mutex<Entry<V, ID>>>
+where {
+        let v = self.tst.get(k).and_then(|x| self.map.get(*x as usize));
         let o = match v {
             Some(s) => Arc::clone(s),
             None => {
-                self.insert(k.to_owned(), V::default());
+                self.insert(k, V::default());
                 self.entry(k).expect("This shouldn't happen")
             }
         };
@@ -490,29 +506,38 @@ where
         ))
     }
 
-    pub fn insert(&mut self, k: K, v: V) -> Option<Arc<Mutex<Entry<V, ID>>>>
-where {
-        let (idx, o) = self.map.insert_full(
-            k,
-            Arc::new(Mutex::new(Entry::Memory(v, self.map.len() as u32))),
-        );
+    pub fn insert(&mut self, k: &str, v: V) -> Option<Arc<Mutex<Entry<V, ID>>>> {
+        let idx = self.tst.get(k);
+
+        // self.map
+        // Arc::new(Mutex::new(Entry::Memory(v, self.map.len() as u32)))
 
         // if the value is nothing, we need to make sure to remove its record
-        match &o {
+        let old = match &idx {
             None => {
+                self.tst.insert(k, self.map.len());
+                self.map.push(Arc::new(Mutex::new(Entry::Memory(
+                    v,
+                    self.map.len() as u32,
+                ))));
+
                 *IN_MEM_RECORDS.lock().get_mut(ID).unwrap() += 1;
                 RECORD_PRIORITIES
                     .lock()
                     .get_mut(ID)
                     .unwrap()
                     .push((self.map.len() - 1) as u32, 0.into());
+                None
             }
-            Some(_) => self.map.get_index(idx).unwrap().1.lock().set_id(idx as u32),
-        }
+            Some(i) => Some(std::mem::replace(
+                &mut self.map[**i],
+                Arc::new(Mutex::new(Entry::Memory(v, **i as u32))),
+            )),
+        };
 
         self.evict_invariant();
 
-        o
+        old
     }
 
     pub fn new(capacity: u32, persistent_capacity: u32, build_mode: bool) -> Self {
@@ -538,7 +563,8 @@ where {
         };
 
         Self {
-            map: IndexMap::default(),
+            map: Vec::default(),
+            tst: Tst::new(),
             capacity: capacity,
             persistent_capacity,
             build_mode,
@@ -546,19 +572,17 @@ where {
     }
 }
 
-impl<K, V, const ID: usize> MemFootprintCalculator for DiskHashMap<K, V, ID>
+impl<V, const ID: usize> MemFootprintCalculator for DiskHashMap<V, ID>
 where
-    K: Serializable + Hash + Eq + Clone + MemFootprintCalculator,
     V: Serializable + MemFootprintCalculator + Debug,
 {
     fn real_mem(&self) -> u64 {
-        self.map.real_mem()
+        self.map.real_mem() + self.tst.stat().bytes.total as u64
     }
 }
 
-impl<K, V, const ID: usize> Default for DiskHashMap<K, V, ID>
+impl<V, const ID: usize> Default for DiskHashMap<V, ID>
 where
-    K: Serializable + Hash + Eq + Clone,
     V: Serializable + Debug,
 {
     fn default() -> Self {
@@ -566,19 +590,18 @@ where
     }
 }
 
-impl<K, V, const ID: usize> IntoIterator for DiskHashMap<K, V, ID>
-where
-    K: Serializable + Hash + Eq + Clone,
-    V: Serializable + Debug,
-{
-    type Item = (K, Arc<Mutex<Entry<V, ID>>>);
+// impl<V, const ID: usize> IntoIterator for DiskHashMap<V, ID>
+// where
+//     V: Serializable + Debug,
+// {
+//     type Item = (Arc<Mutex<Entry<V, ID>>>);
 
-    type IntoIter = indexmap::map::IntoIter<
-        K,
-        Arc<parking_lot::lock_api::Mutex<parking_lot::RawMutex, Entry<V, ID>>>,
-    >;
+//     type IntoIter = indexmap::map::IntoIter<
+//         K,
+//         Arc<parking_lot::lock_api::Mutex<parking_lot::RawMutex, Entry<V, ID>>>,
+//     >;
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.map.into_iter()
-    }
-}
+//     fn into_iter(self) -> Self::IntoIter {
+//         self.map.into_iter()
+//     }
+// }

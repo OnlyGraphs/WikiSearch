@@ -15,25 +15,24 @@ pub struct Posting {
     pub position: u32,
 }
 
-impl Into<(u32,u32)> for Posting {
-    fn into(self) -> (u32,u32) {
+impl Into<(u32, u32)> for Posting {
+    fn into(self) -> (u32, u32) {
         (self.document_id, self.position)
     }
 }
 
-impl Into<(u32,u32)> for &Posting {
-    fn into(self) -> (u32,u32) {
+impl Into<(u32, u32)> for &Posting {
+    fn into(self) -> (u32, u32) {
         (self.document_id, self.position)
     }
 }
-
-
 
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
 pub struct PostingNode {
     pub postings: Vec<Posting>,
     pub df: u32,
     pub tf: IndexMap<u32, u32, FxBuildHasher>,
+    pub postings_count: u32,
 }
 
 #[derive(Debug, Eq, PartialEq, Default, Clone)]
@@ -44,8 +43,8 @@ where
     pub postings: EncodedPostingList<E>,
     pub df: u32,
     pub tf: IndexMap<u32, u32, FxBuildHasher>,
+    pub postings_count: u32,
 }
-
 
 #[derive(Default, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct PosRange {
