@@ -27,7 +27,7 @@ use parking_lot::Mutex;
 #[derive(Default)]
 pub struct Index {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder<Posting,true>>, 0>, // index map because we want to keep this sorted
+    pub posting_nodes: DiskHashMap<EncodedPostingNode<VbyteEncoder<Posting,true>>, 0>, // index map because we want to keep this sorted
     pub links: HashMap<u32, Vec<u32>>,
     pub incoming_links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,

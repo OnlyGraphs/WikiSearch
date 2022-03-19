@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 /// a common backbone from which any index can be intialized
 pub struct PreIndex {
     pub dump_id: u32,
-    pub posting_nodes: DiskHashMap<String, EncodedPostingNode<VbyteEncoder<Posting,true>>, 0>,
+    pub posting_nodes: DiskHashMap<EncodedPostingNode<VbyteEncoder<Posting,true>>, 0>,
     pub links: HashMap<u32, Vec<u32>>,
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     // pub id_title_map: BiMap<u32, String>,
@@ -115,7 +115,7 @@ impl PreIndex {
     }
 
     fn add_tokens(&mut self, doc_id: u32, text_to_add: &str, mut word_pos: u32) -> u32 {
-        for token in text_to_add.split(" ") {
+        for token in text_to_add.split(" ").filter(|s| s.len() != 0) {
             self.add_posting(token, doc_id, word_pos);
             word_pos += 1;
         }
