@@ -12,7 +12,7 @@ pub const TOKEN_CORRECTION_THRESHOLD: u32 = 1000; //For each token, see if we pe
 pub const CORRECTION_TRIES: u8 = 3; // Number of tries to attempt spell checking. for each failed try, the distance to key argument is increased
 pub const CORRECTION_KEY_DISTANCE: u8 = 1; //Starting distance of current token that is being spell checked to closest words/neighbours in the tree. In orher words, how far do we look in the tree by the difference of characters
 pub const CORRECTION_KEY_DISTANCE_ADD_PER_TRY: u8 = 1; //Increase in distance key per try iteration
-pub const SUGGEST_MOST_APPEARANCES: bool = true; // whether to correct all types of results or only those set by TOKEN_CORRECTION_THRESHOLD
+pub const SUGGEST_MOST_APPEARANCES: bool = true; // whether to display all kinds of results or only those that pass the TOKEN_CORRECTION_THRESHOLD
 
 ///main function to be called to spell check query
 /// TODO: Refactor
