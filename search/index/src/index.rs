@@ -18,6 +18,7 @@ use crate::index_structs::PosRange;
 use crate::Entry;
 use crate::LastUpdatedDate;
 use crate::Posting;
+use crate::SequentialEncoder;
 use crate::VbyteEncoder;
 
 use crate::compute_page_ranks;
