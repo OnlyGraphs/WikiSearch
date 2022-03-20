@@ -412,6 +412,19 @@ fn test_compound_query_or_and_2() {
 
 
 #[test]
+fn test_parse_simple_phrase_query_no_spaces() {
+    let query = "\"April\"";
+    let expected_tks = vec![
+        "April".to_string(),
+    ];
+    let expected = Box::new(Query::PhraseQuery { tks: expected_tks });
+    let (_, actual) = parse_query(query).unwrap();
+    assert!(actual == expected);
+}
+
+
+
+#[test]
 fn test_parse_simple_phrase_query() {
     let query = " \" The big whale ate a tuna sandwich. \" ";
     let expected_tks = vec![

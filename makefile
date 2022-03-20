@@ -5,7 +5,7 @@ ARGS=''
 export SQLX_OFFLINE=true
 export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
 export SEARCH_PORT=8000
-export RUST_LOG=debug,search_api=index=debug,retrieval=debug,parser=debug,search_lib=debug,search_api=debug,actix_web=info,sqlx=off
+export RUST_LOG=debug,search_api=debug,index=debug,retrieval=debug,parser=debug,search_lib=debug,search_api=debug,actix_web=info,sqlx=off
 export BACKEND=http://localhost:8000
 export RUST_BACKTRACE=1
 export CACHE_SIZE=500000

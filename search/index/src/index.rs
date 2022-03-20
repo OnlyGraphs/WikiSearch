@@ -2,7 +2,6 @@ use log::info;
 
 use utils::MemFootprintCalculator;
 
-use std::env;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::ops::Deref;

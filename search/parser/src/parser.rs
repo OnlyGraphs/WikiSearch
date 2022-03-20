@@ -56,6 +56,10 @@ pub fn parse_separator(nxt: &str) -> IResult<&str, &str> {
     take_while(is_seperator)(nxt)
 }
 
+pub fn parse_separator1(nxt: &str) -> IResult<&str, &str> {
+    take_while1(is_seperator)(nxt)
+}
+
 
 pub fn parse_separator_untill_eof(nxt: &str) -> IResult<&str, &str>{
     let (nxt, _) = take_while(is_seperator)(nxt)?;
@@ -374,7 +378,7 @@ pub fn parse_phrase_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt , _) = parse_separator(nxt)?;
     let (nxt, _) = tag("\"")(nxt)?;
     let (nxt , _) = parse_separator(nxt)?;
-    let (nxt, tokens) = separated_list0(parse_separator, parse_token)(nxt)?;
+    let (nxt, tokens) = separated_list0(parse_separator1, parse_token)(nxt)?;
     let (nxt , _) = parse_separator(nxt)?;
     let (nxt, _) = tag("\"")(nxt)?;
 

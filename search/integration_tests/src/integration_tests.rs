@@ -1227,6 +1227,60 @@ fn test_structure_search_citation() {
     );
 }
 
+
+
+#[test]
+fn test_structure_search_infobox() {
+    let mut pre_idx = PreIndex::default();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            2,
+            "d2",
+            vec![("infobox", "hello world")],
+            "hello world",
+            vec!["ddd ddd"],
+            "ooo ppp",
+        ))
+        .unwrap();
+
+    pre_idx
+        .add_document(get_document_with_text(
+            3,
+            "d3",
+            vec![("", "aaa bbb")],
+            "hello world",
+            vec!["aaa bb"],
+            "ggg hhh",
+        ))
+        .unwrap();
+
+    let idx = Index::from_pre_index(pre_idx);
+
+    assert_eq!(
+        execute_query(
+            &Box::new(Query::StructureQuery {
+                elem: StructureElem::Infobox("infobox".to_string()),
+                sub: Box::new(Query::FreetextQuery {
+                    tokens: vec!["hello".to_string(), "world".to_string()]
+                })
+            }),
+            &idx
+        )
+        .collect::<Vec<Posting>>(),
+        vec![
+            Posting {
+                document_id: 2,
+                position: 0
+            },
+            Posting {
+                document_id: 2,
+                position: 1
+            },
+        ]
+    );
+}
+
 #[test]
 fn test_relational_search() {
     let mut pre_idx = PreIndex::default();

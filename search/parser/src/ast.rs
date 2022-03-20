@@ -34,9 +34,9 @@ impl From<&str> for StructureElem {
 impl From<StructureElem> for String {
     fn from(val: StructureElem) -> Self {
         match val{
-            StructureElem::Title => "title".to_string(),
-            StructureElem::Category => "category".to_string(),
-            StructureElem::Citation => "citation".to_string(),
+            StructureElem::Title => "Title".to_string(),
+            StructureElem::Category => "Category".to_string(),
+            StructureElem::Citation => "Citation".to_string(),
             StructureElem::Infobox(v) => v,
         }
     }
