@@ -440,6 +440,7 @@ where
                     if victim.is_none() {
                         break;
                     }
+                    info!("Evicting {:?} from cache.", victim);
                     records = *IN_MEM_RECORDS.lock().get(ID).unwrap();
                 } else {
                     break;
