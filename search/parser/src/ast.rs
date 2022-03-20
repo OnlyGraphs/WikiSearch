@@ -31,6 +31,17 @@ impl From<&str> for StructureElem {
     }
 }
 
+impl From<StructureElem> for String {
+    fn from(val: StructureElem) -> Self {
+        match val{
+            StructureElem::Title => "title".to_string(),
+            StructureElem::Category => "category".to_string(),
+            StructureElem::Citation => "citation".to_string(),
+            StructureElem::Infobox(v) => v,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Query {
     BinaryQuery {

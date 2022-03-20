@@ -227,7 +227,8 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
         }
         Query::StructureQuery { ref elem, ref sub } => {
             PostingIterator::new(execute_query(sub, index).filter(|c| {
-                match index.get_extent_for(elem.clone().into(), &c.document_id) {
+                let s : String = elem.clone().into();
+                match index.get_extent_for(&s, &c.document_id) {
                     Some(PosRange {
                         start_pos,
                         end_pos_delta,
