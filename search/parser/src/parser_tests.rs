@@ -76,11 +76,51 @@ fn test_complex_dist_with_binary_query() {
         lhs: "boris".to_string(),
         rhs: "johnson".to_string(),
     });
-    match *dist_node {
-        Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
+    let expected = Box::new(
+        Query::BinaryQuery { op: (BinaryOp::And), lhs: (l), rhs: (r) }
+    );
+    
+    assert_eq!(expected, dist_node);
+}
 
-        _ => assert!(false),
-    }
+# [test]
+fn test_complex_dist_with_binary_query_2() {
+    let query = "borisss, AND, #DIST,4,boris ,johnson,OR,#CITATION,boris";
+
+    let (_s, dist_node) = parse_query(query).unwrap();
+
+    let l = Box::new(Query::FreetextQuery {
+        tokens: vec!["borisss".to_string()],
+    });
+    let r1 = Box::new(Query::DistanceQuery {
+        dst: 4,
+        lhs: "boris".to_string(),
+        rhs: "johnson".to_string(),
+    });
+    let r2 = Box::new(Query::StructureQuery { 
+        elem: (StructureElem::Citation), 
+        sub: (Box::new(
+            Query::FreetextQuery { 
+                tokens: (vec!["boris".to_string()]) 
+            })) 
+    });
+    let expected = Box::new(
+        Query::BinaryQuery {
+             op: (BinaryOp::And), 
+             lhs: (l), 
+             rhs: (Box::new(
+                 Query::BinaryQuery { 
+                     op: (BinaryOp::Or), 
+                     lhs: (r1), 
+                     rhs: (r2) 
+                    }
+                )
+                
+            ) 
+        }
+    );
+    
+    assert_eq!(expected, dist_node);
 }
 
 #[test]
