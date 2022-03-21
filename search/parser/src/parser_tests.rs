@@ -1,9 +1,7 @@
 use crate::{
     ast::{BinaryOp, Query, StructureElem, UnaryOp},
     parser::{
-        is_comma, is_tab, parse_and_query, parse_binary_query, parse_dist_query, parse_not_query,
-        parse_or_query, parse_phrase_query, parse_query, parse_relation_query,
-        parse_structure_query, parse_token_in_phrase, parse_wildcard_query,
+        is_comma, is_tab, parse_query,
     },
 };
 
@@ -31,7 +29,7 @@ fn test_is_not_tab() {
 // AST Parser Tests
 #[test]
 fn test_freehand_query() {
-    let (_nxt, query) = parse_query("hello     world").unwrap();
+    let (_nxt, query) = parse_query(" hello     world ").unwrap();
 
     let tokens = match *query {
         Query::FreetextQuery { tokens } => tokens,
@@ -44,8 +42,8 @@ fn test_freehand_query() {
 
 #[test]
 fn test_dist_query() {
-    let query = "#DIST,3,pumpkin,pie";
-    let (_s, dist_node) = parse_dist_query(query).unwrap();
+    let query = " #DIST , 3 , pumpkin,pie ";
+    let (_s, dist_node) = parse_query(query).unwrap();
     match *dist_node {
         Query::DistanceQuery { dst, lhs, rhs } => {
             assert!(dst == 3 && lhs == "pumpkin" && rhs == "pie")
@@ -56,8 +54,8 @@ fn test_dist_query() {
 
 #[test]
 fn test_dist_query_2() {
-    let query = "#DIST 3 pumpkin pie";
-    let (_s, dist_node) = parse_dist_query(query).unwrap();
+    let query = " #DIST 3 pumpkin pie ";
+    let (_s, dist_node) = parse_query(query).unwrap();
     match *dist_node {
         Query::DistanceQuery { dst, lhs, rhs } => {
             assert!(dst == 3 && lhs == "pumpkin" && rhs == "pie")
@@ -68,8 +66,8 @@ fn test_dist_query_2() {
 
 #[test]
 fn test_simple_structure_query() {
-    let query = "#TITLE pumpkin";
-    let (_s, struct_node) = parse_structure_query(query).unwrap();
+    let query = " #TITLE pumpkin ";
+    let (_s, struct_node) = parse_query(query).unwrap();
     match *struct_node {
         Query::StructureQuery { elem, sub } => assert!(
             elem == StructureElem::Title
@@ -85,7 +83,7 @@ fn test_simple_structure_query() {
 #[test]
 fn test_simple_not_query() {
     let query = "NOT pumpkin";
-    let (_s, unary_node) = parse_not_query(query).unwrap();
+    let (_s, unary_node) = parse_query(query).unwrap();
     match *unary_node {
         Query::UnaryQuery { op, sub } => assert!(
             op == UnaryOp::Not
@@ -107,7 +105,7 @@ fn test_simple_or_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pie".to_string()],
     });
-    let (_s, binary_node) = parse_or_query(query).unwrap();
+    let (_s, binary_node) = parse_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::Or && lhs == l && rhs == r),
         _ => assert!(false),
@@ -123,7 +121,7 @@ fn test_multitoken_or_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pumpkin".to_string(), "patch".to_string()],
     });
-    let (_s, binary_node) = parse_or_query(query).unwrap();
+    let (_s, binary_node) = parse_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::Or && lhs == l && rhs == r),
         _ => assert!(false),
@@ -139,7 +137,7 @@ fn test_simple_and_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pie".to_string()],
     });
-    let (_s, binary_node) = parse_and_query(query).unwrap();
+    let (_s, binary_node) = parse_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
         _ => assert!(false),
@@ -155,7 +153,7 @@ fn test_multitoken_and_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pumpkin".to_string(), "patch".to_string()],
     });
-    let (_s, binary_node) = parse_and_query(query).unwrap();
+    let (_s, binary_node) = parse_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
         _ => assert!(false),
@@ -171,7 +169,7 @@ fn test_simple_binary_query() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pumpkin".to_string(), "patch".to_string()],
     });
-    let (_s, binary_node) = parse_binary_query(query).unwrap();
+    let (_s, binary_node) = parse_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
         _ => assert!(false),
@@ -187,7 +185,7 @@ fn test_simple_binary_query_2() {
     let r = Box::new(Query::FreetextQuery {
         tokens: vec!["pumpkin".to_string(), "patch".to_string()],
     });
-    let (_s, binary_node) = parse_binary_query(query).unwrap();
+    let (_s, binary_node) = parse_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::Or && lhs == l && rhs == r),
         _ => assert!(false),
@@ -216,7 +214,7 @@ fn test_nested_binary_query() {
         rhs: r2,
     });
 
-    let (_s, binary_node) = parse_binary_query(query).unwrap();
+    let (_s, binary_node) = parse_query(query).unwrap();
     match *binary_node {
         Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
         _ => assert!(false),
@@ -228,9 +226,9 @@ fn test_parse_simple_wildcard_query() {
     let query = "p*kin";
     let expected = Query::WildcardQuery {
         prefix: "p".to_string(),
-        postfix: "kin".to_string(),
+        suffix: "kin".to_string(),
     };
-    let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    let (_s, wildcard_query) = parse_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
     }
@@ -241,9 +239,9 @@ fn test_parse_wildcard_query_with_whitespace() {
     let query = " p * kin           ";
     let expected = Query::WildcardQuery {
         prefix: "p".to_string(),
-        postfix: "kin".to_string(),
+        suffix: "kin".to_string(),
     };
-    let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    let (_s, wildcard_query) = parse_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
     }
@@ -254,9 +252,9 @@ fn test_parse_wildcard_query_no_prefix() {
     let query = "*kin";
     let expected = Query::WildcardQuery {
         prefix: "".to_string(),
-        postfix: "kin".to_string(),
+        suffix: "kin".to_string(),
     };
-    let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    let (_s, wildcard_query) = parse_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
     }
@@ -267,12 +265,95 @@ fn test_parse_simple_wildcard_query_no_suffix() {
     let query = "p*";
     let expected = Query::WildcardQuery {
         prefix: "p".to_string(),
-        postfix: "".to_string(),
+        suffix: "".to_string(),
     };
-    let (_s, wildcard_query) = parse_wildcard_query(query).unwrap();
+    let (_s, wildcard_query) = parse_query(query).unwrap();
     match *wildcard_query {
         q => assert!(q == expected),
     }
+}
+
+#[test]
+fn test_wildcard_query() {
+    let query = "a*ril";
+    let expected = Box::new(Query::WildcardQuery {
+        prefix: "a".to_string(),
+        suffix: "ril".to_string(),
+    });
+    assert_eq!(parse_query(query), Ok(("", expected)));
+}
+
+#[test]
+fn test_wildcard_query_2() {
+    let query = "alche*";
+    let expected = Box::new(Query::WildcardQuery {
+        prefix: "alche".to_string(),
+        suffix: "".to_string(),
+    });
+    assert_eq!(parse_query(query), Ok(("", expected)));
+}
+
+#[test]
+fn test_binary_with_wildcard_query() {
+    let query = "pumpk*n AND pie";
+    let l = Box::new(Query::WildcardQuery {
+        prefix: "pumpk".to_string(),
+        suffix: "n".to_string(),
+    });
+    let r = Box::new(Query::FreetextQuery {
+        tokens: vec!["pie".to_string()],
+    });
+    let (_s, binary_node) = parse_query(query).unwrap();
+
+    let target = Box::new(Query::BinaryQuery {
+        op: BinaryOp::And,
+        lhs: l,
+        rhs: r,
+    });
+    assert_eq!(target, binary_node);
+}
+
+#[test]
+fn test_compound_query_or_and_with_wildcard() {
+    let query = "pumpkin pie AND pumpkin OR p*tch";
+
+    assert_eq!(
+        parse_query(query),
+        Ok((
+            "",
+            Box::new(Query::BinaryQuery {
+                lhs: Box::new(Query::FreetextQuery {
+                    tokens: vec!["pumpkin".to_string(), "pie".to_string()],
+                }),
+                op: BinaryOp::And,
+                rhs: Box::new(Query::BinaryQuery {
+                    lhs: Box::new(Query::FreetextQuery {
+                        tokens: vec!["pumpkin".to_string()],
+                    }),
+                    op: BinaryOp::Or,
+                    rhs: Box::new(Query::WildcardQuery {
+                        prefix: "p".to_string(),
+                        suffix: "tch".to_string()
+                    }),
+                }),
+            })
+        ))
+    );
+}
+
+#[test]
+fn test_not_with_wildcard() {
+    let query = "NOT ca*";
+    let (_s, unary_node) = parse_query(query).unwrap();
+    let target = Box::new(Query::UnaryQuery {
+        op: UnaryOp::Not,
+        sub: Box::new(Query::WildcardQuery {
+            prefix: "ca".to_string(),
+            suffix: "".to_string(),
+        }),
+    });
+
+    assert_eq!(target, unary_node)
 }
 
 #[test]
@@ -329,17 +410,23 @@ fn test_compound_query_or_and_2() {
     );
 }
 
+
 #[test]
-fn test_parse_token_in_phrase() {
-    let phrase = "  hello world";
-    let expected = Ok(("world", "hello".to_string()));
-    let actual = parse_token_in_phrase(phrase);
-    assert!(expected == actual);
+fn test_parse_simple_phrase_query_no_spaces() {
+    let query = "\"April\"";
+    let expected_tks = vec![
+        "April".to_string(),
+    ];
+    let expected = Box::new(Query::PhraseQuery { tks: expected_tks });
+    let (_, actual) = parse_query(query).unwrap();
+    assert!(actual == expected);
 }
+
+
 
 #[test]
 fn test_parse_simple_phrase_query() {
-    let query = " The big whale ate a tuna sandwich.";
+    let query = " \" The big whale ate a tuna sandwich. \" ";
     let expected_tks = vec![
         "The".to_string(),
         "big".to_string(),
@@ -350,13 +437,13 @@ fn test_parse_simple_phrase_query() {
         "sandwich".to_string(),
     ];
     let expected = Box::new(Query::PhraseQuery { tks: expected_tks });
-    let (_, actual) = parse_phrase_query(query).unwrap();
+    let (_, actual) = parse_query(query).unwrap();
     assert!(actual == expected);
 }
 
 #[test]
 fn test_parse_complex_phrase_query() {
-    let query = " The  , big ,,,, whale  , ate              a ,tuna     sandwich.";
+    let query = " \" The  , big ,,,, whale  , ate              a ,tuna     sandwich. \" ";
     let expected_tks = vec![
         "The".to_string(),
         "big".to_string(),
@@ -367,28 +454,28 @@ fn test_parse_complex_phrase_query() {
         "sandwich".to_string(),
     ];
     let expected = Box::new(Query::PhraseQuery { tks: expected_tks });
-    let (_, actual) = parse_phrase_query(query).unwrap();
+    let (_, actual) = parse_query(query).unwrap();
     assert!(actual == expected);
 }
 
 #[test]
 fn test_parse_simple_relation_query() {
-    let query = "#LINKSTO, 4,3";
-    let expected_root = 4;
-    let expected_hops = 3;
+    let query = " #LINKSTO, 173302 ,1 ";
+    let expected_root = 173302;
+    let expected_hops = 1;
     let expected_sub = None;
     let expected = Box::new(Query::RelationQuery {
         root: expected_root,
         hops: expected_hops,
         sub: expected_sub,
     });
-    let (_, actual) = parse_relation_query(query).unwrap();
+    let (_, actual) = parse_query(query).unwrap();
     assert_eq!(expected, actual);
 }
 
 #[test]
 fn test_parse_simple_relation_query2() {
-    let query = "#LINKSTO, 69, 3";
+    let query = " #LINKSTO  69  3 ";
     let expected_root = 69;
     let expected_hops = 3;
     let expected_sub = None;
@@ -397,30 +484,30 @@ fn test_parse_simple_relation_query2() {
         hops: expected_hops,
         sub: expected_sub,
     });
-    let (_, actual) = parse_relation_query(query).unwrap();
+    let (_, actual) = parse_query(query).unwrap();
     assert_eq!(expected, actual);
 }
 
 #[test]
 fn test_parse_simple_relation_query3() {
-    let query = "#LINKSTO, 142, 354545";
+    let query = "#LINKSTO, 142, 255";
     let expected_root = 142;
-    let expected_hops = 354545;
+    let expected_hops = 255;
     let expected_sub = None;
     let expected = Box::new(Query::RelationQuery {
         root: expected_root,
         hops: expected_hops,
         sub: expected_sub,
     });
-    let (_, actual) = parse_relation_query(query).unwrap();
+    let (_, actual) = parse_query(query).unwrap();
     assert_eq!(expected, actual);
 }
 
 #[test]
 fn test_parse_nested_relation_query() {
-    let query = "#LINKSTO , 2222 , 354545 , Donald OR Trump";
+    let query = "#LINKSTO , 2222 , 0 , Donald OR Trump  ";
     let expected_root = 2222;
-    let expected_hops = 354545;
+    let expected_hops = 0;
     let expected_sub = Box::new(Query::BinaryQuery {
         op: BinaryOp::Or,
         lhs: Box::new(Query::FreetextQuery {
@@ -435,7 +522,7 @@ fn test_parse_nested_relation_query() {
         hops: expected_hops,
         sub: Some(expected_sub),
     });
-    let (_, actual) = parse_relation_query(query).unwrap();
+    let (_, actual) = parse_query(query).unwrap();
     assert_eq!(expected, actual);
 }
 

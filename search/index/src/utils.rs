@@ -30,6 +30,7 @@ impl MemFootprintCalculator for DocumentMetaData {
     }
 }
 
+
 #[allow(dead_code)]
 pub fn get_document_with_text_and_links(
     id: u32,

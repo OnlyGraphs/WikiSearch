@@ -2,6 +2,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use index::index::Index;
+use sqlx::Pool;
+use sqlx::Postgres;
 use std::sync::{Arc, RwLock};
 
 /// Represents the type of order to be imposed on list of documents
@@ -73,6 +75,20 @@ pub struct Document {
     pub article_abstract: String,
 }
 
+#[derive(Serialize, Debug)]
+
+pub struct RelationDocument {
+    #[serde(skip_serializing)]
+    pub id: u32,
+
+    pub title: String,
+    pub score: f64,
+    pub hops: u8,
+
+    #[serde(rename = "abstract")]
+    pub article_abstract: String,
+}
+
 /// Represents a relation between two articles
 /// where source is the origin of a link
 /// and destination is the destination of the link
@@ -85,9 +101,19 @@ pub struct Relation {
 /// Represents a collection of documents and relations
 #[derive(Serialize, Debug)]
 pub struct RelationSearchOutput {
-    pub documents: Vec<Document>,
+    pub documents: Vec<RelationDocument>,
     pub relations: Vec<Relation>,
+    pub domain: String,
+    pub suggested_query: String,
 }
+
+#[derive(Serialize, Debug)]
+pub struct SearchOutput {
+    pub documents: Vec<Document>,
+    pub domain: String,
+    pub suggested_query: String
+}
+
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ResultsCount(pub u16);
@@ -109,4 +135,5 @@ impl Default for DefaultPage {
 pub struct RESTSearchData {
     pub index_rest: Arc<RwLock<Index>>,
     pub connection_string: String, //Used to query Database for metadata results like Title or Abstracts
+    pub pool: Pool<Postgres>
 }

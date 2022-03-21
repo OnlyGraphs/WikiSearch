@@ -11,9 +11,13 @@ use api_rs::wiki_search::{
 use index::index::{Index};
 use log::{error, info};
 use pretty_env_logger;
+use search_lib::APIError;
 use search_lib::endpoints;
 use search_lib::grpc_server::CheckIndexService;
 use search_lib::structs::RESTSearchData;
+use sqlx::Pool;
+use sqlx::Postgres;
+use sqlx::postgres::PgPoolOptions;
 use core::time;
 use std::path::Path;
 use std::process;
@@ -31,7 +35,8 @@ const DEFAULT_GRPC_ADDRESS: &str = "127.0.0.1:50051";
 const DEFAULT_REST_IP: &str = "127.0.0.1";
 const DEFAULT_REST_PORT: &str = "8000";
 
-fn main() -> std::io::Result<()> {
+#[tokio::main]
+async fn main() -> std::io::Result<()> {
     pretty_env_logger::init();
 
     let connection_string = env::var("DATABASE_URL")
@@ -45,7 +50,16 @@ fn main() -> std::io::Result<()> {
     let rest_ip: String = env::var("SEARCH_IP").unwrap_or(DEFAULT_REST_IP.to_string());
     let rest_port = env::var("SEARCH_PORT").unwrap_or(DEFAULT_REST_PORT.to_string());
     let static_serve_dir = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string());
-    
+    let pool = PgPoolOptions::new()
+        .max_connections(150)
+        // .connect_lazy(&connection_string)
+        .connect(&connection_string)
+        .await
+        .unwrap();
+        // .map_err(|_e| {
+        //     APIError::new_internal_error("Failed to initialise connection with postgres")
+        // })?;
+
     info!("Reading Directories at STATIC_DIR:");
     read_dir(Path::new(&static_serve_dir)).unwrap().map(|v| v.unwrap().path())
      .for_each(|v| info!("\t {}",v.display()) );
@@ -57,12 +71,14 @@ fn main() -> std::io::Result<()> {
     // with redeclarations of the handle, no idea if any version of that would work
     let connection_string_grpc = connection_string.clone();
     let index_grpc = index.clone();
+    let pool_rest = pool.clone();
     thread::spawn(move || {
         loop {
             let status = run_grpc(
                 index_grpc.clone(),
                 grpc_address.clone(),
                 connection_string_grpc.clone(),
+                pool_rest.clone(),
             );
 
             if status.is_err() {
@@ -85,6 +101,7 @@ fn main() -> std::io::Result<()> {
                 static_serve_dir.clone(),
                 index_rest.clone(),
                 connection_string_rest.clone(),
+                pool.clone(),
             );
             if status.is_err() {
                 error!("REST service error: {:?}", status.err().unwrap());
@@ -110,6 +127,7 @@ async fn run_grpc<'a>(
     index_grpc: Arc<RwLock<Index>>,
     grpc_address: String,
     connection_string: String,
+    pool : Pool<Postgres>
 ) -> std::io::Result<()> {
     // launc grpc serices and server
     info!("Lauching gRPC server");
@@ -119,6 +137,7 @@ async fn run_grpc<'a>(
     let service = CheckIndexService {
         index: index_grpc.clone(),
         connection_string: connection_string,
+        pool,
     };
 
     info!("Building initial index..");
@@ -160,6 +179,7 @@ async fn run_rest(
     static_dir: String,
     index_rest: Arc<RwLock<Index>>,
     connection_string: String,
+    pool : Pool<Postgres>
 ) -> std::io::Result<()> {
     // launch REST api
     info!("Lauching Search API");
@@ -172,6 +192,8 @@ async fn run_rest(
         let data = RESTSearchData {
             index_rest: index_rest.clone(),
             connection_string: connection_string.clone(),
+            pool: pool.clone(),
+
         };
         let logger = Logger::default();
 
@@ -195,7 +217,7 @@ async fn run_rest(
                             let with_extension = format!("{}{}{}", root, http_req.path(), ".html");
                             let file = match NamedFile::open_async(with_extension.clone()).await {
                                 Ok(v) => v,
-                                Err(e) => NamedFile::open_async(format!("{}/404.html", root))
+                                Err(_e) => NamedFile::open_async(format!("{}/404.html", root))
                                     .await
                                     .expect(&format!("No file named 404.html at {}",root)),
                             };

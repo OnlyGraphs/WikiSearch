@@ -1,6 +1,5 @@
 use index::Posting;
-use streaming_iterator::{convert, StreamingIterator};
-use crate::{UnionMergeStreamingIterator, IntersectionMergeStreamingIterator, DifferenceMergeStreamingIterator, DistanceMergeStreamingIterator};
+use crate::{UnionMergeIterator, IntersectionMergeIterator, DifferenceMergeIterator, DistanceMergeIterator};
 
 // --------
 // Union
@@ -39,12 +38,12 @@ fn test_union_merge_iterator(){
         Posting{ document_id: 7, position: 5 },
     ];
 
-    let iter = UnionMergeStreamingIterator::new(
-        Box::new(convert(left.into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = UnionMergeIterator::new(
+        Box::new(left.into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(target,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(target,iter.collect::<Vec<Posting>>());
 }
 
 
@@ -61,12 +60,12 @@ fn test_union_merge_iterator_empty_left(){
         Posting{ document_id: 7, position: 2 }
         ];
 
-    let iter = UnionMergeStreamingIterator::new(
-        Box::new(convert(left.into_iter())),
-        Box::new(convert(right.clone().into_iter())),
+    let iter = UnionMergeIterator::new(
+        Box::new(left.into_iter()),
+        Box::new(right.clone().into_iter()),
     );
 
-    assert_eq!(right,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(right,iter.collect::<Vec<Posting>>());
 }
 
 #[test]
@@ -83,12 +82,12 @@ fn test_union_merge_iterator_empty_right(){
 
     let right = Vec::default();
 
-    let iter = UnionMergeStreamingIterator::new(
-        Box::new(convert(left.clone().into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = UnionMergeIterator::new(
+        Box::new(left.clone().into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(left,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(left,iter.collect::<Vec<Posting>>());
 }
 
 #[test]
@@ -99,12 +98,12 @@ fn test_union_merge_iterator_empty_both(){
 
     let right = Vec::default();
 
-    let iter = UnionMergeStreamingIterator::new(
-        Box::new(convert(left.clone().into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = UnionMergeIterator::new(
+        Box::new(left.clone().into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(left,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(left,iter.collect::<Vec<Posting>>());
 }
 
 // --------
@@ -141,12 +140,12 @@ fn test_intersection_merge_iterator(){
         // Posting{ document_id: 7, position: 5 },
     ];
 
-    let iter = IntersectionMergeStreamingIterator::new(
-        Box::new(convert(left.into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = IntersectionMergeIterator::new(
+        Box::new(left.into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(target,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(target,iter.collect::<Vec<Posting>>());
 }
 
 
@@ -163,12 +162,12 @@ fn test_intersection_merge_iterator_empty_left(){
         Posting{ document_id: 7, position: 2 }
         ];
 
-    let iter = IntersectionMergeStreamingIterator::new(
-        Box::new(convert(left.clone().into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = IntersectionMergeIterator::new(
+        Box::new(left.clone().into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(left,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(left,iter.collect::<Vec<Posting>>());
 }
 
 #[test]
@@ -185,12 +184,12 @@ fn test_intersection_merge_iterator_empty_right(){
 
     let right = Vec::default();
 
-    let iter = IntersectionMergeStreamingIterator::new(
-        Box::new(convert(left.into_iter())),
-        Box::new(convert(right.clone().into_iter())),
+    let iter = IntersectionMergeIterator::new(
+        Box::new(left.into_iter()),
+        Box::new(right.clone().into_iter()),
     );
 
-    assert_eq!(right,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(right,iter.collect::<Vec<Posting>>());
 }
 
 #[test]
@@ -201,12 +200,12 @@ fn test_intersection_merge_iterator_empty_both(){
 
     let right = Vec::default();
 
-    let iter = IntersectionMergeStreamingIterator::new(
-        Box::new(convert(left.clone().into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = IntersectionMergeIterator::new(
+        Box::new(left.clone().into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(left,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(left,iter.collect::<Vec<Posting>>());
 }
 
 // // --------
@@ -238,12 +237,12 @@ fn test_difference_merge_iterator(){
         Posting{ document_id: 8, position: 5 }
     ];
 
-    let iter = DifferenceMergeStreamingIterator::new(
-        Box::new(convert(left.into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = DifferenceMergeIterator::new(
+        Box::new(left.into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(target,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(target,iter.collect::<Vec<Posting>>());
 }
 
 
@@ -261,12 +260,12 @@ fn test_difference_merge_iterator_empty_left(){
         Posting{ document_id: 7, position: 2 }
         ];
 
-    let iter = DifferenceMergeStreamingIterator::new(
-        Box::new(convert(left.clone().into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = DifferenceMergeIterator::new(
+        Box::new(left.clone().into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(left,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(left,iter.collect::<Vec<Posting>>());
 }
 
 #[test]
@@ -283,12 +282,12 @@ fn test_difference_merge_iterator_empty_right(){
 
     let right = Vec::default();
 
-    let iter = DifferenceMergeStreamingIterator::new(
-        Box::new(convert(left.clone().into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = DifferenceMergeIterator::new(
+        Box::new(left.clone().into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(left,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(left,iter.collect::<Vec<Posting>>());
 }
 
 #[test]
@@ -299,12 +298,12 @@ fn test_difference_merge_iterator_empty_both(){
 
     let right = Vec::default();
 
-    let iter = DifferenceMergeStreamingIterator::new(
-        Box::new(convert(left.clone().into_iter())),
-        Box::new(convert(right.into_iter())),
+    let iter = DifferenceMergeIterator::new(
+        Box::new(left.clone().into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(left,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(left,iter.collect::<Vec<Posting>>());
 }
 
 // // --------
@@ -338,13 +337,13 @@ fn test_distance_merge_iterator(){
         Posting{ document_id: 7, position: 2 } 
     ];
 
-    let iter = DistanceMergeStreamingIterator::new(
+    let iter = DistanceMergeIterator::new(
         2,
-        Box::new(convert(left.into_iter())),
-        Box::new(convert(right.into_iter())),
+        Box::new(left.into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(target,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(target,iter.collect::<Vec<Posting>>());
 }
 
 
@@ -362,13 +361,13 @@ fn test_distance_merge_iterator_empty_left(){
         Posting{ document_id: 7, position: 2 }
         ];
 
-    let iter = DistanceMergeStreamingIterator::new(
+    let iter = DistanceMergeIterator::new(
         1,
-        Box::new(convert(left.clone().into_iter())),
-        Box::new(convert(right.into_iter())),
+        Box::new(left.clone().into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(left,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(left,iter.collect::<Vec<Posting>>());
 }
 
 #[test]
@@ -385,13 +384,13 @@ fn test_distance_merge_iterator_empty_right(){
 
     let right = Vec::default();
 
-    let iter = DistanceMergeStreamingIterator::new(
+    let iter = DistanceMergeIterator::new(
         1,
-        Box::new(convert(left.into_iter())),
-        Box::new(convert(right.clone().into_iter())),
+        Box::new(left.into_iter()),
+        Box::new(right.clone().into_iter()),
     );
 
-    assert_eq!(right,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(right,iter.collect::<Vec<Posting>>());
 }
 
 #[test]
@@ -402,11 +401,55 @@ fn test_distance_merge_iterator_empty_both(){
 
     let right = Vec::default();
 
-    let iter = DistanceMergeStreamingIterator::new(
+    let iter = DistanceMergeIterator::new(
         1,
-        Box::new(convert(left.clone().into_iter())),
-        Box::new(convert(right.into_iter())),
+        Box::new(left.clone().into_iter()),
+        Box::new(right.into_iter()),
     );
 
-    assert_eq!(left,iter.cloned().collect::<Vec<Posting>>());
+    assert_eq!(left,iter.collect::<Vec<Posting>>());
+}
+
+
+#[test]
+fn test_distance_merge_iterator_many_docs(){
+
+
+    let left = vec![
+        Posting{ document_id: 2, position: 0 },
+        Posting{ document_id: 2, position: 3 },
+        Posting{ document_id: 2, position: 5 },
+        Posting{ document_id: 3, position: 0 },
+        Posting{ document_id: 3, position: 8 },
+        ];
+
+    let right =  vec![
+        Posting{ document_id: 2, position: 1 },
+        Posting{ document_id: 2, position: 4 },
+        Posting{ document_id: 2, position: 6 },
+        Posting{ document_id: 3, position: 1 },
+        Posting{ document_id: 3, position: 7 },
+        Posting{ document_id: 3, position: 9 },
+        ];
+
+    let target = vec![
+        Posting{ document_id: 2, position: 0 },
+        Posting{ document_id: 2, position: 1 },
+        Posting{ document_id: 2, position: 3 },
+        Posting{ document_id: 2, position: 4 },
+        Posting{ document_id: 2, position: 5 },
+        Posting{ document_id: 2, position: 6 },
+        Posting{ document_id: 3, position: 0 },
+        Posting{ document_id: 3, position: 1 },
+        Posting{ document_id: 3, position: 8 },
+        Posting{ document_id: 3, position: 9 },
+        ];
+
+    let iter = DistanceMergeIterator::new(
+        1,
+        Box::new(left.into_iter()),
+        Box::new(right.into_iter()),
+    );
+
+    assert_eq!(target,iter.collect::<Vec<Posting>>());
 }

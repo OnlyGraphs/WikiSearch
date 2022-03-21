@@ -13,7 +13,7 @@ path = "src/lib.rs"
 utils = { path = "../utils" }
 parser = { path = "../parser" }
 index = { path = "../index" }
-preprocessor = { git = "https://github.com/OnlyGraphs/Preprocessor", branch="makspll-patch-1" }
+preprocessor = { git = "https://github.com/OnlyGraphs/Preprocessor" }
 itertools = "0.10.3"
 chrono = "0.4"
 log = "0.4"

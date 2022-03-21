@@ -2,11 +2,13 @@ use bimap::BiMap;
 use chrono::NaiveDateTime;
 use either::Either;
 use indexmap::IndexMap;
+
+use parking_lot::Mutex;
 use std::collections::HashMap;
-
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 use std::mem::size_of;
-
+use std::ops::Deref;
+use std::sync::Arc;
 pub trait MemFootprintCalculator {
     fn real_mem(&self) -> u64;
 }
@@ -16,6 +18,20 @@ impl MemFootprintCalculator for &str {
         (self.len() * size_of::<u8>()) as u64 + size_of::<&str>() as u64
     }
 }
+
+impl<T: MemFootprintCalculator> MemFootprintCalculator for Arc<Mutex<T>> {
+    fn real_mem(&self) -> u64 {
+        <T as MemFootprintCalculator>::real_mem(self.lock().deref())
+    }
+}
+
+// impl <T : MemFootprintCalculator >MemFootprintCalculator for Mutex<T>
+// {
+//     fn real_mem(&self) -> u64 {
+//         <T as MemFootprintCalculator>::real_mem(self.lock().deref())
+//     }
+// }
+
 impl MemFootprintCalculator for String {
     fn real_mem(&self) -> u64 {
         (self.len() * size_of::<u8>()) as u64 + size_of::<String>() as u64
@@ -68,15 +84,16 @@ where
     }
 }
 
-impl<K, V> MemFootprintCalculator for IndexMap<K, V>
+impl<K, V, S> MemFootprintCalculator for IndexMap<K, V, S>
 where
     K: MemFootprintCalculator,
     V: MemFootprintCalculator,
+    S: BuildHasher,
 {
     fn real_mem(&self) -> u64 {
         self.iter()
             .fold(0, |a, (k, v)| v.real_mem() + k.real_mem() + a)
-            + size_of::<IndexMap<K, V>>() as u64 // need this as above doesnt count metadata
+            + size_of::<IndexMap<K, V, S>>() as u64 // need this as above doesnt count metadata
     }
 }
 
