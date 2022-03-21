@@ -65,7 +65,7 @@ impl APIError {
             .body(self.to_string())
     }
 
-    fn new_user_error<T: Display, O: Display>(user_msg: &T, hidden_msg: &O) -> Self {
+    pub fn new_user_error<T: Display, O: Display>(user_msg: &T, hidden_msg: &O) -> Self {
         APIError {
             code: StatusCode::UNPROCESSABLE_ENTITY,
             hidden_msg: hidden_msg.to_string(),
@@ -73,7 +73,7 @@ impl APIError {
         }
     }
 
-    fn new_internal_error<T: Display + ?Sized>(hidden_msg: &T) -> Self {
+    pub fn new_internal_error<T: Display + ?Sized>(hidden_msg: &T) -> Self {
         APIError {
             code: StatusCode::INTERNAL_SERVER_ERROR,
             hidden_msg: hidden_msg.to_string(),
@@ -101,15 +101,6 @@ pub async fn search(
     let timer_whole = Instant::now();
 
     info!("received query: {}", q.query);
-
-    //Initialise Database connection to retrieve article title and abstract for each document found for the query
-    let pool = PgPoolOptions::new()
-        .max_connections(1)
-        .connect(&data.connection_string)
-        .await
-        .map_err(|_e| {
-            APIError::new_internal_error("Failed to initialise connection with postgres")
-        })?;
 
     // construct + execute query
     let idx = data
@@ -174,7 +165,7 @@ pub async fn search(
     let future_documents = ordered_docs
         .into_iter() // consumes ordered_docs
         .map(|doc| {
-            let pool_cpy = pool.clone();
+            let pool_cpy = data.pool.clone();
             async move {
                 let sql = sqlx::query(
                     "SELECT a.title, c.abstracts
@@ -229,12 +220,6 @@ pub async fn relational(
 ) -> Result<impl Responder, APIError> {
     let timer = Instant::now();
 
-    let pool = PgPoolOptions::new()
-        .max_connections(1)
-        .connect(&data.connection_string)
-        .await
-        .map_err(|e| APIError::new_internal_error(&e))?;
-
     // construct + execute query
     let root_article = sqlx::query(
         "SELECT a.articleid
@@ -242,7 +227,7 @@ pub async fn relational(
         where a.title=$1",
     )
     .bind(q.root.clone())
-    .fetch_one(&pool)
+    .fetch_one(&data.pool)
     .await
     .map_err(|e| {
         APIError::new_user_error(
@@ -297,7 +282,7 @@ pub async fn relational(
     let documents = scored_documents
         .iter()
         .map(|doc| {
-            let pool_cpy = pool.clone();
+            let pool_cpy = data.pool.clone();
             async move {
                 let sql = sqlx::query(
                     "SELECT a.title, c.abstracts

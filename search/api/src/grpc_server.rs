@@ -2,6 +2,7 @@ use api_rs::wiki_search::{wiki_search_server::WikiSearch, CheckIndexReply, Check
 use index::index::Index;
 use index::index_builder::{IndexBuilder, SqlIndexBuilder};
 use log::info;
+use sqlx::{Pool, Postgres};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 use tonic::{Request, Response, Status};
@@ -12,6 +13,7 @@ use tonic::{Request, Response, Status};
 pub struct CheckIndexService {
     pub index: Arc<RwLock<Index>>,
     pub connection_string: String,
+    pub pool: Pool<Postgres>,
 }
 
 #[tonic::async_trait]

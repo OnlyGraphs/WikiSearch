@@ -2,6 +2,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use index::index::Index;
+use sqlx::Pool;
+use sqlx::Postgres;
 use std::sync::{Arc, RwLock};
 
 /// Represents the type of order to be imposed on list of documents
@@ -133,4 +135,5 @@ impl Default for DefaultPage {
 pub struct RESTSearchData {
     pub index_rest: Arc<RwLock<Index>>,
     pub connection_string: String, //Used to query Database for metadata results like Title or Abstracts
+    pub pool: Pool<Postgres>
 }
