@@ -128,7 +128,7 @@ test_serialize_deserialize!(
     (PosRange),
     PosRange {
         start_pos: 69,
-        end_pos_delta: 42
+        end_pos: 42
     }
 );
 

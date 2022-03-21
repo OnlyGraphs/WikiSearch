@@ -2,10 +2,10 @@ use crate::ast::{BinaryOp, Query, StructureElem, UnaryOp};
 
 use nom::{
     branch::alt,
-    bytes::complete::{tag, tag_no_case, take_until, take_while, take_while1},
+    bytes::complete::{is_not, tag, tag_no_case, take_until, take_while, take_while1},
     character::complete::{digit0, digit1},
     character::{is_alphanumeric, is_space},
-    combinator::eof,
+    combinator::{eof, not, peek},
     multi::{many1, separated_list0},
     sequence::terminated,
     IResult,
@@ -49,8 +49,6 @@ pub fn is_seperator(nxt: char) -> bool {
     return is_whitespace(nxt) | is_comma(nxt) | is_tab(nxt) | (nxt == '.');
 }
 
-
-
 // Parses any amount of whitespace, tab and comma separators
 pub fn parse_separator(nxt: &str) -> IResult<&str, &str> {
     take_while(is_seperator)(nxt)
@@ -60,8 +58,7 @@ pub fn parse_separator1(nxt: &str) -> IResult<&str, &str> {
     take_while1(is_seperator)(nxt)
 }
 
-
-pub fn parse_separator_untill_eof(nxt: &str) -> IResult<&str, &str>{
+pub fn parse_separator_untill_eof(nxt: &str) -> IResult<&str, &str> {
     let (nxt, _) = take_while(is_seperator)(nxt)?;
     eof(nxt)
 }
@@ -109,8 +106,6 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
     Ok((nxt, Box::new(dist_query)))
 }
 
-
-
 pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
     if nxt.chars().count() == 0 {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -143,18 +138,18 @@ fn parse_query_sub(nxt: &str) -> IResult<&str, Box<Query>> {
 
     alt((
         parse_structure_query,
-        parse_wildcard_query,
-        parse_relation_query,
         parse_dist_query,
         parse_binary_query,
         parse_not_query,
+        parse_wildcard_query,
+        parse_relation_query,
         parse_freetext_query,
         parse_phrase_query,
     ))(nxt)
 }
 
 pub fn parse_structure_query(nxt: &str) -> IResult<&str, Box<Query>> {
-    let (nxt,_) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     let (nxt, struct_elem) = parse_structure_elem(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, query) = parse_query_sub(nxt)?;
@@ -197,19 +192,20 @@ pub fn parse_structure_query(nxt: &str) -> IResult<&str, Box<Query>> {
 // }
 
 pub fn parse_freetext_query(nxt: &str) -> IResult<&str, Box<Query>> {
-    let (nxt,_) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     separated_list0(parse_whitespace, parse_token)(nxt)
         .map(|(nxt, res)| (nxt, Box::new(Query::FreetextQuery { tokens: res })))
 }
 
 pub fn parse_structure_elem(nxt: &str) -> IResult<&str, StructureElem> {
-    let (nxt,_) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
+
     let (nxt, _) = tag("#")(nxt)?;
     alt((
         tag_no_case("TITLE"),
         tag_no_case("CATEGORY"),
         tag_no_case("CITATION"),
-        parse_token_str
+        parse_token_str,
     ))(nxt) // TODO: also recognize any '#<infobox name>' names
     .map(|(nxt, res)| (nxt, res.into()))
 }
@@ -317,7 +313,7 @@ pub fn parse_wildcard_query(nxt: &str) -> IResult<&str, Box<Query>> {
 }
 
 pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
-    let (nxt,_) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     let (nxt, _) = tag_no_case("#LinksTo")(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, id) = digit0(nxt)?;
@@ -343,7 +339,7 @@ pub fn parse_simple_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
 // TODO: What if the title contains integers?
 pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
-    let (nxt,_) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     let (nxt, _) = tag_no_case("#LinksTo")(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, id) = digit0(nxt)?;
@@ -370,16 +366,16 @@ pub fn parse_nested_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
 }
 
 pub fn parse_relation_query(nxt: &str) -> IResult<&str, Box<Query>> {
-    let (nxt,_) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     alt((parse_nested_relation_query, parse_simple_relation_query))(nxt)
 }
 
 pub fn parse_phrase_query(nxt: &str) -> IResult<&str, Box<Query>> {
-    let (nxt , _) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     let (nxt, _) = tag("\"")(nxt)?;
-    let (nxt , _) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     let (nxt, tokens) = separated_list0(parse_separator1, parse_token)(nxt)?;
-    let (nxt , _) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator(nxt)?;
     let (nxt, _) = tag("\"")(nxt)?;
 
     Ok((nxt, Box::new(Query::PhraseQuery { tks: tokens })))
