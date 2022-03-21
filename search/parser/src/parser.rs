@@ -83,6 +83,15 @@ pub fn parse_dist_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, t1) = parse_token(nxt)?;
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, t2) = parse_token(nxt)?;
+    let (remainder, _) = parse_separator(nxt)?;
+    
+    if remainder.len() > 0 {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            //the new struct, instead of the tuple
+            "Too many elements. Not a dist query.",
+            nom::error::ErrorKind::Tag,
+        )));
+    }
 
     let dst: u32;
 
@@ -137,8 +146,8 @@ fn parse_query_sub(nxt: &str) -> IResult<&str, Box<Query>> {
     }
 
     alt((
-        parse_structure_query,
         parse_dist_query,
+        parse_structure_query,
         parse_binary_query,
         parse_not_query,
         parse_wildcard_query,
@@ -151,6 +160,15 @@ fn parse_query_sub(nxt: &str) -> IResult<&str, Box<Query>> {
 pub fn parse_structure_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, struct_elem) = parse_structure_elem(nxt)?;
+
+    if struct_elem == StructureElem::Infobox("dist".to_string()) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            //the new struct, instead of the tuple
+            "detected DIST. Not a structure query",
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, query) = parse_query_sub(nxt)?;
 
