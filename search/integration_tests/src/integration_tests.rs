@@ -193,8 +193,8 @@ fn test_phrase_query() {
 
     assert_eq!(
         q,
-        Query::PhraseQuery {
-            tks: vec!["bike".to_string()],
+        Query::FreetextQuery {
+            tokens: vec!["bike".to_string()],
         }
     )
 }
