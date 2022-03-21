@@ -5,10 +5,11 @@ ARGS=''
 export SQLX_OFFLINE=true
 export DATABASE_URL=postgresql://postgres:password@localhost:8001/only_graph
 export SEARCH_PORT=8000
-export RUST_LOG=debug,search_api=debug,index=debug,retrieval=debug,parser=debug,search_lib=debug,search_api=debug,actix_web=info,sqlx=off
+export RUST_LOG=debug,sqlx=off
 export BACKEND=http://localhost:8000
 export RUST_BACKTRACE=1
 export CACHE_SIZE=500000
+export SQL_MAX_CLIENTS=100
 run_img: #build_img
 	docker run \
 		-e SEARCH_PORT \
@@ -18,6 +19,7 @@ run_img: #build_img
 		-e RUST_LOG=${RUST_LOG} \
 		-e STATIC_DIR=./out \
 		-e CACHE_SIZE=${CACHE_SIZE} \
+		-e SQL_MAX_CLIENTS=${SQL_MAX_CLIENTS} \
 		--rm -a stdin -a stdout -a stderr --network "host" ${IMAGE_NAME}:${IMAGE_VERSION} \
 
 build_img:

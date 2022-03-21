@@ -4,10 +4,14 @@ use index::{index::Index, index_structs::Posting, PosRange};
 
 use itertools::Itertools;
 
+use log::info;
 use parser::errors::{QueryError, QueryErrorKind};
 use parser::{ast::Query, BinaryOp, UnaryOp};
 use preprocessor::{Preprocessor, ProcessingOptions};
+use once_cell::sync::Lazy;
 
+
+use std::ops::Deref;
 use std::{
     collections::{HashMap, VecDeque},
     iter::empty,
@@ -27,16 +31,19 @@ pub struct ScoredRelationDocument {
     pub hops: u8,
 }
 
-pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
-    // first pass, preprocess
-    let ref opts = ProcessingOptions::default();
-    let ref opts_wild_card = ProcessingOptions {
+    
+static opts : Lazy<ProcessingOptions> = Lazy::new(|| ProcessingOptions::default());
+
+static opts_wild_card : Lazy<ProcessingOptions> = Lazy::new(|| ProcessingOptions {
         tokenisation_options: Default::default(),
         fold_case: true,
-        remove_stop_words: false, //Set to false , to avoid edge cases like the*ter (theater, where "the" can be considered a stop word)
-        normalisation: preprocessor::Normalisation::None, //no stemming as that would lose structure of query? 
+        remove_stop_words: false, 
+        normalisation: preprocessor::Normalisation::None, 
         remove_url: false, 
-    };
+    }
+);
+
+pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
 
     match *query {
         Query::RelationQuery { ref mut sub, .. } => {
@@ -52,17 +59,33 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
             preprocess_query(lhs)?;
             preprocess_query(rhs)?;
         }
-        Query::PhraseQuery { ref mut tks } => {
-            *tks = tks
-                .into_iter()
-                .flat_map(|c| Preprocessor::process(opts, c.to_string()))
-                .filter(|w| !w.trim().is_empty())
-                .collect()
+        ref mut q @ Query::PhraseQuery { .. }  => {
+
+            let tks = match q {
+                Query::PhraseQuery { ref mut tks } => {
+                    *tks = tks
+                    .into_iter()
+                    .flat_map(|c| Preprocessor::process(opts.deref(), c.to_string()))
+                    .filter(|w| !w.trim().is_empty())
+                    .collect();
+                    if tks.len() <= 1{
+                        Some(tks.clone())
+                    } else {
+                        None
+                    }
+                },
+                _ => panic!(),
+            };
+            if let Some(tks) = tks {
+                *q = Query::FreetextQuery {
+                    tokens: tks,
+                } 
+            };
         }
         Query::FreetextQuery { ref mut tokens } => {
             *tokens = tokens
                 .into_iter()
-                .flat_map(|c| Preprocessor::process(opts, c.to_string()))
+                .flat_map(|c| Preprocessor::process(opts.deref(), c.to_string()))
                 .filter(|w| !w.trim().is_empty())
                 .collect()
         }
@@ -71,7 +94,7 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
             ref mut rhs,
             ..
         } => {
-            *lhs = Preprocessor::process(opts, lhs.clone())
+            *lhs = Preprocessor::process(opts.deref(), lhs.clone())
                 .into_iter()
                 .next()
                 .ok_or(QueryError {
@@ -80,7 +103,7 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
                         .to_string(),
                     pos: lhs.to_string(),
                 })?;
-            *rhs = Preprocessor::process(opts, rhs.clone())
+            *rhs = Preprocessor::process(opts.deref(), rhs.clone())
                 .into_iter()
                 .next()
                 .ok_or(QueryError {
@@ -96,11 +119,11 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
         } => {
             // *prefix = prefix.to_lowercase(); // needs a more thorough look
             // *suffix = suffix.to_lowercase();
-            *prefix = Preprocessor::process(opts_wild_card, prefix.to_string())
+            *prefix = Preprocessor::process(opts_wild_card.deref(), prefix.to_string())
                 .into_iter()
                 .filter(|w| !w.trim().is_empty())
                 .collect();
-            *suffix = Preprocessor::process(opts_wild_card, suffix.to_string())
+            *suffix = Preprocessor::process(opts_wild_card.deref(), suffix.to_string())
                 .into_iter()
                 .filter(|w| !w.trim().is_empty())
                 .collect();

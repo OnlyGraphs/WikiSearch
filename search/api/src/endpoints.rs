@@ -110,9 +110,10 @@ pub async fn search(
     let (_, ref mut query) = parse_query(&q.query).map_err(|e| APIError::new_user_error(&e, &e))?;
 
     let mut timer = Instant::now();
-    preprocess_query(query).map_err(|e| APIError::new_user_error(&e, &e))?;
+    preprocess_query(query)
+        .map_err(|e| APIError::new_user_error(&e, &e))?;
     info!(
-        "preproced query: {:?}, {}s",
+        "preprocessed query: {:?}, {}s",
         query,
         timer.elapsed().as_secs_f32()
     );

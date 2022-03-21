@@ -1437,3 +1437,25 @@ fn test_relational_search() {
         ]
     );
 }
+
+
+#[test]
+fn test_preprocess_singular_phrase() {
+
+  
+    let mut q = 
+        Box::new(Query::PhraseQuery {
+            tks: vec!["april".to_string()],
+        });
+
+    preprocess_query(&mut q).unwrap();
+
+    assert_eq!(
+        q,
+        Box::new(Query::FreetextQuery {
+            tokens: vec!["april".to_string()]
+        })
+    );
+
+  
+}

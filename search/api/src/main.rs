@@ -34,6 +34,7 @@ const DEFAULT_STATICFILES_DIR: &str = "./staticfiles";
 const DEFAULT_GRPC_ADDRESS: &str = "127.0.0.1:50051";
 const DEFAULT_REST_IP: &str = "127.0.0.1";
 const DEFAULT_REST_PORT: &str = "8000";
+const DEFAULT_SQL_MAX_CLIENTS: &str = "100";
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -50,8 +51,10 @@ async fn main() -> std::io::Result<()> {
     let rest_ip: String = env::var("SEARCH_IP").unwrap_or(DEFAULT_REST_IP.to_string());
     let rest_port = env::var("SEARCH_PORT").unwrap_or(DEFAULT_REST_PORT.to_string());
     let static_serve_dir = env::var("STATIC_DIR").unwrap_or(DEFAULT_STATICFILES_DIR.to_string());
+    let max_clients = env::var("SQL_MAX_CLIENTS").unwrap_or(DEFAULT_SQL_MAX_CLIENTS.to_string());
+
     let pool = PgPoolOptions::new()
-        .max_connections(150)
+        .max_connections(max_clients.parse::<u32>().unwrap_or(150))
         // .connect_lazy(&connection_string)
         .connect(&connection_string)
         .await
