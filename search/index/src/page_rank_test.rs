@@ -390,7 +390,7 @@ fn test_page_rank_converged_4() {
         outgoing_links.insert(n, out_links);
     }
 
-    let d = 0.15;
+    let d = 1.0/7.0;
     println!("Commencing page rank computation");
     let mut page_rank = incoming_links.keys().map(|k| (*k,1.0/100.0)).collect::<HashMap<u32,f64>>();
     update_all_page_ranks(&outgoing_links, &incoming_links, &mut page_rank, d);
@@ -404,9 +404,6 @@ fn test_page_rank_converged_4() {
             println!("Page rank did not converge!");
             break;
         } else {
-            for (key, value) in &page_rank {
-                println!("Page: {}, Page rank: {}", key, value);
-            }
             iterations += 1;
         }
     }
