@@ -454,6 +454,71 @@ fn test_parse_query_with_structure_query() {
     assert_eq!(expected, actual);
 }
 
+#[test]
+fn test_complex_structural_binary_query() {
+    let query = "Boris,AND,Johnson,AND,#CATEGORY, Prime Ministers of the United Kingdom";
+    let expected = Box::new(Query::BinaryQuery {
+        op: BinaryOp::And,
+        lhs : Box::new(
+            Query::FreetextQuery { tokens : vec!["Boris".to_string()]}
+        ),
+        rhs : Box::new(
+            Query::BinaryQuery {
+                op : BinaryOp::And,
+                lhs : Box::new(
+                    Query::FreetextQuery { tokens : vec!["Johnson".to_string()]}
+                ),
+                rhs : Box::new(
+                    Query::StructureQuery {
+                        elem : StructureElem::Category,
+                        sub : Box::new(
+                            Query::FreetextQuery {
+                                tokens : vec!["Prime".to_string(), "Ministers".to_string(), "of".to_string(), "the".to_string(), "United".to_string(), "Kingdom".to_string()]
+                            }
+                        )
+                    }
+                ),
+            }
+        )
+    });
+    let (_, actual) = parse_query(query).unwrap();
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn test_complex_structural_binary_query_2() {
+    let query = "#CATEGORY, Prime Ministers of the United Kingdom,AND,Boris,AND,Johnson";
+    let expected = Box::new(
+        Query::StructureQuery {
+            elem : StructureElem::Category,
+            sub : Box::new(
+                Query::BinaryQuery{
+                    op : BinaryOp::And,
+                    lhs : Box::new(
+                        Query::FreetextQuery {
+                            tokens : vec!["Prime".to_string(), "Ministers".to_string(), "of".to_string(), "the".to_string(), "United".to_string(), "Kingdom".to_string()]
+                        }
+                    ),
+                    rhs : Box::new(
+                        Query::BinaryQuery {
+                            op : BinaryOp::And,
+                            lhs: Box::new(
+                                Query::FreetextQuery { tokens : vec!["Boris".to_string()]}
+                            ),
+                            rhs: Box::new(
+                                Query::FreetextQuery { tokens : vec!["Johnson".to_string()]}
+                            ),
+                        }
+                    ),
+                }
+                
+            )
+        }
+    );
+    let (_, actual) = parse_query(query).unwrap();
+    assert_eq!(expected, actual);
+}
+
 // test for left associativity for both operators
 // right associativity is fine too you can adapt this, but specify in the grammar the associativity and precedence
 //
