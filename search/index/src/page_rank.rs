@@ -22,7 +22,7 @@ pub fn init_page_rank(ids: &HashMap<u32, Vec<u32>>, init_value: f64) -> HashMap<
 pub fn update_page_rank(page: u32, d: f64, in_links: &Vec<u32>, page_ranks: &mut HashMap<u32, f64>, out_links: &HashMap<u32, Vec<u32>>, prev_page_ranks: &HashMap<u32, f64>) -> f64 {
 
     //let previous_page_rank = *page_ranks.get(&page).unwrap(); // guaranteed to exist
-    let mut page_rank = d/in_links.len();
+    let mut page_rank = d/(in_links.len() as f64);
     let mut summed = 0.0;
     let mut delta = 0.0;
     for page in in_links {
@@ -41,7 +41,7 @@ pub fn update_page_rank(page: u32, d: f64, in_links: &Vec<u32>, page_ranks: &mut
     page_rank = page_rank + (1.0-d)*(summed as f64);
     page_ranks.insert(page,page_rank); // should always replace an old key
 
-    return (page_rank-prev_page_ranks.get(page).unwrap()).abs()
+    return (page_rank-prev_page_ranks.get(&page).unwrap()).abs()
 }
 
 // Normalize the page ranks to be within the range 0 and 1
@@ -95,7 +95,7 @@ pub fn update_all_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_l
 }
 
 pub fn compute_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_links: &HashMap<u32, Vec<u32>>, d:f64) -> HashMap<u32, f64> {
-    let mut page_rank = incoming_links.keys().map(|k| (*k,1/incoming_links.keys().len())).collect::<HashMap<u32,f64>>();
+    let mut page_rank = incoming_links.keys().map(|k| (*k,1.0/(incoming_links.keys().len() as f64))).collect::<HashMap<u32,f64>>();
     update_all_page_ranks(outgoing_links, incoming_links, &mut page_rank, d);
 
     let mut max_iters = std::env::var("PAGE_RANK_ITERS").unwrap_or("70".to_string())
@@ -113,5 +113,7 @@ pub fn compute_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_link
         timer = Instant::now();
     }
 
-    return softmax(page_rank);
+    softmax(&mut page_rank);
+
+    return page_rank;
 }
