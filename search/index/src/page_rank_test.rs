@@ -42,13 +42,14 @@ fn test_update_page_rank_simple() {
     out_links.insert(0, linked_pages_2);
 
     let page = 0;
-    let d = 0.85;
+    let d = 0.15;
     // Only page 1 links to page 0
     let in_links = vec![1];
 
     update_page_rank(page, d, &in_links, &mut current_pr, &out_links, &old_pr);
-    let expected_pr = 0.15;
+    let expected_pr = (0.15/3.0);
     let pr = current_pr.get(&page).unwrap();
+    println!("Simple test 1: {}", pr);
     assert!((pr - expected_pr).abs() < 0.000001);
 }
 
@@ -80,10 +81,10 @@ fn test_update_page_rank_complex_1() {
     old_pr.insert(2, 0.9);
     old_pr.insert(3, 1.0);
 
-    update_page_rank(page, 0.85, &in_links, &mut current_pr, &out_links, &old_pr);
+    update_page_rank(page, 0.15, &in_links, &mut current_pr, &out_links, &old_pr);
     let updated_pr = current_pr.get(&page).unwrap();
 
-    let expected_pr = 2.2325;
+    let expected_pr = (0.15/4.0)+(0.85*((1.5/1.0)+(0.9/2.0)+(1.0/2.0)));
     assert!((updated_pr-expected_pr).abs() < 0.000001);
 }
 
@@ -147,19 +148,18 @@ pub fn test_update_page_rank_for_all_simple_step1() {
     current_pr.insert(0, 0.0);
     current_pr.insert(2, 0.0);
 
-    let pr_0 = 0.15+0.85*((current_pr.get(&1).unwrap()/2.0)+(current_pr.get(&2).unwrap()/2.0));
-    let pr_1 = 0.15+0.85*((current_pr.get(&0).unwrap()/1.0)+(current_pr.get(&2).unwrap()/2.0));
-    let pr_2 = 0.15+0.85*((current_pr.get(&1).unwrap()/2.0));
-    let op_pr_0 = pr_0/(pr_0+pr_1+pr_2);
-    let op_pr_1 = pr_1/(pr_0+pr_1+pr_2);
-    let op_pr_2 = pr_2/(pr_0+pr_1+pr_2);
-
-    update_all_page_ranks(&outgoing_links, &incoming_links, &mut current_pr, 0.85);
+    let pr_0 = (0.15/3.0)+0.85*((current_pr.get(&1).unwrap()/2.0)+(current_pr.get(&2).unwrap()/2.0));
+    let pr_1 = (0.15/3.0)+0.85*((current_pr.get(&0).unwrap()/1.0)+(current_pr.get(&2).unwrap()/2.0));
+    let pr_2 = (0.15/3.0)+0.85*((current_pr.get(&1).unwrap()/2.0));
+    println!("{}", pr_0);
+    println!("{}", pr_1);
+    println!("{}", pr_2);
+    update_all_page_ranks(&outgoing_links, &incoming_links, &mut current_pr, 0.15);
 
     let mut expected_pr = HashMap::new();
-    expected_pr.insert(0, op_pr_0);
-    expected_pr.insert(1, op_pr_1);
-    expected_pr.insert(2, op_pr_2);
+    expected_pr.insert(0, pr_0);
+    expected_pr.insert(1, pr_1);
+    expected_pr.insert(2, pr_2);
 
     assert!(page_rank_converged(&current_pr, &expected_pr));
 
@@ -180,23 +180,24 @@ pub fn test_update_page_rank_for_all_simple_step2() {
     incoming_links.insert(2, vec![1]);
 
     let mut current_pr = HashMap::new();
-    current_pr.insert(1, 0.15);
-    current_pr.insert(0, 0.15);
-    current_pr.insert(2, 0.15);
+    current_pr.insert(1, 0.049999999999999996);
+    current_pr.insert(0, 0.049999999999999996);
+    current_pr.insert(2, 0.049999999999999996);
 
-    let pr_0 = 0.15+0.85*((current_pr.get(&1).unwrap()/2.0)+(current_pr.get(&2).unwrap()/2.0));
-    let pr_1 = 0.15+0.85*((current_pr.get(&0).unwrap()/1.0)+(current_pr.get(&2).unwrap()/2.0));
-    let pr_2 = 0.15+0.85*((current_pr.get(&1).unwrap()/2.0));
-    let op_pr_0 = pr_0/(pr_0+pr_1+pr_2);
-    let op_pr_1 = pr_1/(pr_0+pr_1+pr_2);
-    let op_pr_2 = pr_2/(pr_0+pr_1+pr_2);
+    let pr_0 = (0.15/3.0)+0.85*((current_pr.get(&1).unwrap()/2.0)+(current_pr.get(&2).unwrap()/2.0));
+    let pr_1 = (0.15/3.0)+0.85*((current_pr.get(&0).unwrap()/1.0)+(current_pr.get(&2).unwrap()/2.0));
+    let pr_2 = (0.15/3.0)+0.85*((current_pr.get(&1).unwrap()/2.0));
+    
+    println!("0: {}", pr_0);
+    println!("1: {}", pr_1);
+    println!("2: {}", pr_2);
 
-    update_all_page_ranks(&outgoing_links, &incoming_links, &mut current_pr, 0.85);
+    update_all_page_ranks(&outgoing_links, &incoming_links, &mut current_pr, 0.15);
 
     let mut expected_pr = HashMap::new();
-    expected_pr.insert(0, op_pr_0);
-    expected_pr.insert(1, op_pr_1);
-    expected_pr.insert(2, op_pr_2);
+    expected_pr.insert(0, pr_0);
+    expected_pr.insert(1, pr_1);
+    expected_pr.insert(2, pr_2);
 
     assert!(page_rank_converged(&current_pr, &expected_pr));
 }
@@ -215,23 +216,20 @@ pub fn test_update_page_rank_for_all_simple_step3() {
     incoming_links.insert(2, vec![1]);
 
     let mut current_pr = HashMap::new();
-    current_pr.insert(1, 0.4099099099099099);
-    current_pr.insert(0, 0.33333333333333337);
-    current_pr.insert(2, 0.2567567567567568);
+    current_pr.insert(1, 0.11374999999999999);
+    current_pr.insert(0, 0.0925);
+    current_pr.insert(2, 0.07125);
 
-    let pr_0 = 0.15+0.85*((current_pr.get(&1).unwrap()/2.0)+(current_pr.get(&2).unwrap()/2.0));
-    let pr_1 = 0.15+0.85*((current_pr.get(&0).unwrap()/1.0)+(current_pr.get(&2).unwrap()/2.0));
-    let pr_2 = 0.15+0.85*((current_pr.get(&1).unwrap()/2.0));
-    let op_pr_0 = pr_0/(pr_0+pr_1+pr_2);
-    let op_pr_1 = pr_1/(pr_0+pr_1+pr_2);
-    let op_pr_2 = pr_2/(pr_0+pr_1+pr_2);
+    let pr_0 = (0.15/3.0)+0.85*((current_pr.get(&1).unwrap()/2.0)+(current_pr.get(&2).unwrap()/2.0));
+    let pr_1 = (0.15/3.0)+0.85*((current_pr.get(&0).unwrap()/1.0)+(current_pr.get(&2).unwrap()/2.0));
+    let pr_2 = (0.15/3.0)+0.85*((current_pr.get(&1).unwrap()/2.0));
 
-    update_all_page_ranks(&outgoing_links, &incoming_links, &mut current_pr, 0.85);
+    update_all_page_ranks(&outgoing_links, &incoming_links, &mut current_pr, 0.15);
 
     let mut expected_pr = HashMap::new();
-    expected_pr.insert(0, op_pr_0);
-    expected_pr.insert(1, op_pr_1);
-    expected_pr.insert(2, op_pr_2);
+    expected_pr.insert(0, pr_0);
+    expected_pr.insert(1, pr_1);
+    expected_pr.insert(2, pr_2);
 
     assert!(page_rank_converged(&current_pr, &expected_pr));
 }
@@ -248,7 +246,7 @@ fn test_calculate_page_rank() {
     incoming_links.insert(1, vec![0, 2]);
     incoming_links.insert(2, vec![1]);
 
-    let pr = compute_page_ranks(&outgoing_links, &incoming_links, 0.85);
+    let pr = compute_page_ranks(&outgoing_links, &incoming_links, 0.15);
 
 }
 
@@ -265,9 +263,9 @@ fn test_page_rank_converged_1() {
     incoming_links.insert(1, vec![0,2]);
     incoming_links.insert(2, vec![1]);
 
-    let d = 0.85;
+    let d = 0.15;
 
-    let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
+    let mut page_rank = incoming_links.keys().map(|k| (*k,1.0/3.0)).collect::<HashMap<u32,f64>>();
     update_all_page_ranks(&outgoing_links, &incoming_links, &mut page_rank, d);
 
     let mut iterations = 1;
@@ -300,9 +298,9 @@ fn test_page_rank_converged_2() {
     incoming_links.insert(2, vec![1,3]);
     incoming_links.insert(3, vec![2]);
 
-    let d = 0.85;
+    let d = 0.15;
 
-    let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
+    let mut page_rank = incoming_links.keys().map(|k| (*k,1.0/4.0)).collect::<HashMap<u32,f64>>();
     update_all_page_ranks(&outgoing_links, &incoming_links, &mut page_rank, d);
 
     let mut iterations = 1;
@@ -337,9 +335,9 @@ fn test_page_rank_converged_3() {
     incoming_links.insert(3, vec![2]);
     incoming_links.insert(4, vec![0,1,2,3]);
 
-    let d = 0.85;
+    let d = 0.15;
 
-    let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
+    let mut page_rank = incoming_links.keys().map(|k| (*k,1.0/5.0)).collect::<HashMap<u32,f64>>();
     update_all_page_ranks(&outgoing_links, &incoming_links, &mut page_rank, d);
 
     let mut iterations = 1;
@@ -392,9 +390,9 @@ fn test_page_rank_converged_4() {
         outgoing_links.insert(n, out_links);
     }
 
-    let d = 0.85;
+    let d = 0.15;
     println!("Commencing page rank computation");
-    let mut page_rank = incoming_links.keys().map(|k| (*k,0.0)).collect::<HashMap<u32,f64>>();
+    let mut page_rank = incoming_links.keys().map(|k| (*k,1.0/100.0)).collect::<HashMap<u32,f64>>();
     update_all_page_ranks(&outgoing_links, &incoming_links, &mut page_rank, d);
 
     let mut iterations = 1;
@@ -402,10 +400,13 @@ fn test_page_rank_converged_4() {
         if update_all_page_ranks(&outgoing_links, &incoming_links,&mut page_rank, d){
             println!("Number of iterations until convergence: {}", iterations);
             break;
-        } else if iterations > 1000 {
+        } else if iterations > 52 {
             println!("Page rank did not converge!");
             break;
         } else {
+            for (key, value) in &page_rank {
+                println!("Page: {}, Page rank: {}", key, value);
+            }
             iterations += 1;
         }
     }

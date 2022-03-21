@@ -1,4 +1,4 @@
-use std::{collections::HashMap, cmp::max, time::Instant, f64::INFINITY};
+use std::{collections::HashMap, cmp::max, time::Instant};
 
 use log::info;
 
@@ -22,7 +22,7 @@ pub fn init_page_rank(ids: &HashMap<u32, Vec<u32>>, init_value: f64) -> HashMap<
 pub fn update_page_rank(page: u32, d: f64, in_links: &Vec<u32>, page_ranks: &mut HashMap<u32, f64>, out_links: &HashMap<u32, Vec<u32>>, prev_page_ranks: &HashMap<u32, f64>) -> f64 {
 
     //let previous_page_rank = *page_ranks.get(&page).unwrap(); // guaranteed to exist
-    let mut page_rank = d/(in_links.len() as f64);
+    let mut page_rank = d/(page_ranks.keys().len() as f64);
     let mut summed = 0.0;
     let mut delta = 0.0;
     for page in in_links {
@@ -37,31 +37,11 @@ pub fn update_page_rank(page: u32, d: f64, in_links: &Vec<u32>, page_ranks: &mut
 
         summed = summed + (pr/ca_len);
     }
-    
+    //println!("Interim: {}, {}, {}", page_rank, (1.0-d), summed);
     page_rank = page_rank + (1.0-d)*(summed as f64);
     page_ranks.insert(page,page_rank); // should always replace an old key
 
     return (page_rank-prev_page_ranks.get(&page).unwrap()).abs()
-}
-
-// Normalize the page ranks to be within the range 0 and 1
-// Returns the change in page rank from the previous iteration
-pub fn normalize_pr(min: f64, max: f64, page_ranks: &mut HashMap<u32, f64>, prev_page_ranks: &HashMap<u32, f64>) -> f64 {
-
-    let mut delta = 0.0;
-
-    page_ranks.iter_mut().for_each(|(page, page_rank)|  {
-        // Normalize the new page rank
-        let normalized_page_rank = (*page_rank-min)/(max-min);
-        
-        let prev_page_rank = prev_page_ranks.get(&page).unwrap();
-        delta += (normalized_page_rank-prev_page_rank).abs();
-
-        // update page rank
-        *page_rank = normalized_page_rank;
-    });
-
-    return delta;
 }
 
 pub fn softmax(page_ranks: &mut HashMap<u32, f64>) {
@@ -85,13 +65,13 @@ pub fn softmax(page_ranks: &mut HashMap<u32, f64>) {
 pub fn update_all_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_links: &HashMap<u32, Vec<u32>>, current_pr: &mut HashMap<u32, f64>, d: f64) -> bool {
     
     let old_pr = current_pr.clone();
-    let delta = 0.0;
+    let mut delta = 0.0;
 
     for (page, in_links) in incoming_links {
         delta += update_page_rank(*page, d, in_links,current_pr, outgoing_links, &old_pr);
     }
-
-    return delta < 0.000001*(current_pr.keys().len() as f64);
+    println!("Delta: {}", delta);
+    return delta < 0.0001*(current_pr.keys().len() as f64);
 }
 
 pub fn compute_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_links: &HashMap<u32, Vec<u32>>, d:f64) -> HashMap<u32, f64> {
