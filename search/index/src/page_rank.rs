@@ -71,7 +71,7 @@ pub fn update_all_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_l
         delta += update_page_rank(*page, d, in_links,current_pr, outgoing_links, &old_pr);
     }
     
-    return delta < 0.0000001*(current_pr.keys().len() as f64);
+    return delta < 0.0000001;
 }
 
 pub fn compute_page_ranks(outgoing_links: &HashMap<u32, Vec<u32>>, incoming_links: &HashMap<u32, Vec<u32>>, d:f64) -> HashMap<u32, f64> {

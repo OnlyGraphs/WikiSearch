@@ -123,9 +123,9 @@ pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
     alt((
         terminated(parse_relation_query, parse_separator_untill_eof),
         terminated(parse_dist_query, parse_separator_untill_eof),
+        terminated(parse_structure_query, parse_separator_untill_eof),
         terminated(parse_binary_query, parse_separator_untill_eof),
         terminated(parse_not_query, parse_separator_untill_eof),
-        terminated(parse_structure_query, parse_separator_untill_eof),
         terminated(parse_phrase_query, parse_separator_untill_eof),
         terminated(parse_freetext_query, parse_separator_untill_eof),
         terminated(parse_wildcard_query, parse_separator_untill_eof),
@@ -142,9 +142,10 @@ fn parse_query_sub(nxt: &str) -> IResult<&str, Box<Query>> {
     }
 
     alt((
+        parse_structure_query,
+        parse_wildcard_query,
         parse_relation_query,
         parse_dist_query,
-        parse_structure_query,
         parse_binary_query,
         parse_not_query,
         parse_freetext_query,
