@@ -33,7 +33,7 @@ impl From<&str> for StructureElem {
 
 impl From<StructureElem> for String {
     fn from(val: StructureElem) -> Self {
-        match val{
+        match val {
             StructureElem::Title => "Title".to_string(),
             StructureElem::Category => "Category".to_string(),
             StructureElem::Citation => "Citation".to_string(),
@@ -103,7 +103,7 @@ impl Display for StructureElem {
             StructureElem::Title => write!(f, "#TITLE"),
             StructureElem::Category => write!(f, "#CATEGORY"),
             StructureElem::Citation => write!(f, "#CITATION"),
-            StructureElem::Infobox(str) => write!(f, "{}", str),
+            StructureElem::Infobox(str) => write!(f, "#{}", str),
         }
     }
 }
@@ -113,11 +113,11 @@ impl Display for Query {
         match self {
             Query::BinaryQuery { op, lhs, rhs } => write!(f, "{} {} {}", lhs, op, rhs),
             Query::UnaryQuery { op, sub } => write!(f, "{} {}", op, sub),
-            Query::PhraseQuery { tks } => write!(f, "{}", tks.join(" ")),
+            Query::PhraseQuery { tks } => write!(f, "\"{}\"", tks.join(" ")),
             Query::DistanceQuery { dst, lhs, rhs } => {
                 write!(f, "{},{},{},{}", crate::parser::DIST_TAG, dst, lhs, rhs)
             }
-            Query::StructureQuery { elem, sub } => write!(f, "{}: {}", elem, sub),
+            Query::StructureQuery { elem, sub } => write!(f, "{}, {}", elem, sub),
             Query::RelationQuery { root, hops, sub } => {
                 write!(f, "root:{}\n hops:{}\n query:{:?}", root, hops, sub) //TODO: Probably need to do this in a better way
             }
