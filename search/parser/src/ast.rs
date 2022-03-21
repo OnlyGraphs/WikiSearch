@@ -115,7 +115,14 @@ impl Display for Query {
             Query::UnaryQuery { op, sub } => write!(f, "{} {}", op, sub),
             Query::PhraseQuery { tks } => write!(f, "\"{}\"", tks.join(" ")),
             Query::DistanceQuery { dst, lhs, rhs } => {
-                write!(f, "{},{},{},{}", crate::parser::DIST_TAG, dst, lhs, rhs)
+                write!(
+                    f,
+                    "{},{},{},{}",
+                    crate::parser::DIST_TAG.to_uppercase(),
+                    dst,
+                    lhs,
+                    rhs
+                )
             }
             Query::StructureQuery { elem, sub } => write!(f, "{}, {}", elem, sub),
             Query::RelationQuery { root, hops, sub } => {

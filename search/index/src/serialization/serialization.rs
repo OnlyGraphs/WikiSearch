@@ -712,13 +712,13 @@ impl<T: Serializable> Serializable for Option<T> {
 impl Serializable for PosRange {
     fn serialize<W: Write>(&self, buf: &mut W) -> usize {
         buf.write_u32::<NativeEndian>(self.start_pos).unwrap();
-        buf.write_u32::<NativeEndian>(self.end_pos_delta).unwrap();
+        buf.write_u32::<NativeEndian>(self.end_pos).unwrap();
         8
     }
 
     fn deserialize<R: Read>(&mut self, buf: &mut R) -> usize {
         self.start_pos = buf.read_u32::<NativeEndian>().unwrap();
-        self.end_pos_delta = buf.read_u32::<NativeEndian>().unwrap();
+        self.end_pos = buf.read_u32::<NativeEndian>().unwrap();
         8
     }
 }

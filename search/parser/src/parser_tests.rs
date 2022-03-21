@@ -1,8 +1,6 @@
 use crate::{
     ast::{BinaryOp, Query, StructureElem, UnaryOp},
-    parser::{
-        is_comma, is_tab, parse_query,
-    },
+    parser::{is_comma, is_tab, parse_query},
 };
 
 // AST Helper Functions
@@ -60,6 +58,27 @@ fn test_dist_query_2() {
         Query::DistanceQuery { dst, lhs, rhs } => {
             assert!(dst == 3 && lhs == "pumpkin" && rhs == "pie")
         }
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_complex_dist_with_binary_query() {
+    let query = "borisss, AND, #DIST,4,boris ,johnson,";
+
+    let (_s, dist_node) = parse_query(query).unwrap();
+
+    let l = Box::new(Query::FreetextQuery {
+        tokens: vec!["borisss".to_string()],
+    });
+    let r = Box::new(Query::DistanceQuery {
+        dst: 4,
+        lhs: "boris".to_string(),
+        rhs: "johnson".to_string(),
+    });
+    match *dist_node {
+        Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::And && lhs == l && rhs == r),
+
         _ => assert!(false),
     }
 }
@@ -410,19 +429,14 @@ fn test_compound_query_or_and_2() {
     );
 }
 
-
 #[test]
 fn test_parse_simple_phrase_query_no_spaces() {
     let query = "\"April\"";
-    let expected_tks = vec![
-        "April".to_string(),
-    ];
+    let expected_tks = vec!["April".to_string()];
     let expected = Box::new(Query::PhraseQuery { tks: expected_tks });
     let (_, actual) = parse_query(query).unwrap();
     assert!(actual == expected);
 }
-
-
 
 #[test]
 fn test_parse_simple_phrase_query() {
@@ -546,27 +560,28 @@ fn test_complex_structural_binary_query() {
     let query = "Boris,AND,Johnson,AND,#CATEGORY, Prime Ministers of the United Kingdom";
     let expected = Box::new(Query::BinaryQuery {
         op: BinaryOp::And,
-        lhs : Box::new(
-            Query::FreetextQuery { tokens : vec!["Boris".to_string()]}
-        ),
-        rhs : Box::new(
-            Query::BinaryQuery {
-                op : BinaryOp::And,
-                lhs : Box::new(
-                    Query::FreetextQuery { tokens : vec!["Johnson".to_string()]}
-                ),
-                rhs : Box::new(
-                    Query::StructureQuery {
-                        elem : StructureElem::Category,
-                        sub : Box::new(
-                            Query::FreetextQuery {
-                                tokens : vec!["Prime".to_string(), "Ministers".to_string(), "of".to_string(), "the".to_string(), "United".to_string(), "Kingdom".to_string()]
-                            }
-                        )
-                    }
-                ),
-            }
-        )
+        lhs: Box::new(Query::FreetextQuery {
+            tokens: vec!["Boris".to_string()],
+        }),
+        rhs: Box::new(Query::BinaryQuery {
+            op: BinaryOp::And,
+            lhs: Box::new(Query::FreetextQuery {
+                tokens: vec!["Johnson".to_string()],
+            }),
+            rhs: Box::new(Query::StructureQuery {
+                elem: StructureElem::Category,
+                sub: Box::new(Query::FreetextQuery {
+                    tokens: vec![
+                        "Prime".to_string(),
+                        "Ministers".to_string(),
+                        "of".to_string(),
+                        "the".to_string(),
+                        "United".to_string(),
+                        "Kingdom".to_string(),
+                    ],
+                }),
+            }),
+        }),
     });
     let (_, actual) = parse_query(query).unwrap();
     assert_eq!(expected, actual);
@@ -575,33 +590,31 @@ fn test_complex_structural_binary_query() {
 #[test]
 fn test_complex_structural_binary_query_2() {
     let query = "#CATEGORY, Prime Ministers of the United Kingdom,AND,Boris,AND,Johnson";
-    let expected = Box::new(
-        Query::StructureQuery {
-            elem : StructureElem::Category,
-            sub : Box::new(
-                Query::BinaryQuery{
-                    op : BinaryOp::And,
-                    lhs : Box::new(
-                        Query::FreetextQuery {
-                            tokens : vec!["Prime".to_string(), "Ministers".to_string(), "of".to_string(), "the".to_string(), "United".to_string(), "Kingdom".to_string()]
-                        }
-                    ),
-                    rhs : Box::new(
-                        Query::BinaryQuery {
-                            op : BinaryOp::And,
-                            lhs: Box::new(
-                                Query::FreetextQuery { tokens : vec!["Boris".to_string()]}
-                            ),
-                            rhs: Box::new(
-                                Query::FreetextQuery { tokens : vec!["Johnson".to_string()]}
-                            ),
-                        }
-                    ),
-                }
-                
-            )
-        }
-    );
+    let expected = Box::new(Query::StructureQuery {
+        elem: StructureElem::Category,
+        sub: Box::new(Query::BinaryQuery {
+            op: BinaryOp::And,
+            lhs: Box::new(Query::FreetextQuery {
+                tokens: vec![
+                    "Prime".to_string(),
+                    "Ministers".to_string(),
+                    "of".to_string(),
+                    "the".to_string(),
+                    "United".to_string(),
+                    "Kingdom".to_string(),
+                ],
+            }),
+            rhs: Box::new(Query::BinaryQuery {
+                op: BinaryOp::And,
+                lhs: Box::new(Query::FreetextQuery {
+                    tokens: vec!["Boris".to_string()],
+                }),
+                rhs: Box::new(Query::FreetextQuery {
+                    tokens: vec!["Johnson".to_string()],
+                }),
+            }),
+        }),
+    });
     let (_, actual) = parse_query(query).unwrap();
     assert_eq!(expected, actual);
 }

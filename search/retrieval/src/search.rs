@@ -34,8 +34,8 @@ pub fn preprocess_query(query: &mut Query) -> Result<(), QueryError> {
         tokenisation_options: Default::default(),
         fold_case: true,
         remove_stop_words: false, //Set to false , to avoid edge cases like the*ter (theater, where "the" can be considered a stop word)
-        normalisation: preprocessor::Normalisation::None, //no stemming as that would lose structure of query? 
-        remove_url: false, 
+        normalisation: preprocessor::Normalisation::None, //no stemming as that would lose structure of query?
+        remove_url: false,
     };
 
     match *query {
@@ -227,12 +227,11 @@ pub fn execute_query<'a>(query: &'a Box<Query>, index: &'a Index) -> PostingIter
         }
         Query::StructureQuery { ref elem, ref sub } => {
             PostingIterator::new(execute_query(sub, index).filter(|c| {
-                let s : String = elem.clone().into();
+                let s: String = elem.clone().into();
                 match index.get_extent_for(&s, &c.document_id) {
-                    Some(PosRange {
-                        start_pos,
-                        end_pos_delta,
-                    }) => c.position >= *start_pos && c.position <= (*start_pos + *end_pos_delta),
+                    Some(PosRange { start_pos, end_pos }) => {
+                        c.position >= *start_pos && c.position < *end_pos
+                    }
                     None => false,
                 }
             }))
