@@ -284,6 +284,19 @@ fn test_simple_or_query() {
 }
 
 #[test]
+fn test_phrase_freetext_query () {
+    let query = "fresh,AND,\"goat\"";
+
+    let (_, actual) = parse_query(query).unwrap();
+    let lhs = Box::new(Query::FreetextQuery { tokens: (vec!["fresh".to_string()]) });
+    let rhs = Box::new(Query::PhraseQuery { tks: (vec!["goat".to_string()]) });
+
+    let expected = Box::new(Query::BinaryQuery { op: (BinaryOp::And), lhs: (lhs), rhs: (rhs) });
+
+    assert_eq!(expected, actual);
+}
+
+#[test]
 fn test_multitoken_or_query() {
     let query = "pumpkin pie OR pumpkin patch";
     let l = Box::new(Query::FreetextQuery {

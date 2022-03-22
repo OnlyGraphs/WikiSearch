@@ -131,9 +131,8 @@ pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
         terminated(parse_not_query, parse_separator_untill_eof),
         terminated(parse_binary_query, parse_separator_untill_eof),
         terminated(parse_wildcard_query, parse_separator_untill_eof),
-        terminated(parse_freetext_query, parse_separator_untill_eof),
         terminated(parse_phrase_query, parse_separator_untill_eof),
-
+        terminated(parse_freetext_query, parse_separator_untill_eof),
     ))(nxt)
 }
 
@@ -153,8 +152,8 @@ fn parse_query_sub(nxt: &str) -> IResult<&str, Box<Query>> {
         parse_not_query,
         parse_binary_query,
         parse_wildcard_query,
-        parse_freetext_query,
         parse_phrase_query,
+        parse_freetext_query,
     ))(nxt)
 }
 
@@ -212,7 +211,7 @@ pub fn parse_structure_query(nxt: &str) -> IResult<&str, Box<Query>> {
 
 pub fn parse_freetext_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
-    separated_list0(parse_whitespace, parse_token)(nxt)
+    separated_list0(parse_separator1, parse_token)(nxt)
         .map(|(nxt, res)| (nxt, Box::new(Query::FreetextQuery { tokens: res })))
 }
 
