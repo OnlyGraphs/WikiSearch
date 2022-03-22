@@ -3,7 +3,7 @@ use crate::ast::{BinaryOp, Query, StructureElem, UnaryOp};
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, tag_no_case, take_until, take_while, take_while1},
-    character::complete::{digit0, digit1},
+    character::complete::{digit0, digit1, anychar},
     character::{is_alphanumeric, is_space},
     combinator::{eof, not, peek},
     multi::{many1, separated_list0},
@@ -128,8 +128,8 @@ pub fn parse_query(nxt: &str) -> IResult<&str, Box<Query>> {
         terminated(parse_dist_query, parse_separator_untill_eof),
         terminated(parse_relation_query, parse_separator_untill_eof),
         terminated(parse_structure_query, parse_separator_untill_eof),
-        terminated(parse_binary_query, parse_separator_untill_eof),
         terminated(parse_not_query, parse_separator_untill_eof),
+        terminated(parse_binary_query, parse_separator_untill_eof),
         terminated(parse_wildcard_query, parse_separator_untill_eof),
         terminated(parse_freetext_query, parse_separator_untill_eof),
         terminated(parse_phrase_query, parse_separator_untill_eof),
@@ -150,8 +150,8 @@ fn parse_query_sub(nxt: &str) -> IResult<&str, Box<Query>> {
         parse_dist_query,
         parse_relation_query,
         parse_structure_query,
-        parse_binary_query,
         parse_not_query,
+        parse_binary_query,
         parse_wildcard_query,
         parse_freetext_query,
         parse_phrase_query,
@@ -258,7 +258,7 @@ pub fn parse_token0(nxt: &str) -> IResult<&str, String> {
 pub fn parse_not_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
     let (nxt, _) = tag_no_case("NOT")(nxt)?;
-    let (nxt, _) = parse_separator(nxt)?;
+    let (nxt, _) = parse_separator1(nxt)?;
     let (nxt, query) = parse_query_sub(nxt)?;
 
     return Ok((
@@ -273,9 +273,13 @@ pub fn parse_not_query(nxt: &str) -> IResult<&str, Box<Query>> {
 // TODO: Make OR not case sensitive
 pub fn parse_or_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
-    let (query2, query1) = take_until("OR")(nxt)?;
+    let (query2, query1) = alt((
+        take_until(" OR"),
+        take_until(",OR")
+    ))(nxt)?;
+    let (query2, _) = anychar(query2)?;
     let (query2, _) = tag("OR")(query2)?;
-    let (query2, _) = parse_separator(query2)?;
+    let (query2, _) = parse_separator1(query2)?;
 
     let (_nxt, q1) = parse_query_sub(query1)?;
     let (nxt, q2) = parse_query_sub(query2)?;
@@ -293,9 +297,14 @@ pub fn parse_or_query(nxt: &str) -> IResult<&str, Box<Query>> {
 // TODO: Make AND not case sensitive
 pub fn parse_and_query(nxt: &str) -> IResult<&str, Box<Query>> {
     let (nxt, _) = parse_separator(nxt)?;
-    let (query2, query1) = take_until("AND")(nxt)?;
+    let (query2, query1) = alt((
+        take_until(" AND"),
+        take_until(",AND")
+    ))(nxt)?;
+
+    let (query2, _) = anychar(query2)?;
     let (query2, _) = tag("AND")(query2)?;
-    let (query2, _) = parse_separator(query2)?;
+    let (query2, _) = parse_separator1(query2)?;
     let (_nxt, q1) = parse_query_sub(query1)?;
     let (nxt, q2) = parse_query_sub(query2)?;
 

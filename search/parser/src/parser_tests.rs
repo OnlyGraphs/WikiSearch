@@ -24,6 +24,118 @@ fn test_is_not_tab() {
     assert!(is_tab(',') == false)
 }
 
+
+
+#[macro_export]
+macro_rules! test_parse_and_print {
+    ($name:ident, $target:expr ) => {
+        #[test]
+        fn $name() {
+            let intermediate = format!("{}",$target);
+            assert_eq!(parse_query(&intermediate).unwrap().1,$target, "Query (right) did not parse back into its original representation (left), print was: {}",&intermediate);
+        }
+    };
+}
+
+
+
+// print and parse back tests
+
+test_parse_and_print!(test_parse_print_freetext, Box::new(Query::FreetextQuery { tokens: vec!["world".to_string(),"dog".to_string()] }));
+test_parse_and_print!(test_parse_print_freetext_2, Box::new(Query::FreetextQuery { tokens: vec!["world".to_string()] }));
+test_parse_and_print!(test_parse_print_phrase, Box::new(Query::PhraseQuery { tks: vec!["world".to_string(),"dog".to_string()] }));
+test_parse_and_print!(test_parse_print_phrase_2, Box::new(Query::PhraseQuery { tks: vec!["world".to_string()] }));
+test_parse_and_print!(test_parse_print_dist, Box::new(Query::DistanceQuery { dst: 3, lhs: "world".to_string(), rhs: "dog".to_string() }));
+test_parse_and_print!(test_parse_print_structure, Box::new(Query::StructureQuery { 
+    elem: StructureElem::Title, 
+    sub:  Box::new(Query::FreetextQuery { tokens: vec!["world".to_string(),"dog".to_string()] })
+}));
+
+test_parse_and_print!(test_parse_print_structure_2, Box::new(Query::StructureQuery { 
+    elem: StructureElem::Category, 
+    sub:  Box::new(Query::FreetextQuery { tokens: vec!["world".to_string(),"dog".to_string()] })
+}));
+
+test_parse_and_print!(test_parse_print_structure_3, Box::new(Query::StructureQuery { 
+    elem: StructureElem::Title, 
+    sub:  Box::new(Query::FreetextQuery { tokens: vec!["world".to_string(),"dog".to_string()] })
+}));
+
+test_parse_and_print!(test_parse_print_structure_4, Box::new(Query::StructureQuery { 
+    elem: StructureElem::Infobox("lmao".to_string()), 
+    sub:  Box::new(Query::FreetextQuery { tokens: vec!["world".to_string(),"dog".to_string()] })
+}));
+
+test_parse_and_print!(test_parse_print_structure_5, Box::new(Query::StructureQuery { 
+    elem: StructureElem::Infobox("dista".to_string()), 
+    sub:  Box::new(Query::FreetextQuery { tokens: vec!["world".to_string(),"dog".to_string()] })
+}));
+
+test_parse_and_print!(test_parse_print_wildcard, Box::new(Query::WildcardQuery { 
+    prefix: "".to_string(), 
+    suffix: "w".to_string(), 
+} ));
+
+test_parse_and_print!(test_parse_print_wildcard_2, Box::new(Query::WildcardQuery { 
+    prefix: "w".to_string(), 
+    suffix: "".to_string(), 
+} ));
+
+test_parse_and_print!(test_parse_print_wildcard_3, Box::new(Query::WildcardQuery { 
+    prefix: "h".to_string(), 
+    suffix: "w".to_string(), 
+} ));
+
+test_parse_and_print!(test_parse_print_relational, Box::new(Query::RelationQuery { 
+    root: 5, 
+    hops: 2, 
+    sub: Some(Box::new(Query::FreetextQuery { tokens: vec!["hello".to_string(),"dog".to_string()] })) 
+} ));
+
+test_parse_and_print!(test_parse_print_relational_2, Box::new(Query::RelationQuery { 
+    root: 5, 
+    hops: 2, 
+    sub: None 
+} ));
+
+test_parse_and_print!(test_parse_print_not, Box::new(Query::UnaryQuery { 
+    op: UnaryOp::Not, 
+    sub: Box::new(Query::FreetextQuery { tokens: vec!["hello".to_string(),"dog".to_string()] }) 
+} ));
+
+test_parse_and_print!(test_parse_print_and, Box::new(Query::BinaryQuery { 
+    op: BinaryOp::And,
+    lhs: Box::new(Query::FreetextQuery { tokens: vec!["dog".to_string(),"world".to_string()] }),
+    rhs: Box::new(Query::FreetextQuery { tokens: vec!["fish".to_string(),"hello".to_string()] }),
+ }));
+
+ test_parse_and_print!(test_parse_print_or, Box::new(Query::BinaryQuery { 
+    op: BinaryOp::Or,
+    lhs: Box::new(Query::FreetextQuery { tokens: vec!["dog".to_string(),"world".to_string()] }),
+    rhs: Box::new(Query::FreetextQuery { tokens: vec!["fish".to_string(),"hello".to_string()] }),
+ }));
+
+ test_parse_and_print!(test_parse_print_complex_1, Box::new(Query::BinaryQuery { 
+    op: BinaryOp::And,
+    lhs: Box::new(Query::BinaryQuery { 
+        op: BinaryOp::Or, 
+        lhs: Box::new(Query::FreetextQuery { tokens: vec!["pORg".to_string(),"hello".to_string()] }), 
+        rhs: Box::new(Query::FreetextQuery { tokens: vec!["fish".to_string(),"pORg".to_string()] }) 
+    }),
+    rhs: Box::new(Query::FreetextQuery { tokens: vec!["fish".to_string(),"hello".to_string()] }),
+ }));
+
+
+ test_parse_and_print!(test_parse_print_complex_2, Box::new(Query::BinaryQuery { 
+    op: BinaryOp::And,
+    lhs: Box::new(Query::BinaryQuery { 
+        op: BinaryOp::Or, 
+        lhs: Box::new(Query::FreetextQuery { tokens: vec!["fish".to_string(),"hello".to_string()] }), 
+        rhs: Box::new(Query::FreetextQuery { tokens: vec!["fish".to_string(),"pORg".to_string()] }) 
+    }),
+    rhs:Box::new(Query::StructureQuery{ elem: StructureElem::Category, sub: Box::new(Query::FreetextQuery{tokens: vec!["FishORernios".to_string()]}) }),
+ }));
+
 // AST Parser Tests
 #[test]
 fn test_freehand_query() {
