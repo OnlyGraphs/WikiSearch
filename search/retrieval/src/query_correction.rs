@@ -8,11 +8,11 @@ use parser::ast::Query;
 // for search - query correction (spell correction).
 // functionality for normal search for some query types
 pub const TOTAL_POSTING_CORRECTION_THRESHOLD: u32 = 10000; //NOT USED AT THE MOMENT-  If the results are below this threshold, we execute spell checking
-pub const TOKEN_CORRECTION_THRESHOLD: u32 = 1; //For each token, see if we perform spell checking
+pub const TOKEN_CORRECTION_THRESHOLD: u32 = 50; //For each token, see if we perform spell checking
 pub const CORRECTION_TRIES: u8 = 3; // Number of tries to attempt spell checking. for each failed try, the distance to key argument is increased
 pub const CORRECTION_KEY_DISTANCE: u8 = 1; //Starting distance of current token that is being spell checked to closest words/neighbours in the tree. In orher words, how far do we look in the tree by the difference of characters
 pub const CORRECTION_KEY_DISTANCE_ADD_PER_TRY: u8 = 1; //Increase in distance key per try iteration
-pub const SUGGEST_MOST_APPEARANCES: bool = false; // whether to display all kinds of results or only those that pass the TOKEN_CORRECTION_THRESHOLD
+pub const SUGGEST_MOST_APPEARANCES: bool = true; // whether to display all kinds of results or only those that pass the TOKEN_CORRECTION_THRESHOLD
 
 ///main function to be called to spell check query
 /// TODO: Refactor
