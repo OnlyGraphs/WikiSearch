@@ -37,6 +37,17 @@ macro_rules! test_parse_and_print {
     };
 }
 
+#[macro_export]
+macro_rules! test_parse_to {
+    ($name:ident,$string:expr, $target:expr ) => {
+        #[test]
+        fn $name() {
+            assert_eq!(parse_query($string).unwrap().1,$target, "Query (right) was not parsed correctly from string (left), string was: {}",$string);
+        }
+    };
+}
+
+
 
 
 // print and parse back tests
@@ -135,6 +146,119 @@ test_parse_and_print!(test_parse_print_and, Box::new(Query::BinaryQuery {
     }),
     rhs:Box::new(Query::StructureQuery{ elem: StructureElem::Category, sub: Box::new(Query::FreetextQuery{tokens: vec!["FishORernios".to_string()]}) }),
  }));
+
+
+ test_parse_to!(test_parse_complex_1, "#CATEGORY BOR AND #CATEGORY TOR",
+    Box::new(Query::StructureQuery { 
+        elem: StructureElem::Category, 
+        sub: Box::new(Query::BinaryQuery { 
+            op: BinaryOp::And, 
+            lhs: Box::new(Query::FreetextQuery { tokens: vec!["BOR".to_string()] }), 
+            rhs: Box::new(Query::StructureQuery { elem: StructureElem::Category, sub: Box::new(Query::FreetextQuery { tokens: vec!["TOR".to_string()] }) }), 
+        }),
+    })
+);
+
+
+test_parse_to!(test_parse_complex_2, "#DIST 3 BOR AND",
+Box::new(Query::DistanceQuery { 
+    dst: 3,
+    lhs: "BOR".to_string(),
+    rhs: "AND".to_string(),
+}));
+
+
+test_parse_to!(test_parse_complex_3, "#LINKSTO 1337 3 #DIST 3 BOR AND",
+Box::new(Query::RelationQuery{ 
+    root: 1337, 
+    hops: 3, 
+    sub: Some(Box::new(Query::DistanceQuery { dst: 3, lhs: "BOR".to_string(), rhs: "AND".to_string() })) 
+}));
+
+test_parse_to!(test_parse_complex_4, "#LINKSTO 1337 3 #CATEGORY #DIST 3 BOR AND",
+Box::new(Query::RelationQuery{ 
+    root: 1337, 
+    hops: 3, 
+    sub: Some(
+        Box::new(Query::StructureQuery { 
+            elem: StructureElem::Category, 
+            sub: Box::new(Query::DistanceQuery { dst: 3, lhs: "BOR".to_string(), rhs: "AND".to_string() })
+        })
+    ) 
+}));
+
+test_parse_to!(test_parse_complex_5, "#LINKSTO 1337 3 NOT #CATEGORY  #DIST 3 BOR AND",
+Box::new(Query::RelationQuery{ 
+    root: 1337, 
+    hops: 3, 
+    sub: Some(
+        Box::new(Query::UnaryQuery { 
+            op: UnaryOp::Not, 
+            sub:  
+            Box::new(Query::StructureQuery { 
+                elem: StructureElem::Category, 
+                sub: Box::new(Query::DistanceQuery { dst: 3, lhs: "BOR".to_string(), rhs: "AND".to_string() })
+            })
+        })
+       
+    ) 
+}));
+
+test_parse_to!(test_parse_complex_6, "#LINKSTO 1337 3 #CATEGORY NOT #DIST 3 BOR AND",
+Box::new(Query::RelationQuery{ 
+    root: 1337, 
+    hops: 3, 
+    sub: Some(
+        Box::new(Query::StructureQuery { 
+            elem: StructureElem::Category, 
+            sub: 
+            Box::new(Query::UnaryQuery { 
+                op: UnaryOp::Not, 
+                sub: Box::new(Query::DistanceQuery { dst: 3, lhs: "BOR".to_string(), rhs: "AND".to_string() })
+            }) 
+        })
+    ) 
+}));
+
+test_parse_to!(test_parse_complex_7, "#LINKSTO 1337 3 #CATEGORY NOT \"april may\" AND #DIST 3 BOR AND",
+Box::new(Query::RelationQuery{ 
+    root: 1337, 
+    hops: 3, 
+    sub: Some(
+        Box::new(Query::StructureQuery { 
+            elem: StructureElem::Category, 
+            sub: 
+            Box::new(Query::UnaryQuery { 
+                op: UnaryOp::Not, 
+                sub: Box::new(Query::BinaryQuery { 
+                    op: BinaryOp::And, 
+                    lhs: Box::new(Query::PhraseQuery { tks: vec!["april".to_string(),"may".to_string()] }), 
+                    rhs: Box::new(Query::DistanceQuery { dst: 3, lhs: "BOR".to_string(), rhs: "AND".to_string() })
+                })
+            }) 
+        })
+    ) 
+}));
+
+test_parse_to!(test_parse_complex_8, "#distobox #LINKSTO 1337 3 NOT april*may AND #DIST 3 BOR AND",
+Box::new(Query::StructureQuery{ 
+    elem: StructureElem::Infobox("distobox".to_string()),
+    sub: 
+        Box::new(Query::RelationQuery { 
+            root: 1337, 
+            hops: 3, 
+            sub: 
+            Some(Box::new(Query::UnaryQuery { 
+                op: UnaryOp::Not, 
+                sub: Box::new(Query::BinaryQuery { 
+                    op: BinaryOp::And, 
+                    lhs: Box::new(Query::WildcardQuery { prefix: "april".to_string(), suffix: "may".to_string() }), 
+                    rhs: Box::new(Query::DistanceQuery { dst: 3, lhs: "BOR".to_string(), rhs: "AND".to_string() })
+                })
+            }))
+        })
+    
+}));
 
 // AST Parser Tests
 #[test]
@@ -267,21 +391,15 @@ fn test_simple_not_query() {
     }
 }
 
-#[test]
-fn test_simple_or_query() {
-    let query = "pumpkin OR pie";
-    let l = Box::new(Query::FreetextQuery {
-        tokens: vec!["pumpkin".to_string()],
-    });
-    let r = Box::new(Query::FreetextQuery {
-        tokens: vec!["pie".to_string()],
-    });
-    let (_s, binary_node) = parse_query(query).unwrap();
-    match *binary_node {
-        Query::BinaryQuery { op, lhs, rhs } => assert!(op == BinaryOp::Or && lhs == l && rhs == r),
-        _ => assert!(false),
-    }
-}
+
+
+test_parse_to!(test_simple_or_query,
+    "pumpkin OR pie",
+    Box::new(Query::BinaryQuery { 
+        op: BinaryOp::Or, 
+        lhs: Box::new(Query::FreetextQuery { tokens: vec!["pumpkin".to_string()] }), 
+        rhs: Box::new(Query::FreetextQuery { tokens: vec!["pie".to_string()] }) 
+}));
 
 #[test]
 fn test_phrase_freetext_query () {
