@@ -1,8 +1,10 @@
-# Requirements
+# WikiSearch
+
+## Requirements
 - docker
 - sqlx-cli (cargo install sqlx-cli)
 
-# Starting search API server in docker container
+## Starting search API server in docker container
 - in the `infrastructure` repository run `make up COMPOSE_FILE:=docker-compose-db-only.yml` -> `make migrate` -> `make add-test-data` to populate the test database 
 - run `make update-schema` 
     - Install sqlx-cli (`cargo install sqlx-cli`) if it is not installed already
@@ -17,7 +19,7 @@
     - `-a` options bind the console output and input to your shell for debugging
 - The API server should now be available under `localhost:8000`
 
-# Compiling and running locally without docker
+## Compiling and running locally without docker
 - Install rust 1.58.1: https://www.rust-lang.org/learn/get-started
     - running `cargo build` should automatically install this version
 - Install docker: https://docs.docker.com/
@@ -25,14 +27,14 @@
 
 - `./target/release/search`
 
-# Running tests
+## Running tests
 - Tests are found in `src/tests`
 - To run simply use: `make test`
 
-# Accessing & building documentation
+## Accessing & building documentation
 - `make docs` (opens in browser)
 
-# Environment Variables
+## Environment Variables
 - `SEARCH_PORT`: sets the port at which search API listens (default 8000)
 - `SEARCH_IP`: setst the ip address to which the search API binds (default 127.0.0.1) 
 - `SQLX_OFFLINE` : if true reads sqlx-data.json at compile time to verify queries
