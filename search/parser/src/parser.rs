@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::ast::{BinaryOp, Query, StructureElem, UnaryOp};
 
 use nom::{
@@ -27,26 +29,22 @@ pub fn parse_whitespace0(nxt: &str) -> IResult<&str, &str> {
     take_while(is_whitespace)(nxt)
 }
 
-pub fn parse_comma(nxt: &str) -> IResult<&str, &str> {
-    take_while1(is_comma)(nxt)
-}
-
 pub fn is_whitespace(nxt: char) -> bool {
     return is_space(nxt as u8);
 }
 
-#[inline(always)]
-pub fn is_comma(nxt: char) -> bool {
-    return nxt == ',';
-}
 
-#[inline(always)]
-pub fn is_tab(nxt: char) -> bool {
-    return nxt == '\t';
-}
+lazy_static!(
+    static ref SEPS : HashSet<char> = HashSet::from_iter(
+        vec!['?',',','\t','.','-','(',')','&','^','!','$','¥','€','¢','}','{','>',
+        '<','@','+','÷','×','~','[',']','\\',':',';','=','_','`','|','•','√',
+        'π','¶','∆','°','✓','™','®','©','%']
+        .into_iter());
+);
 
 pub fn is_seperator(nxt: char) -> bool {
-    return is_whitespace(nxt) | is_comma(nxt) | is_tab(nxt) | (nxt == '.');
+    return is_space(nxt as u8) | SEPS.contains(&nxt)
+    
 }
 
 // Parses any amount of whitespace, tab and comma separators

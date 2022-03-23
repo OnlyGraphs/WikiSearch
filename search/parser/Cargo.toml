@@ -12,3 +12,4 @@ path = "src/lib.rs"
 [dependencies]
 nom = "6.1.2"
 strum_macros = "0.23"
+lazy_static = "1.4.0"

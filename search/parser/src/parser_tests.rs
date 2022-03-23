@@ -1,30 +1,9 @@
 use crate::{
     ast::{BinaryOp, Query, StructureElem, UnaryOp},
-    parser::{is_comma, is_tab, parse_query},
+    parser::parse_query,
 };
 
 // AST Helper Functions
-#[test]
-fn test_is_comma() {
-    assert!(is_comma(','));
-}
-
-#[test]
-fn test_is_not_comma() {
-    assert!(is_comma('h') == false);
-}
-
-#[test]
-fn test_is_tab() {
-    assert!(is_tab('\t'))
-}
-
-#[test]
-fn test_is_not_tab() {
-    assert!(is_tab(',') == false)
-}
-
-
 
 #[macro_export]
 macro_rules! test_parse_and_print {
