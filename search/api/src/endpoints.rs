@@ -12,7 +12,7 @@ use actix_web::{
     web::{Data, Json, Query},
     HttpResponse, Responder, Result,
 };
-use futures::stream::FuturesUnordered;
+use futures::stream::{FuturesUnordered, FuturesOrdered};
 use futures::StreamExt;
 
 use index::index_structs::Posting;
@@ -23,7 +23,7 @@ use retrieval::search::{execute_query, preprocess_query, score_query, ScoredDocu
 use retrieval::{execute_relational_query, ScoredRelationDocument};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Row;
-use std::cmp::{min, Ordering};
+use std::cmp::{min, Ordering, max};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt::{self, Display};
@@ -65,6 +65,7 @@ impl APIError {
             .body(self.to_string())
     }
 
+
     pub fn new_user_error<T: Display, O: Display>(user_msg: &T, hidden_msg: &O) -> Self {
         APIError {
             code: StatusCode::UNPROCESSABLE_ENTITY,
@@ -82,15 +83,8 @@ impl APIError {
     }
 }
 
-impl std::error::Error for APIError {}
 
-//TODO!:
-//1) if index doesnt find id, return error to check implementation of index builder or retrieval.
-//2) Check other parsing errors, throw them back to frontend
-//3) adjust document scores based on tfidf parameter
-// 4) Maybe caching user results could be good, but that is extra if we have time.
-// 5) Optimise code (Less memory, instead of initialising another docs vector, use the one returned by score_query)
-// 6) Make sure to return first page only if second page is not satisfied
+impl std::error::Error for APIError {}
 
 // Endpoint for performing general wiki queries
 #[get("/api/v1/search")]
@@ -101,17 +95,28 @@ pub async fn search(
     let timer_whole = Instant::now();
 
     info!("received query: {}", q.query);
+    if q.query.len() > 255 {
+        let msg = "Query is too long, please shorten it before trying again.".to_string(); 
+        return Err(APIError::new_user_error(
+            &msg,&msg
+        ))
+    }
 
     // construct + execute query
     let idx = data
         .index_rest
         .read()
         .map_err(|e| APIError::new_internal_error(&e))?;
-    let (_, ref mut query) = parse_query(&q.query).map_err(|e| APIError::new_user_error(&e, &e))?;
+    let (_, ref mut query) = parse_query(&q.query)
+        .map_err(|e| APIError::new_user_error(&format!("Your query: {} is not valid, please form a valid query.",q.query),&e))?;
+    
+
 
     let mut timer = Instant::now();
     preprocess_query(query)
-        .map_err(|e| APIError::new_user_error(&e, &e))?;
+        .map_err(|e| APIError::new_user_error(
+            &format!("Your query: {} is not valid, please form a valid query.",q.query),
+            &e))?;
     info!(
         "preprocessed query: {:?}, {}s",
         query,
@@ -135,10 +140,11 @@ pub async fn search(
     let ordered_docs: Vec<ScoredDocument> = match q.sort_by {
         SortType::Relevance => {
             let mut scored_documents = score_query(query, &idx, &mut postings);
+            info!("{:?}",&scored_documents);
             scored_documents.sort_unstable_by(|doc1, doc2| {
                 doc2.score
                     .partial_cmp(&doc1.score)
-                    .unwrap_or(Ordering::Equal)
+                    .unwrap_or(Ordering::Less)
             });
             scored_documents
                 .into_iter() // consumes scored_documents
@@ -192,7 +198,7 @@ pub async fn search(
                 })
             }
         })
-        .collect::<FuturesUnordered<_>>()
+        .collect::<FuturesOrdered<_>>()
         .collect::<Vec<Result<Document, APIError>>>()
         .await
         .into_iter()
@@ -220,6 +226,13 @@ pub async fn relational(
     q: Query<RelationalSearchParameters>,
 ) -> Result<impl Responder, APIError> {
     let timer = Instant::now();
+
+    if q.query.as_ref().unwrap_or(&"".to_string()).len() > 255 {
+        let msg = "Query is too long, please shorten it before trying again.".to_string(); 
+        return Err(APIError::new_user_error(
+            &msg,&msg
+        ))
+    }
 
     // construct + execute query
     let root_article = sqlx::query(
@@ -252,7 +265,7 @@ pub async fn relational(
     let query_string = format!(
         "#LINKSTO, {},{} {}",
         root_id,
-        q.hops,
+        max(q.hops,5), // max out hops
         q.query
             .clone()
             .map(|v| format!(",{}", v))

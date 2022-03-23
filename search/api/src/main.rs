@@ -55,13 +55,9 @@ async fn main() -> std::io::Result<()> {
 
     let pool = PgPoolOptions::new()
         .max_connections(max_clients.parse::<u32>().unwrap_or(150))
-        // .connect_lazy(&connection_string)
         .connect(&connection_string)
         .await
         .unwrap();
-        // .map_err(|_e| {
-        //     APIError::new_internal_error("Failed to initialise connection with postgres")
-        // })?;
 
     info!("Reading Directories at STATIC_DIR:");
     read_dir(Path::new(&static_serve_dir)).unwrap().map(|v| v.unwrap().path())

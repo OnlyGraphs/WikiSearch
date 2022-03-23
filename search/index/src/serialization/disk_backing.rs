@@ -377,6 +377,7 @@ where
 
     /// picks a victim to evict according to eviction policy and unloads it
     fn evict_victim(&self) -> Option<&Arc<Mutex<Entry<V, ID>>>> {
+
         let victim = RECORD_PRIORITIES
             .lock()
             .get_mut(ID)
@@ -436,6 +437,7 @@ where
         } else {
             loop {
                 if records > self.capacity {
+                    info!("Cache full at {} records", records);
                     let victim = self.evict_victim();
                     if victim.is_none() {
                         break;
@@ -589,7 +591,7 @@ where
     V: Serializable + Debug,
 {
     fn default() -> Self {
-        Self::new(0, 0, false)
+        Self::new(1000, 1000, false)
     }
 }
 

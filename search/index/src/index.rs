@@ -24,7 +24,6 @@ use crate::compute_page_ranks;
 use crate::PreIndex;
 use parking_lot::Mutex;
 
-#[derive(Default)]
 pub struct Index {
     pub dump_id: u32,
     pub posting_nodes: DiskHashMap<EncodedPostingNode<VbyteEncoder<Posting, true>>, 0>, // index map because we want to keep this sorted
@@ -33,6 +32,13 @@ pub struct Index {
     pub extent: HashMap<String, HashMap<u32, PosRange>>,
     pub last_updated_docs: HashMap<u32, LastUpdatedDate>,
     pub page_rank: HashMap<u32, f64>,
+    enabled: bool,
+}
+
+impl Default for Index {
+    fn default() -> Self {
+        Self { dump_id: Default::default(), posting_nodes: Default::default(), links: Default::default(), incoming_links: Default::default(), extent: Default::default(), last_updated_docs: Default::default(), page_rank: Default::default(), enabled: false }
+    }
 }
 
 impl MemFootprintCalculator for Index {
@@ -111,6 +117,10 @@ impl Index {
     }
 
     pub fn df(&self, token: &str) -> u32 {
+        if !self.enabled{
+            return 0;
+        }
+
         match self.posting_nodes.entry(token) {
             Some(v) => v.deref().lock().get().unwrap().df,
             None => return 0,
@@ -118,6 +128,10 @@ impl Index {
     }
 
     pub fn tf(&self, token: &str, docid: u32) -> u32 {
+        if !self.enabled{
+            return 0;
+        }
+
         match self.posting_nodes.entry(token) {
             Some(v) => v
                 .deref()
@@ -140,6 +154,10 @@ impl Index {
         &self,
         token: &str,
     ) -> Option<Arc<Mutex<Entry<EncodedPostingNode<VbyteEncoder<Posting, true>>, 0>>>> {
+        if !self.enabled{
+            return None;
+        }
+        
         self.posting_nodes.entry(token)
     }
 
@@ -173,6 +191,7 @@ impl Index {
             extent: HashMap::with_capacity(256),
             last_updated_docs: HashMap::with_capacity(articles as usize),
             page_rank: HashMap::with_capacity(articles as usize),
+            enabled: true,
         }
     }
 
@@ -191,6 +210,7 @@ impl Index {
             links: p.links,
             extent: p.extent,
             last_updated_docs: p.last_updated_docs,
+            enabled: true,
         };
 
         index.posting_nodes.set_runtime_mode();
