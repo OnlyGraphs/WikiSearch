@@ -260,6 +260,84 @@ Box::new(Query::StructureQuery{
     
 }));
 
+test_parse_to!(test_parse_complex_9, "a,AND,\"b\",AND,NOT,c,AND,d,AND,#CATEGORY,g,AND,#h i,AND,#DIST,1,e,f",
+Box::new(Query::BinaryQuery { 
+    op: BinaryOp::And,
+    lhs: Box::new(Query::FreetextQuery { tokens: vec!["a".to_string()] }), 
+    rhs: Box::new(Query::BinaryQuery { 
+        op: BinaryOp::And, 
+        lhs: Box::new(Query::PhraseQuery { tks: vec!["b".to_string()] }), 
+        rhs: Box::new(Query::UnaryQuery { 
+            op: UnaryOp::Not, 
+            sub: Box::new(Query::BinaryQuery { 
+                op: BinaryOp::And, 
+                lhs: Box::new(Query::FreetextQuery { tokens: vec!["c".to_string()] }), 
+                rhs: Box::new(Query::BinaryQuery { 
+                    op: BinaryOp::And, 
+                    lhs: Box::new(Query::FreetextQuery { tokens: vec!["d".to_string()] }), 
+                    rhs: Box::new(Query::StructureQuery { 
+                        elem: StructureElem::Category, 
+                        sub: Box::new(Query::BinaryQuery { 
+                            op: BinaryOp::And, 
+                            lhs: Box::new(Query::FreetextQuery { tokens: vec!["g".to_string()] }), 
+                            rhs: Box::new(Query::StructureQuery { 
+                                elem: StructureElem::Infobox("h".to_string()), 
+                                sub: Box::new(Query::BinaryQuery { 
+                                    op: BinaryOp::And, 
+                                    lhs: Box::new(Query::FreetextQuery { tokens: vec!["i".to_string()] }), 
+                                    rhs: Box::new(Query::DistanceQuery { 
+                                        dst: 1, 
+                                        lhs: "e".to_string(), 
+                                        rhs: "f".to_string()
+                                    })
+                                }) 
+                            })
+                        }) 
+                    }) 
+                })
+            }) 
+        }), 
+    }),
+    })
+
+);
+
+test_parse_to!(test_parse_complex_10, "a,AND,\"b\",AND,d,AND,#CATEGORY,g,AND,#h i,AND,#DIST,1,e,f, AND NOT c",
+Box::new(Query::BinaryQuery { 
+    op: BinaryOp::And,
+    lhs: Box::new(Query::BinaryQuery{
+        op: BinaryOp::And,
+        lhs: Box::new(Query::FreetextQuery { tokens: vec!["a".to_string()] }), 
+        rhs: Box::new(Query::BinaryQuery { 
+            op: BinaryOp::And, 
+            lhs: Box::new(Query::PhraseQuery { tks: vec!["b".to_string()] }), 
+            rhs:Box::new(Query::BinaryQuery { 
+                    op: BinaryOp::And, 
+                    lhs: Box::new(Query::FreetextQuery { tokens: vec!["d".to_string()] }), 
+                    rhs: Box::new(Query::StructureQuery{ 
+                        elem: StructureElem::Category, 
+                        sub: Box::new(Query::BinaryQuery { 
+                            op: BinaryOp::And, 
+                            lhs: Box::new(Query::FreetextQuery { tokens: vec!["g".to_string()] }), 
+                            rhs: Box::new(Query::StructureQuery { 
+                                elem: StructureElem::Infobox("h".to_string()), 
+                                sub: Box::new(Query::BinaryQuery { 
+                                    op: BinaryOp::And, 
+                                    lhs: Box::new(Query::FreetextQuery { tokens: vec!["i".to_string()] }), 
+                                    rhs: Box::new(Query::DistanceQuery { dst: 1, lhs: "e".to_string(), rhs: "f".to_string() }) 
+                                }) 
+                            })
+                        }) 
+                    })
+                })
+        })
+    }),
+    rhs: Box::new(Query::UnaryQuery { 
+        op: UnaryOp::Not, 
+        sub: Box::new(Query::FreetextQuery { tokens: vec!["c".to_string()] })
+    })  
+}));
+
 // AST Parser Tests
 #[test]
 fn test_freehand_query() {
