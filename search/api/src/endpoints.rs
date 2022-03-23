@@ -140,7 +140,6 @@ pub async fn search(
     let ordered_docs: Vec<ScoredDocument> = match q.sort_by {
         SortType::Relevance => {
             let mut scored_documents = score_query(query, &idx, &mut postings);
-            info!("{:?}",&scored_documents);
             scored_documents.sort_unstable_by(|doc1, doc2| {
                 doc2.score
                     .partial_cmp(&doc1.score)
@@ -324,7 +323,7 @@ pub async fn relational(
                 })
             }
         })
-        .collect::<FuturesUnordered<_>>()
+        .collect::<FuturesOrdered<_>>()
         .collect::<Vec<Result<RelationDocument, APIError>>>()
         .await
         .into_iter()
